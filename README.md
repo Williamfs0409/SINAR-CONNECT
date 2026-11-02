@@ -31,4 +31,3 @@ Jalankan `npm run dev` di terminal terpisah selama pengembangan frontend.
 - Laravel 12
 - PHP ^8.2
 - Vite
-
