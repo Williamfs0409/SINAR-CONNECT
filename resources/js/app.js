@@ -11,11 +11,8 @@ passwordToggle?.addEventListener('click', () => {
     const isPassword = passwordInput.type === 'password';
     passwordInput.type = isPassword ? 'text' : 'password';
     passwordToggle.setAttribute('aria-label', isPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
-});
-
-document.querySelector('#login-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    document.querySelector('#login-feedback').textContent = 'Tampilan demo: autentikasi akun belum diaktifkan.';
+    passwordToggle.classList.toggle('is-visible', isPassword);
+    passwordToggle.setAttribute('aria-pressed', String(isPassword));
 });
 
 document.querySelector('#google-login')?.addEventListener('click', () => {

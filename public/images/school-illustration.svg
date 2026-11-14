@@ -17,6 +17,7 @@
   <path d="m172 48 4-9 4 9 9 4-9 4-4 9-4-9-9-4 9-4Z" fill="#F4C34E"/>
 
   <!-- School -->
+  <g transform="translate(55 0)">
   <path d="M297 159V117l57-42 60 42v42" fill="#FDF3D7"/>
   <path d="m286 119 68-51 70 51-9 12-61-44-59 44-9-12Z" fill="url(#roof)"/>
   <path d="M332 88V55h34v31" fill="#F9D9C7"/>
@@ -30,6 +31,7 @@
   <path d="M292 159h128v12H292z" fill="#E9C68E"/>
   <path d="M306 117h8v-9c0-2-2-4-4-4s-4 2-4 4v9ZM393 117h8v-9c0-2-2-4-4-4s-4 2-4 4v9Z" fill="#F6C557"/>
   <path d="M283 164h145" stroke="#CF9A73" stroke-width="4" stroke-linecap="round"/>
+  </g>
 
   <!-- Trees -->
   <path d="M450 157v73" stroke="#986A4B" stroke-width="9" stroke-linecap="round"/>
@@ -43,6 +45,7 @@
   <path d="M462 225c12-12 25-12 37-4-12 11-23 13-37 4Zm-25-2c-11-13-23-14-36-7 10 12 21 15 36 7Z" fill="#66B978"/>
 
   <!-- Child on the left -->
+  <g transform="translate(80 0)">
   <path d="M84 300c-20 19-22 37-6 46 13 7 36 5 59-6 11-5 16-13 9-21-11-13-42-29-62-19Z" fill="#4E8ED4"/>
   <path d="M82 337c-10 8-13 15-8 21 6 7 21 6 34-3l15-11-15-16-26 9Z" fill="#F5B65E"/>
   <path d="M72 351c-8 3-12 8-10 12 3 5 12 5 20 1l12-7-9-10-13 4Z" fill="#F27E67"/>
@@ -96,6 +99,7 @@
   <ellipse cx="171" cy="244" rx="7" ry="4" fill="#F18F7D" opacity=".48"/>
   <path d="M222 292c-12 11-25 17-42 17" stroke="#F8D27F" stroke-width="4" stroke-linecap="round"/>
   <path d="M222 300c7 9 12 18 14 29" stroke="#F8D27F" stroke-width="6" stroke-linecap="round"/>
+  </g>
 
   <path d="M38 358c54 13 98 13 140 1m137 0c56 14 103 13 164-2" stroke="#CBE8D3" stroke-width="4" stroke-linecap="round"/>
   <path d="M101 115c8-10 17-12 28-7m304 73c9-10 20-10 28-1" stroke="#72BDE4" stroke-width="3" stroke-linecap="round"/>
