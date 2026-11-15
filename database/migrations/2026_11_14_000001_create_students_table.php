@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('siswa')) {
+            return;
+        }
+
         Schema::create('students', function (Blueprint $table) {
             $table->id();
             $table->string('registration_number')->unique();
@@ -22,6 +26,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasTable('siswa')) {
+            return;
+        }
+
         Schema::dropIfExists('students');
     }
 };

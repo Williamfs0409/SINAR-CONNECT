@@ -15,11 +15,12 @@
                             auth()->guest() ? ['role' => $dashboardRoleKey] : []
                         ));
                 @endphp
-                <a class="role-nav-link {{ $dashboardSection === $item['id'] ? 'is-active' : '' }}" href="{{ $dashboardLink }}">
-                    <span aria-hidden="true">{{ $item['icon'] }}</span>{{ $item['label'] }}
+                <a class="role-nav-link {{ $dashboardSection === $item['id'] ? 'is-active' : '' }}" data-dashboard-searchable href="{{ $dashboardLink }}">
+                    {{ $item['label'] }}
                 </a>
             @endforeach
         </nav>
+        <p class="database-navigation-empty" data-dashboard-search-empty aria-live="polite">Menu tidak ditemukan.</p>
         <div id="pengaturan" class="role-sidebar-bottom">
             @auth
                 <form method="POST" action="{{ route('logout') }}">
@@ -34,12 +35,107 @@
     <main class="role-main">
         <header class="role-topbar">
             <button class="sidebar-toggle" type="button" aria-label="Buka menu">☰</button>
-            <div class="role-welcome">
-                <strong>Halo, {{ $dashboardDisplayName }} ({{ $dashboardRoleName }})</strong>
-                <small><time data-live-date>{{ now()->locale('id')->translatedFormat('l, d F Y') }}</time> · <time data-live-clock>{{ now()->timezone('Asia/Jakarta')->format('H:i:s') }}</time> WIB · Semester ganjil 2026/2027</small>
+            <label class="portal-dashboard-search">
+                <span aria-hidden="true">⌕</span>
+                <input type="search" data-dashboard-search placeholder="Cari menu..." aria-label="Cari menu">
+            </label>
+            <div class="portal-dashboard-term">
+                <span>Semester Ganjil · T.A. 2026/2027</span>
+                <strong>{{ now()->locale('id')->translatedFormat('l, d F Y') }}</strong>
             </div>
-            <button class="role-notifications" type="button" aria-label="Notifikasi">Notifikasi <span aria-hidden="true">♧</span></button>
-            <span class="role-user-avatar" aria-hidden="true">{{ mb_substr($dashboardDisplayName, 0, 1) }}</span>
+            <div class="portal-dashboard-account">
+                @guest
+                    <div class="message-notifications role-notification-menu" data-role-notifications="{{ $dashboardRoleKey }}">
+                        <button class="message-notifications-toggle"
+                                type="button"
+                                aria-label="Notifikasi {{ $dashboardRoleName }}"
+                                aria-expanded="false"
+                                aria-controls="role-notification-panel"
+                                data-role-notifications-toggle>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+                            </svg>
+                            <span class="message-unread-badge"
+                                  data-role-notification-badge
+                                  aria-live="polite">{{ count($dashboardNotifications) }}</span>
+                        </button>
+                        <section class="message-notification-panel"
+                                 id="role-notification-panel"
+                                 data-role-notification-panel
+                                 aria-label="Notifikasi {{ $dashboardRoleName }}"
+                                 hidden>
+                            <div class="message-notification-heading">
+                                <strong>Notifikasi {{ $dashboardRoleName }}</strong>
+                                <button class="role-notification-mark-all"
+                                        type="button"
+                                        data-role-notifications-mark-all>
+                                    Tandai semua dibaca
+                                </button>
+                            </div>
+                            <div data-role-notification-items>
+                                @forelse ($dashboardNotifications as $notification)
+                                    <a class="message-notification-item"
+                                       data-role-notification-item
+                                       data-notification-id="{{ $notification['id'] }}"
+                                       href="{{ $notification['href'] }}">
+                                        <strong>{{ $notification['title'] }}</strong>
+                                        <span>{{ $notification['message'] }}</span>
+                                    </a>
+                                @empty
+                                    <p class="message-notification-empty">Belum ada notifikasi baru.</p>
+                                @endforelse
+                            </div>
+                        </section>
+                    </div>
+                @else
+                    <a class="message-notifications-toggle"
+                       href="{{ route('messages.index') }}"
+                       aria-label="Buka pesan"
+                       title="Buka pesan">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+                        </svg>
+                    </a>
+                @endguest
+                <div class="portal-profile-menu" data-profile-menu>
+                    <button class="portal-profile-trigger"
+                            type="button"
+                            aria-expanded="false"
+                            aria-controls="role-profile-dropdown"
+                            data-profile-menu-toggle>
+                        @auth
+                            @if (auth()->user()->profile_photo_path)
+                                <img class="database-topbar-avatar" src="{{ route('profile.photo', ['user' => auth()->user()->getKey()]) }}" alt="">
+                            @else
+                                <span class="database-topbar-avatar" aria-hidden="true">{{ mb_substr($dashboardDisplayName, 0, 1) }}</span>
+                            @endif
+                        @else
+                            <span class="database-topbar-avatar" aria-hidden="true">{{ mb_substr($dashboardDisplayName, 0, 1) }}</span>
+                        @endauth
+                        <span class="portal-profile-copy">
+                            <strong>{{ $dashboardDisplayName }}</strong>
+                            <small>{{ $dashboardRoleName }}</small>
+                        </span>
+                        <span class="portal-profile-chevron" aria-hidden="true">⌄</span>
+                    </button>
+                    <div class="portal-profile-dropdown" id="role-profile-dropdown" data-profile-menu-panel hidden>
+                        <div class="portal-profile-dropdown-heading">
+                            <strong>{{ $dashboardDisplayName }}</strong>
+                            <small>{{ $dashboardRoleName }}</small>
+                        </div>
+                        @auth
+                            <a href="{{ route('profile.edit') }}"><span aria-hidden="true">◎</span> Profil Saya</a>
+                            <a href="{{ route('messages.index') }}"><span aria-hidden="true">✉</span> Pesan</a>
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit"><span aria-hidden="true">↪</span> Keluar</button>
+                            </form>
+                        @else
+                            <a href="{{ route('login') }}"><span aria-hidden="true">↪</span> Masuk untuk mengakses akun</a>
+                        @endauth
+                    </div>
+                </div>
+            </div>
         </header>
         <div class="role-content">
             @guest

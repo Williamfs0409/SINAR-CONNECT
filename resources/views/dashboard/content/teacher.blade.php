@@ -1,9 +1,9 @@
 <section id="ringkasan" class="role-section">
     <h1 class="role-section-title">Kartu Ringkasan</h1>
     <div class="role-stat-grid">
-        <article class="role-stat stat-soft-blue"><span>Siswa Kelompok A1</span><strong>16</strong><small>Kelompok Melati</small><b aria-hidden="true">♧</b></article>
-        <article class="role-stat stat-soft-green"><span>Hadir Hari Ini</span><strong>15</strong><small>1 izin · 0 tanpa keterangan</small><b aria-hidden="true">▦</b></article>
-        <article class="role-stat stat-soft-yellow"><span>Draf Rapor Belum Lengkap</span><strong>4</strong><small>12 dari 16 draf tersimpan</small><b aria-hidden="true">▤</b></article>
+        <article class="role-stat stat-soft-blue"><span>Siswa Kelompok A1</span><strong>16</strong><small>Kelompok Melati</small></article>
+        <article class="role-stat stat-soft-green"><span>Hadir Hari Ini</span><strong>15</strong><small>1 izin · 0 tanpa keterangan</small></article>
+        <article class="role-stat stat-soft-yellow"><span>Draf Rapor Belum Lengkap</span><strong>4</strong><small>12 dari 16 draf tersimpan</small></article>
     </div>
 </section>
 

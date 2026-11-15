@@ -57,6 +57,23 @@ class LoginTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_inactive_accounts_cannot_authenticate(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'inactive@example.com',
+            'is_active' => false,
+        ]);
+
+        $this->post(route('login.authenticate'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertSessionHasErrors([
+            'email' => 'Email atau kata sandi salah.',
+        ]);
+
+        $this->assertGuest();
+    }
+
     public function test_valid_credentials_authenticate_the_user(): void
     {
         $user = User::factory()->create(['email' => 'admin@example.com']);
@@ -130,21 +147,17 @@ class LoginTest extends TestCase
             ->assertSee('Perkembangan Anak');
     }
 
-    public function test_guest_can_preview_admin_dashboard_without_management_actions(): void
+    public function test_guest_cannot_preview_admin_dashboard_and_is_sent_to_login(): void
     {
         $this->get(route('dashboard', ['role' => 'admin']))
-            ->assertOk()
-            ->assertSee('Mode pratinjau administrator')
-            ->assertSee('Selamat Datang, Administrator')
-            ->assertSee('Siswa Aktif')
-            ->assertDontSee('<form', false);
+            ->assertRedirect(route('login'));
         $this->assertGuest();
     }
 
     public function test_guest_cannot_open_admin_management_pages_without_login(): void
     {
         $this->get(route('dashboard.feature', ['section' => 'pendaftaran', 'role' => 'admin']))
-            ->assertNotFound();
+            ->assertRedirect(route('login'));
     }
 
     public function test_teacher_features_open_as_separate_pages(): void

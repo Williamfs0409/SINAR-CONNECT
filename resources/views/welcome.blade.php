@@ -57,7 +57,7 @@
             <button class="button button-primary welcome-submit" type="submit">Masuk <span aria-hidden="true">→</span></button>
         </form>
 
-        <p class="welcome-contact">Belum punya akun? <a href="mailto:info@tkcerdasceria.sch.id">Hubungi administrator</a></p>
+        <p class="welcome-contact">Orang tua belum punya akun? <a href="{{ route('registration.create') }}">Daftarkan anak secara daring</a></p>
     </section>
 </main>
 @endsection

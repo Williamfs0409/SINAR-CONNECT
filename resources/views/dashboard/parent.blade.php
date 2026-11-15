@@ -3,15 +3,20 @@
     $dashboardRoleName = 'Orang Tua';
     $dashboardContentView = 'dashboard.content.parent';
     $dashboardMenu = [
-        ['id' => 'ringkasan', 'icon' => '⌂', 'label' => 'Dashboard'],
-        ['id' => 'perkembangan', 'icon' => '▥', 'label' => 'Perkembangan Anak'],
-        ['id' => 'absensi', 'icon' => '▦', 'label' => 'Absensi Anak'],
-        ['id' => 'spp', 'icon' => '▣', 'label' => 'Pembayaran SPP'],
-        ['id' => 'tabungan', 'icon' => '▣', 'label' => 'Tabungan Anak'],
-        ['id' => 'tugas', 'icon' => '▤', 'label' => 'Tugas Anak'],
-        ['id' => 'rapor', 'icon' => '▤', 'label' => 'Rapor Anak'],
-        ['id' => 'dokumentasi', 'icon' => '▱', 'label' => 'Dokumentasi Kegiatan'],
-        ['id' => 'siswa', 'icon' => '♧', 'label' => 'Data Siswa'],
+        ['id' => 'ringkasan', 'label' => 'Dashboard'],
+        ['id' => 'perkembangan', 'label' => 'Perkembangan Anak'],
+        ['id' => 'absensi', 'label' => 'Absensi Anak'],
+        ['id' => 'spp', 'label' => 'Pembayaran SPP'],
+        ['id' => 'tabungan', 'label' => 'Tabungan Anak'],
+        ['id' => 'tugas', 'label' => 'Tugas Anak'],
+        ['id' => 'rapor', 'label' => 'Rapor Anak'],
+        ['id' => 'dokumentasi', 'label' => 'Dokumentasi Kegiatan'],
+        ['id' => 'siswa', 'label' => 'Data Siswa'],
+    ];
+    $dashboardNotifications = [
+        ['id' => 'parent-spp', 'title' => 'Tagihan SPP November', 'message' => 'Tagihan Rp250.000 jatuh tempo pada 20 November.', 'href' => route('dashboard', ['role' => 'parent']).'#spp'],
+        ['id' => 'parent-progress', 'title' => 'Catatan perkembangan anak', 'message' => 'Ibu Dewi mencatat perkembangan Arka di kelas.', 'href' => route('dashboard', ['role' => 'parent']).'#perkembangan'],
+        ['id' => 'parent-tasks', 'title' => 'Tugas anak belum dikumpulkan', 'message' => 'Kolase daun kering dikumpulkan pada 17 November.', 'href' => route('dashboard', ['role' => 'parent']).'#tugas'],
     ];
     $dashboardFeatureDetails = [
         'perkembangan' => ['description' => 'Pantau perkembangan belajar dan catatan guru untuk anak.', 'stats' => [['Bahasa & literasi', 'Sesuai harapan'], ['Sosial emosional', 'Sangat baik'], ['Status hari ini', 'Hadir']], 'columns' => ['Aspek perkembangan', 'Penilaian', 'Catatan'], 'rows' => [['Bahasa & literasi', 'Sesuai harapan', 'Mengikuti kegiatan bercerita'], ['Sosial emosional', 'Sangat baik', 'Percaya diri dan senang membantu'], ['Motorik halus', 'Sesuai harapan', 'Aktif dalam kegiatan kolase']]],

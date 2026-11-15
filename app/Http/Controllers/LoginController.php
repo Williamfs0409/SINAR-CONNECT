@@ -19,7 +19,7 @@ class LoginController extends Controller
             'password.required' => 'Kata sandi wajib diisi.',
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        if (! Auth::attempt([...$credentials, 'is_active' => true], $request->boolean('remember'))) {
             return back()
                 ->withErrors(['email' => 'Email atau kata sandi salah.'])
                 ->onlyInput('email');

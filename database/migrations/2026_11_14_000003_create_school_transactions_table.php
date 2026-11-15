@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('pembayaran') || Schema::hasTable('transaksi_tabungan')) {
+            return;
+        }
+
         Schema::create('school_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('student_id')->constrained()->cascadeOnDelete();
@@ -24,6 +28,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasTable('pembayaran') || Schema::hasTable('transaksi_tabungan')) {
+            return;
+        }
+
         Schema::dropIfExists('school_transactions');
     }
 };

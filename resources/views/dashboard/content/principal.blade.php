@@ -1,9 +1,9 @@
 <section id="ringkasan" class="role-section">
     <h1 class="role-section-title">Kartu Ringkasan</h1>
     <div class="role-stat-grid">
-        <article class="role-stat stat-soft-blue"><span>Total Siswa</span><strong>128</strong><small>8 kelompok belajar</small><b aria-hidden="true">♧</b></article>
-        <article class="role-stat stat-soft-green"><span>Hadir Hari Ini</span><strong>122</strong><small>95,3% dari total siswa</small><b aria-hidden="true">▦</b></article>
-        <article class="role-stat stat-soft-yellow"><span>Perlu Ditinjau</span><strong>7</strong><small>4 rencana · 3 laporan</small><b aria-hidden="true">▤</b></article>
+        <article class="role-stat stat-soft-blue"><span>Total Siswa</span><strong>128</strong><small>8 kelompok belajar</small></article>
+        <article class="role-stat stat-soft-green"><span>Hadir Hari Ini</span><strong>122</strong><small>95,3% dari total siswa</small></article>
+        <article class="role-stat stat-soft-yellow"><span>Perlu Ditinjau</span><strong>7</strong><small>4 rencana · 3 laporan</small></article>
     </div>
 </section>
 

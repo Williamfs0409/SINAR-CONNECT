@@ -248,11 +248,11 @@ class AdminDashboardTest extends TestCase
 
         $this->patch(route('admin.users.role', $teacher), ['role' => 'principal'])
             ->assertRedirect();
-        $this->assertDatabaseHas('users', ['id' => $teacher->id, 'role' => 'principal']);
+        $this->assertDatabaseHas('users', ['id_user' => $teacher->id_user, 'role' => 'kepala_sekolah']);
 
         $this->from(route('dashboard.feature', ['section' => 'pengguna']))
             ->patch(route('admin.users.role', $admin), ['role' => 'teacher'])
             ->assertSessionHasErrors('role');
-        $this->assertDatabaseHas('users', ['id' => $admin->id, 'role' => 'admin']);
+        $this->assertDatabaseHas('users', ['id_user' => $admin->id_user, 'role' => 'admin']);
     }
 }

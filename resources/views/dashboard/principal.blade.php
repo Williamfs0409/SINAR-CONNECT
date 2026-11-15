@@ -3,14 +3,19 @@
     $dashboardRoleName = 'Kepala Sekolah';
     $dashboardContentView = 'dashboard.content.principal';
     $dashboardMenu = [
-        ['id' => 'ringkasan', 'icon' => '⌂', 'label' => 'Dashboard'],
-        ['id' => 'guru', 'icon' => '♧', 'label' => 'Data Siswa & Guru'],
-        ['id' => 'administrasi', 'icon' => '▱', 'label' => 'Administrasi Sekolah'],
-        ['id' => 'akademik', 'icon' => '▤', 'label' => 'Akademik'],
-        ['id' => 'evaluasi', 'icon' => '▥', 'label' => 'Evaluasi Kegiatan'],
-        ['id' => 'spp', 'icon' => '▣', 'label' => 'SPP & Tabungan'],
-        ['id' => 'laporan', 'icon' => '▤', 'label' => 'Laporan Sekolah'],
-        ['id' => 'jadwal', 'icon' => '▦', 'label' => 'Jadwal Guru'],
+        ['id' => 'ringkasan', 'label' => 'Dashboard'],
+        ['id' => 'guru', 'label' => 'Data Siswa & Guru'],
+        ['id' => 'administrasi', 'label' => 'Administrasi Sekolah'],
+        ['id' => 'akademik', 'label' => 'Akademik'],
+        ['id' => 'evaluasi', 'label' => 'Evaluasi Kegiatan'],
+        ['id' => 'spp', 'label' => 'SPP & Tabungan'],
+        ['id' => 'laporan', 'label' => 'Laporan Sekolah'],
+        ['id' => 'jadwal', 'label' => 'Jadwal Guru'],
+    ];
+    $dashboardNotifications = [
+        ['id' => 'principal-reports', 'title' => 'Laporan menunggu tinjauan', 'message' => '3 laporan perkembangan belum dilengkapi.', 'href' => route('dashboard', ['role' => 'principal']).'#evaluasi'],
+        ['id' => 'principal-student-files', 'title' => 'Berkas siswa perlu diperbarui', 'message' => '10 dari 128 berkas siswa belum terverifikasi.', 'href' => route('dashboard', ['role' => 'principal']).'#administrasi'],
+        ['id' => 'principal-meeting', 'title' => 'Agenda rapat evaluasi', 'message' => 'Rapat dijadwalkan 18 November pukul 13.00.', 'href' => route('dashboard', ['role' => 'principal']).'#administrasi'],
     ];
     $dashboardFeatureDetails = [
         'guru' => ['description' => 'Data guru, wali kelas, dan kelompok belajar di sekolah.', 'stats' => [['Guru aktif', '8'], ['Kelompok', '8'], ['Siswa', '128']], 'columns' => ['Guru', 'Kelompok', 'Status'], 'rows' => [['Dewi Puspita', 'A1 · Melati', 'Aktif'], ['Rina Lestari', 'A2 · Mawar', 'Aktif'], ['Siti Rahma', 'B1 · Anggrek', 'Aktif'], ['Nur Aisyah', 'B2 · Dahlia', 'Aktif']]],

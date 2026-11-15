@@ -36,11 +36,22 @@ proses pengelolaan akun yang digunakan di lingkungan aplikasi.
 
 Administrator dapat mengelola pendaftaran dan data siswa, membuat tagihan SPP,
 mencatat pembayaran dan transaksi tabungan tunai/transfer, melihat tunggakan, serta
-membuat akun dan mengatur peran pengguna melalui menu dashboard. Jalankan `php artisan migrate`
-untuk membuat tabel siswa, tagihan, dan transaksi. Tagihan SPP yang belum lunas hanya tampil
-sebagai tunggakan setelah tanggal jatuh temponya lewat.
+membuat akun dan mengatur peran pengguna melalui menu dashboard. Pengguna aktif dapat saling
+mengirim pesan pribadi; pesan yang belum dibaca muncul pada lonceng notifikasi dashboard dan
+diperbarui otomatis setiap 30 detik. Foto profil dapat diganti melalui menu akun. Foto disimpan
+pada penyimpanan privat dan hanya dapat dilihat oleh pengguna yang masuk. Jalankan
+`php artisan migrate` untuk membuat tabel siswa, tagihan, transaksi, pesan, dan kolom foto profil.
+Tagihan SPP yang belum lunas hanya tampil sebagai tunggakan setelah tanggal jatuh temponya lewat.
 Pratinjau dashboard administrator tanpa login tersedia melalui `/dashboard?role=admin`;
 pratinjau ini hanya menampilkan data contoh dan tidak mengizinkan perubahan data.
+
+### Membuat akun administrator awal
+
+Atur `ADMIN_BOOTSTRAP_EMAIL` dan kata sandi unik minimal 12 karakter pada `.env` lokal,
+lalu jalankan `php artisan config:clear` jika konfigurasi pernah di-cache dan
+`php artisan db:seed`. Seeder hanya membuat akun jika email belum dipakai; seeder tidak
+mengubah kata sandi atau peran akun yang sudah ada. Hapus nilai `ADMIN_BOOTSTRAP_PASSWORD`
+dari `.env` setelah akun berhasil dibuat.
 
 ## Teknologi
 

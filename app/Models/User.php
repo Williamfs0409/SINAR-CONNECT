@@ -12,6 +12,8 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
+    protected $primaryKey = 'id_user';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -22,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'profile_photo_path',
     ];
 
     /**
@@ -44,6 +47,25 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    public function getRoleAttribute(?string $value): ?string
+    {
+        return [
+            'kepala_sekolah' => 'principal',
+            'guru' => 'teacher',
+            'orang_tua' => 'parent',
+        ][$value] ?? $value;
+    }
+
+    public function setRoleAttribute(string $value): void
+    {
+        $this->attributes['role'] = [
+            'principal' => 'kepala_sekolah',
+            'teacher' => 'guru',
+            'parent' => 'orang_tua',
+        ][$value] ?? $value;
     }
 }

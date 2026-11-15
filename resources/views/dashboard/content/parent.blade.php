@@ -1,9 +1,9 @@
 <section id="ringkasan" class="role-section">
     <h1 class="role-section-title">Kartu Ringkasan</h1>
     <div class="role-stat-grid">
-        <article class="role-stat stat-soft-blue"><span>Kehadiran Oktober</span><strong>18 / 20</strong><small>18 hadir · 1 izin · 1 sakit</small><b aria-hidden="true">▦</b></article>
-        <article class="role-stat stat-soft-green"><span>Saldo Tabungan</span><strong>Rp850.000</strong><small>Setoran terakhir Rp50.000</small><b aria-hidden="true">▣</b></article>
-        <article class="role-stat stat-soft-yellow"><span>Tagihan SPP November</span><strong>Rp250.000</strong><small>Jatuh tempo 20 November</small><b aria-hidden="true">▤</b></article>
+        <article class="role-stat stat-soft-blue"><span>Kehadiran Oktober</span><strong>18 / 20</strong><small>18 hadir · 1 izin · 1 sakit</small></article>
+        <article class="role-stat stat-soft-green"><span>Saldo Tabungan</span><strong>Rp850.000</strong><small>Setoran terakhir Rp50.000</small></article>
+        <article class="role-stat stat-soft-yellow"><span>Tagihan SPP November</span><strong>Rp250.000</strong><small>Jatuh tempo 20 November</small></article>
     </div>
 </section>
 

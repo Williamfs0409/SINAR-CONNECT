@@ -3,16 +3,21 @@
     $dashboardRoleName = 'Guru';
     $dashboardContentView = 'dashboard.content.teacher';
     $dashboardMenu = [
-        ['id' => 'ringkasan', 'icon' => '⌂', 'label' => 'Dashboard'],
-        ['id' => 'absensi', 'icon' => '♧', 'label' => 'Data Siswa & Absensi'],
-        ['id' => 'pembelajaran', 'icon' => '▤', 'label' => 'Pembelajaran'],
-        ['id' => 'rencana', 'icon' => '−', 'label' => 'Rencana Pembelajaran'],
-        ['id' => 'tugas', 'icon' => '−', 'label' => 'Tugas'],
-        ['id' => 'nilai', 'icon' => '−', 'label' => 'Nilai & Observasi'],
-        ['id' => 'rapor', 'icon' => '−', 'label' => 'Rapor'],
-        ['id' => 'dokumentasi', 'icon' => '▱', 'label' => 'Dokumentasi Kegiatan'],
-        ['id' => 'pengaturan', 'icon' => '⚙', 'label' => 'Pengaturan'],
-        ['id' => 'jadwal', 'icon' => '▦', 'label' => 'Jadwal Mengajar'],
+        ['id' => 'ringkasan', 'label' => 'Dashboard'],
+        ['id' => 'absensi', 'label' => 'Data Siswa & Absensi'],
+        ['id' => 'pembelajaran', 'label' => 'Pembelajaran'],
+        ['id' => 'rencana', 'label' => 'Rencana Pembelajaran'],
+        ['id' => 'tugas', 'label' => 'Tugas'],
+        ['id' => 'nilai', 'label' => 'Nilai & Observasi'],
+        ['id' => 'rapor', 'label' => 'Rapor'],
+        ['id' => 'dokumentasi', 'label' => 'Dokumentasi Kegiatan'],
+        ['id' => 'pengaturan', 'label' => 'Pengaturan'],
+        ['id' => 'jadwal', 'label' => 'Jadwal Mengajar'],
+    ];
+    $dashboardNotifications = [
+        ['id' => 'teacher-report-drafts', 'title' => 'Draf rapor perlu dilengkapi', 'message' => '4 dari 16 siswa belum memiliki draf rapor lengkap.', 'href' => route('dashboard', ['role' => 'teacher']).'#rapor'],
+        ['id' => 'teacher-attendance', 'title' => 'Rekap kehadiran hari ini', 'message' => '15 siswa hadir dan 1 siswa izin di kelompok A1.', 'href' => route('dashboard', ['role' => 'teacher']).'#absensi'],
+        ['id' => 'teacher-tasks', 'title' => 'Tugas belajar aktif', 'message' => 'Tugas kolase daun kering menunggu tindak lanjut.', 'href' => route('dashboard', ['role' => 'teacher']).'#tugas'],
     ];
     $dashboardFeatureDetails = [
         'absensi' => ['description' => 'Kelola data siswa dan catat kehadiran kelompok A1.', 'stats' => [['Hadir', '15'], ['Izin', '1'], ['Jumlah siswa', '16']], 'columns' => ['Nama siswa', 'Kelompok', 'Kehadiran'], 'rows' => [['Alva Putri', 'A1 · Melati', 'Hadir'], ['Arka Pratama', 'A1 · Melati', 'Hadir'], ['Naufal Rizki', 'A1 · Melati', 'Hadir'], ['Rizky Saputra', 'A1 · Melati', 'Izin']]],
