@@ -84,6 +84,27 @@ class SchoolDataDashboardTest extends TestCase
             ->assertDontSee('Siswa Lain');
     }
 
+    public function test_parent_payment_form_displays_school_transfer_account(): void
+    {
+        $parentForm = view('dashboard.feature-actions', [
+            'section' => 'pembayaran',
+            'role' => 'parent',
+            'actions' => [],
+        ])->render();
+
+        $this->assertStringContainsString('Bank Syariah Indonesia (BSI)', $parentForm);
+        $this->assertStringContainsString('7276048637', $parentForm);
+        $this->assertStringContainsString('Sri Hariati', $parentForm);
+
+        $adminForm = view('dashboard.feature-actions', [
+            'section' => 'pembayaran',
+            'role' => 'admin',
+            'actions' => [],
+        ])->render();
+
+        $this->assertStringNotContainsString('7276048637', $adminForm);
+    }
+
     private function createSiswaData(): void
     {
         Schema::create('siswa', function (Blueprint $table): void {
