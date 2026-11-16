@@ -461,7 +461,7 @@ Sesuai ruang lingkup laporan:
 | 5 | Yabesh Day Siahaan | 251402004 | Hosting (Hostinger) |
 
 **Dosen pengampu:** Bapak Dedy Arisandi, S.T., M.Kom.
-**Mitra:** TK Najmah Rugayah Darus, Medan
+**Mitra:** TK Najmah Rugayah Darus, Medan, Sumatera Utara
 
 ---
 
