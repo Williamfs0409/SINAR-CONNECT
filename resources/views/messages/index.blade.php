@@ -15,7 +15,7 @@
     <div class="message-center-shell">
         <header class="message-center-header">
             <a class="database-brand" href="{{ route('dashboard') }}">
-                <span class="database-brand-mark">S</span>
+                <img class="database-brand-mark" src="{{ asset('images/sinar-school-logo.png') }}" alt="">
                 <span><strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
             </a>
             <div class="message-center-account">

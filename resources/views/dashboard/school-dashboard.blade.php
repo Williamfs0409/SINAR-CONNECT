@@ -14,7 +14,7 @@
     <div class="database-dashboard database-dashboard-portal">
         <header class="portal-dashboard-header">
             <a class="portal-dashboard-brand" href="{{ route('dashboard') }}">
-                <span class="portal-dashboard-brand-mark">S</span>
+                <img class="portal-dashboard-brand-mark" src="{{ asset('images/sinar-school-logo.png') }}" alt="">
                 <span><strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
             </a>
             <label class="portal-dashboard-search">
@@ -65,7 +65,7 @@
         </header>
         <aside class="database-sidebar">
             <a class="database-brand" href="{{ route('dashboard') }}">
-                <span class="database-brand-mark">S</span>
+                <img class="database-brand-mark" src="{{ asset('images/sinar-school-logo.png') }}" alt="">
                 <span><strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
             </a>
 

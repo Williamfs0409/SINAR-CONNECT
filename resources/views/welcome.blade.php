@@ -5,11 +5,13 @@
 
 @section('content')
 <main class="welcome-login">
-    <img class="welcome-background" src="{{ asset('images/school-illustration.svg') }}" alt="" aria-hidden="true">
+    <img class="welcome-backdrop" src="{{ asset('images/login-screen-background.png') }}" alt="" aria-hidden="true">
+    <img class="welcome-background" src="{{ asset('images/login-screen-background.png') }}" alt="" aria-hidden="true">
+    <img class="welcome-mobile-background" src="{{ asset('images/login-school-background.jpeg') }}" alt="" aria-hidden="true">
     <section class="welcome-message" aria-labelledby="welcome-title">
         <div class="welcome-message-copy">
             <p class="welcome-eyebrow">Sistem Informasi Sekolah</p>
-            <h1 id="welcome-title">Halo, Sobat Cerdas Ceria! <span aria-hidden="true"></span></h1>
+            <h1 id="welcome-title">Halo, Sobat Cerdas Ceria!</h1>
             <p>Dengan SINAR, akses informasi sekolah dan dampingi setiap langkah tumbuh kembang anak.</p>
         </div>
         <p class="welcome-message-note"><span aria-hidden="true">✦</span> Belajar · Bermain · Tumbuh bersama</p>
