@@ -262,8 +262,19 @@
 
                     @if ($records->isEmpty())
                         <div class="database-empty-state">
-                            <strong>Belum ada data untuk ditampilkan</strong>
-                            <p>Data pada modul ini akan muncul di sini setelah tersedia di database atau sesuai akses akun.</p>
+                            @if ($role === 'parent' && in_array($section, ['tagihan', 'pembayaran'], true) && ! $hasLinkedStudents)
+                                <strong>Akun orang tua ini belum terhubung ke siswa.</strong>
+                                <p>Hubungi administrator untuk menghubungkan akun ke data keluarga dan siswa yang benar.</p>
+                            @elseif ($role === 'parent' && $section === 'tagihan')
+                                <strong>Belum ada tagihan untuk siswa yang terhubung.</strong>
+                                <p>Tagihan akan muncul setelah administrator menerbitkannya.</p>
+                            @elseif ($role === 'parent' && $section === 'pembayaran')
+                                <strong>Belum ada riwayat pembayaran.</strong>
+                                <p>Pembayaran yang dikirim akan muncul setelah tercatat di sistem.</p>
+                            @else
+                                <strong>Belum ada data untuk ditampilkan</strong>
+                                <p>Data pada modul ini akan muncul di sini setelah tersedia di database atau sesuai akses akun.</p>
+                            @endif
                         </div>
                     @else
                         <div class="database-table-wrap">
@@ -276,6 +287,9 @@
                                         @if ($section === 'pengguna')
                                             <th scope="col">Hak akses</th>
                                         @endif
+                                        @if ($role === 'admin' && in_array($section, ['siswa', 'keluarga', 'pengguna'], true))
+                                            <th scope="col">Aksi</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -283,12 +297,13 @@
                                         <tr>
                                             @foreach ($module['columns'] as $field => $label)
                                                 <td>
+                                                    @php($cellValue = data_get($record, $field))
                                                     @if ($field === 'foto' && data_get($record, 'id_portofolio'))
                                                         <a class="database-photo-link" href="{{ route('database.portfolio.photo', ['portfolio' => data_get($record, 'id_portofolio')]) }}" target="_blank" rel="noopener">
                                                             <img src="{{ route('database.portfolio.photo', ['portfolio' => data_get($record, 'id_portofolio')]) }}" alt="Dokumentasi perkembangan {{ data_get($record, 'nama_lengkap') }}" loading="lazy">
                                                         </a>
                                                     @else
-                                                        {{ data_get($record, $field) ?? '—' }}
+                                                        {{ is_string($cellValue) && trim($cellValue) === '' ? '—' : ($cellValue ?? '—') }}
                                                     @endif
                                                 </td>
                                             @endforeach
@@ -304,6 +319,79 @@
                                                         </select>
                                                         <button class="database-button database-button-secondary" type="submit">Perbarui</button>
                                                     </form>
+                                                </td>
+                                            @endif
+                                            @if ($role === 'admin' && in_array($section, ['siswa', 'keluarga', 'pengguna'], true))
+                                                <td>
+                                                    @if ($section === 'siswa')
+                                                        <div class="database-row-actions">
+                                                            <button type="button" class="database-icon-button" data-open-editor="student-profile-editor-{{ data_get($record, 'id_siswa') }}" aria-label="Edit profil {{ data_get($record, 'nama_lengkap') }}" title="Edit profil">
+                                                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                                                            </button>
+                                                        <form method="POST" action="{{ route('database.student.destroy', ['student' => data_get($record, 'id_siswa')]) }}" data-confirm="Hapus data siswa {{ data_get($record, 'nama_lengkap') }}? Data yang masih memiliki riwayat akan ditolak.">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus data {{ data_get($record, 'nama_lengkap') }}" title="Hapus data">
+                                                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                                                            </button>
+                                                        </form>
+                                                        </div>
+                                                    @elseif ($section === 'keluarga')
+                                                        <div class="database-row-actions">
+                                                            <details class="database-row-editor">
+                                                                <summary class="database-icon-button" aria-label="Edit data keluarga {{ data_get($record, 'id_keluarga') }}" title="Edit data keluarga">
+                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                                                                </summary>
+                                                                <form method="POST" action="{{ route('database.family.update', ['family' => data_get($record, 'id_keluarga')]) }}" class="database-row-editor-form">
+                                                                    @csrf
+                                                                    @method('PATCH')
+                                                                    <label>Nomor KK<input name="no_kk" value="{{ data_get($record, 'no_kk') }}" maxlength="16" inputmode="numeric"></label>
+                                                                    <label>Alamat<textarea name="alamat" rows="2" maxlength="2000">{{ data_get($record, 'alamat') }}</textarea></label>
+                                                                    <label>Nama wali / orang tua<input name="wali_name" value="{{ data_get($record, 'edit_wali_name') }}" maxlength="100"></label>
+                                                                    <label>Hubungan<select name="hubungan">
+                                                                        @if (! data_get($record, 'edit_wali_relationship'))
+                                                                            <option value="" selected disabled>Pilih hubungan</option>
+                                                                        @endif
+                                                                        @foreach (['Ayah', 'Ibu', 'Wali'] as $relationship)
+                                                                            <option value="{{ $relationship }}" @selected(data_get($record, 'edit_wali_relationship') === $relationship)>{{ $relationship }}</option>
+                                                                        @endforeach
+                                                                    </select></label>
+                                                                    <label>Nomor kontak<input name="nomor" value="{{ data_get($record, 'edit_primary_phone') }}" maxlength="16" inputmode="tel"></label>
+                                                                    <small>Nomor wali atau kontak yang dikosongkan tidak akan diubah.</small>
+                                                                    <button class="database-button database-button-secondary" type="submit">Simpan perubahan</button>
+                                                                </form>
+                                                            </details>
+                                                            <form method="POST" action="{{ route('database.family.destroy', ['family' => data_get($record, 'id_keluarga')]) }}" data-confirm="Hapus data keluarga #{{ data_get($record, 'id_keluarga') }}? Hanya data yang tidak memiliki relasi yang dapat dihapus.">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus data keluarga {{ data_get($record, 'id_keluarga') }}" title="Hapus data keluarga">
+                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    @else
+                                                        <div class="database-row-actions">
+                                                            <details class="database-row-editor">
+                                                                <summary class="database-icon-button" aria-label="Edit akun {{ data_get($record, 'name') }}" title="Edit akun">
+                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                                                                </summary>
+                                                                <form method="POST" action="{{ route('database.user.profile.update', ['user' => data_get($record, 'id_user')]) }}" class="database-row-editor-form">
+                                                                    @csrf
+                                                                    @method('PATCH')
+                                                                    <label>Nama<input name="name" value="{{ data_get($record, 'name') }}" maxlength="100" required></label>
+                                                                    <label>Email<input type="email" name="email" value="{{ data_get($record, 'email') }}" maxlength="150" required></label>
+                                                                    <button class="database-button database-button-secondary" type="submit">Simpan perubahan</button>
+                                                                </form>
+                                                            </details>
+                                                            <form method="POST" action="{{ route('database.user.destroy', ['user' => data_get($record, 'id_user')]) }}" data-confirm="Hapus akun {{ data_get($record, 'name') }}? Akun yang masih memiliki riwayat atau relasi akan ditolak.">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus akun {{ data_get($record, 'name') }}" title="Hapus akun">
+                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    @endif
                                                 </td>
                                             @endif
                                         </tr>

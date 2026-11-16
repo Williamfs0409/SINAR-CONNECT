@@ -7,10 +7,13 @@ use App\Services\ImageUploadService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class SchoolFeatureController extends Controller
 {
@@ -41,6 +44,166 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Profil siswa berhasil diperbarui.');
     }
 
+    public function updateFamilyProfile(Request $request, int $familyId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'no_kk' => ['nullable', 'digits:16'],
+            'alamat' => ['nullable', 'string', 'max:2000'],
+            'wali_name' => ['nullable', 'string', 'max:100'],
+            'hubungan' => ['required_with:wali_name', Rule::in(['Ayah', 'Ibu', 'Wali'])],
+            'nomor' => ['nullable', 'string', 'max:16'],
+        ]);
+
+        DB::transaction(function () use ($familyId, $data): void {
+            $family = DB::table('keluarga')
+                ->where('id_keluarga', $familyId)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($family, 404);
+
+            DB::table('keluarga')->where('id_keluarga', $familyId)->update([
+                'no_kk' => $data['no_kk'] ?? null,
+                'alamat' => $data['alamat'] ?? null,
+                'updated_at' => now(),
+            ]);
+
+            $guardian = DB::table('wali')
+                ->where('id_keluarga', $familyId)
+                ->orderBy('id_wali')
+                ->first();
+            if (filled($data['wali_name'] ?? null)) {
+                if ($guardian) {
+                    DB::table('wali')->where('id_wali', $guardian->id_wali)->update([
+                        'nama_lengkap' => $data['wali_name'],
+                        'hubungan' => $data['hubungan'],
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    DB::table('wali')->insert([
+                        'id_keluarga' => $familyId,
+                        'nama_lengkap' => $data['wali_name'],
+                        'hubungan' => $data['hubungan'],
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+
+            if (filled($data['nomor'] ?? null)) {
+                $contact = DB::table('kontak_keluarga')
+                    ->where('id_keluarga', $familyId)
+                    ->orderBy('urutan')
+                    ->first();
+
+                if ($contact) {
+                    DB::table('kontak_keluarga')->where('id_kontak', $contact->id_kontak)
+                        ->update(['nomor' => $data['nomor']]);
+                } else {
+                    DB::table('kontak_keluarga')->insert([
+                        'id_keluarga' => $familyId,
+                        'nomor' => $data['nomor'],
+                        'urutan' => 1,
+                    ]);
+                }
+            }
+        });
+
+        return back()->with('status', 'Data keluarga berhasil diperbarui.');
+    }
+
+    public function updateUserProfile(Request $request, int $userId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        abort_unless(DB::table('users')->where('id_user', $userId)->exists(), 404);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($userId, 'id_user')],
+        ]);
+
+        DB::table('users')->where('id_user', $userId)->update([
+            ...$data,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Profil akun pengguna berhasil diperbarui.');
+    }
+
+    public function destroyStudent(int $studentId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        abort_unless(DB::table('siswa')->where('id_siswa', $studentId)->exists(), 404);
+        $this->assertNoDeleteDependencies($studentId, [
+            ['pendaftaran', 'id_siswa', 'pendaftaran'],
+            ['rombel_siswa', 'id_siswa', 'riwayat kelas'],
+            ['transaksi_tabungan', 'id_siswa', 'transaksi tabungan'],
+        ], 'siswa');
+
+        DB::table('siswa')->where('id_siswa', $studentId)->delete();
+
+        return back()->with('status', 'Data siswa berhasil dihapus.');
+    }
+
+    public function destroyFamily(int $familyId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $family = DB::table('keluarga')->where('id_keluarga', $familyId)->first();
+        abort_unless($family, 404);
+
+        if ($family->id_user !== null) {
+            throw ValidationException::withMessages([
+                'delete' => 'Data keluarga masih terhubung ke akun orang tua. Lepaskan hubungan akun terlebih dahulu.',
+            ]);
+        }
+
+        $this->assertNoDeleteDependencies($familyId, [
+            ['siswa', 'id_keluarga', 'data siswa'],
+            ['kontak_keluarga', 'id_keluarga', 'kontak keluarga'],
+            ['wali', 'id_keluarga', 'data wali'],
+        ], 'keluarga');
+
+        DB::table('keluarga')->where('id_keluarga', $familyId)->delete();
+
+        return back()->with('status', 'Data keluarga berhasil dihapus.');
+    }
+
+    public function destroyUser(int $userId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $target = DB::table('users')->where('id_user', $userId)->first();
+        abort_unless($target, 404);
+
+        if ((int) auth()->id() === $userId) {
+            throw ValidationException::withMessages([
+                'delete' => 'Akun yang sedang digunakan tidak dapat dihapus.',
+            ]);
+        }
+
+        if ($target->role === 'admin'
+            && DB::table('users')->where('role', 'admin')->where('is_active', true)->count() <= 1) {
+            throw ValidationException::withMessages([
+                'delete' => 'Administrator aktif terakhir tidak dapat dihapus.',
+            ]);
+        }
+
+        $this->assertNoDeleteDependencies($userId, [
+            ['keluarga', 'id_user', 'data keluarga'],
+            ['guru', 'id_user', 'data guru'],
+            ['absensi', 'id_user_pencatat', 'catatan absensi'],
+            ['dokumentasi_kegiatan', 'id_user_upload', 'dokumentasi kegiatan'],
+            ['kegiatan', 'id_user_pembuat', 'kegiatan'],
+            ['pembayaran', 'id_user_pencatat', 'catatan pembayaran'],
+            ['pembayaran', 'id_user_verifikator', 'verifikasi pembayaran'],
+            ['pendaftaran', 'id_user_verifikator', 'verifikasi pendaftaran'],
+            ['transaksi_tabungan', 'id_user_pencatat', 'catatan transaksi tabungan'],
+            ['audit_log', 'app_user_id', 'riwayat perubahan'],
+            ['sessions', 'user_id', 'sesi login'],
+        ], 'akun pengguna');
+
+        DB::table('users')->where('id_user', $userId)->delete();
+
+        return back()->with('status', 'Akun pengguna berhasil dihapus.');
+    }
+
     public function reviewRegistration(Request $request, int $registrationId): RedirectResponse
     {
         $user = $this->userFor(['admin']);
@@ -63,13 +226,7 @@ class SchoolFeatureController extends Controller
                     throw ValidationException::withMessages(['decision' => 'Hanya pendaftaran yang diajukan dapat diverifikasi.']);
                 }
 
-                $hasUnverifiedDocuments = DB::table('dokumen_pendaftaran')
-                    ->where('id_pendaftaran', $registrationId)
-                    ->where('status_verifikasi', '!=', 'Valid')
-                    ->exists();
-                if ($hasUnverifiedDocuments) {
-                    throw ValidationException::withMessages(['decision' => 'Periksa atau validasi semua dokumen sebelum memverifikasi pendaftaran.']);
-                }
+                $this->assertRegistrationDocumentsValid($registrationId);
 
                 DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
                     'status' => 'Diverifikasi',
@@ -99,12 +256,7 @@ class SchoolFeatureController extends Controller
             if ($application->status !== 'Diverifikasi') {
                 throw ValidationException::withMessages(['decision' => 'Pendaftaran harus diverifikasi sebelum diterima.']);
             }
-            if (DB::table('dokumen_pendaftaran')
-                ->where('id_pendaftaran', $registrationId)
-                ->where('status_verifikasi', '!=', 'Valid')
-                ->exists()) {
-                throw ValidationException::withMessages(['decision' => 'Masih ada dokumen pendaftaran yang belum valid.']);
-            }
+            $this->assertRegistrationDocumentsValid($registrationId);
 
             $class = DB::table('kelas')
                 ->where('id_kelas', $data['class_id'] ?? 0)
@@ -158,6 +310,99 @@ class SchoolFeatureController extends Controller
         });
 
         return back()->with('status', 'Status pendaftaran berhasil diperbarui.');
+    }
+
+    public function uploadRegistrationDocuments(Request $request, int $registrationId): RedirectResponse
+    {
+        $user = $this->userFor(['parent']);
+        $requiredDocuments = config('registration.required_documents');
+        $rules = [
+            'documents' => ['required', 'array:'.implode(',', array_keys($requiredDocuments)), 'min:1'],
+        ];
+        $messages = [];
+
+        foreach ($requiredDocuments as $key => $label) {
+            $rules["documents.{$key}"] = ['sometimes', 'required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
+            $messages["documents.{$key}.mimes"] = "Berkas {$label} harus berformat PDF, JPG, atau PNG.";
+            $messages["documents.{$key}.max"] = "Ukuran berkas {$label} maksimal 5 MB.";
+        }
+
+        $data = $request->validate($rules, $messages);
+        $familyId = $this->familyId($user);
+        $storedPaths = [];
+
+        try {
+            $previousPaths = DB::transaction(function () use ($data, $familyId, $registrationId, $requiredDocuments, &$storedPaths): array {
+                $application = DB::table('pendaftaran as p')
+                    ->join('siswa as s', 's.id_siswa', '=', 'p.id_siswa')
+                    ->where('p.id_pendaftaran', $registrationId)
+                    ->where('s.id_keluarga', $familyId)
+                    ->lockForUpdate()
+                    ->first(['p.id_pendaftaran', 'p.status']);
+                abort_unless($application, 404);
+
+                if (! in_array($application->status, ['Diajukan', 'Diverifikasi'], true)) {
+                    throw ValidationException::withMessages([
+                        'documents' => 'Dokumen hanya dapat diperbarui selama pendaftaran masih diproses.',
+                    ]);
+                }
+
+                $previousPaths = [];
+                foreach ($data['documents'] as $key => $file) {
+                    $label = $requiredDocuments[$key];
+                    $document = DB::table('dokumen_pendaftaran')
+                        ->where('id_pendaftaran', $registrationId)
+                        ->where('jenis', $label)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($document && $document->status_verifikasi !== 'Tidak Valid') {
+                        throw ValidationException::withMessages([
+                            "documents.{$key}" => "Berkas {$label} tidak perlu diganti saat statusnya {$document->status_verifikasi}.",
+                        ]);
+                    }
+
+                    $path = $this->imageUploads->store($file, 'pendaftaran', "documents.{$key}");
+                    $storedPaths[] = $path;
+
+                    if ($document) {
+                        $previousPaths[] = $document->file_path;
+                        DB::table('dokumen_pendaftaran')->where('id_dokumen', $document->id_dokumen)->update([
+                            'file_path' => $path,
+                            'status_verifikasi' => 'Menunggu',
+                            'catatan' => null,
+                            'updated_at' => now(),
+                        ]);
+                    } else {
+                        DB::table('dokumen_pendaftaran')->insert([
+                            'id_pendaftaran' => $registrationId,
+                            'jenis' => $label,
+                            'file_path' => $path,
+                            'status_verifikasi' => 'Menunggu',
+                            'created_at' => now(),
+                        ]);
+                    }
+                }
+
+                return $previousPaths;
+            });
+        } catch (Throwable $exception) {
+            foreach ($storedPaths as $path) {
+                if (! Storage::disk('local')->delete($path)) {
+                    report(new RuntimeException('Failed to clean up a replaced registration document after upload failed.'));
+                }
+            }
+
+            throw $exception;
+        }
+
+        foreach ($previousPaths as $path) {
+            if (Storage::disk('local')->exists($path) && ! Storage::disk('local')->delete($path)) {
+                report(new RuntimeException('Failed to remove a superseded registration document.'));
+            }
+        }
+
+        return back()->with('status', 'Dokumen pendaftaran berhasil diunggah dan menunggu pemeriksaan admin.');
     }
 
     public function verifyRegistrationDocument(Request $request, int $documentId): RedirectResponse
@@ -698,7 +943,7 @@ class SchoolFeatureController extends Controller
         $data = $request->validate([
             'id_tagihan' => ['required', 'integer'],
             'jumlah' => ['required', 'numeric', 'min:1', 'max:100000000'],
-            'metode' => ['required', Rule::in(['Tunai', 'Transfer'])],
+            'metode' => ['required', Rule::in($user->role === 'parent' ? ['Transfer'] : ['Tunai', 'Transfer'])],
             'bukti_transfer' => [
                 Rule::requiredIf($request->input('metode') === 'Transfer'),
                 'nullable',
@@ -760,6 +1005,33 @@ class SchoolFeatureController extends Controller
         });
 
         return back()->with('status', 'Pembayaran berhasil dicatat dan akan diproses sesuai metode pembayaran.');
+    }
+
+    public function updatePaymentSettings(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'bank_name' => ['required', 'string', 'max:100'],
+            'account_holder' => ['required', 'string', 'max:150'],
+            'account_number' => ['required', 'string', 'max:40'],
+        ]);
+
+        if (DB::table('payment_settings')->where('id', 1)->exists()) {
+            DB::table('payment_settings')->where('id', 1)->update([
+                ...$data,
+                'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('payment_settings')->insert([
+                'id' => 1,
+                ...$data,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect()->route('dashboard.feature', ['section' => 'pembayaran'])
+            ->with('status', 'Rekening pembayaran berhasil diperbarui.');
     }
 
     public function reviewPayment(Request $request, int $paymentId): RedirectResponse
@@ -834,6 +1106,11 @@ class SchoolFeatureController extends Controller
         $schoolYear = DB::table('tahun_ajaran')->where('is_aktif', true)->first();
         abort_unless($schoolYear, 503, 'Tahun ajaran aktif belum tersedia.');
         $period = $data['periode'].'-01';
+        if ($data['jatuh_tempo'] < $period) {
+            throw ValidationException::withMessages([
+                'jatuh_tempo' => 'Tanggal jatuh tempo tidak boleh sebelum periode tagihan.',
+            ]);
+        }
 
         $created = DB::transaction(function () use ($data, $period, $schoolYear): int {
             $rosters = DB::table('rombel_siswa as r')
@@ -876,6 +1153,137 @@ class SchoolFeatureController extends Controller
         });
 
         return back()->with('status', $created.' tagihan SPP baru berhasil dibuat.');
+    }
+
+    public function createStudentBill(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_rombel' => ['required', 'integer', Rule::exists('rombel_siswa', 'id_rombel')->where('status', 'Aktif')],
+            'id_jenis_biaya' => ['required', 'integer'],
+            'periode' => ['required', 'date_format:Y-m'],
+            'jatuh_tempo' => ['required', 'date'],
+        ]);
+
+        $schoolYear = DB::table('tahun_ajaran')->where('is_aktif', true)->first();
+        abort_unless($schoolYear, 503, 'Tahun ajaran aktif belum tersedia.');
+        $period = $data['periode'].'-01';
+        if ($data['jatuh_tempo'] < $period) {
+            throw ValidationException::withMessages([
+                'jatuh_tempo' => 'Tanggal jatuh tempo tidak boleh sebelum periode tagihan.',
+            ]);
+        }
+
+        DB::transaction(function () use ($data, $period, $schoolYear): void {
+            $roster = DB::table('rombel_siswa as r')
+                ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                ->where('r.id_rombel', $data['id_rombel'])
+                ->where('r.status', 'Aktif')
+                ->where('k.id_tahun_ajaran', $schoolYear->id_tahun_ajaran)
+                ->lockForUpdate()
+                ->first(['r.id_rombel', 'k.kelompok']);
+
+            if (! $roster) {
+                throw ValidationException::withMessages([
+                    'id_rombel' => 'Pilih siswa aktif pada tahun ajaran yang sedang berjalan.',
+                ]);
+            }
+
+            $tariff = DB::table('tarif as tf')
+                ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 'tf.id_jenis_biaya')
+                ->where('tf.id_tahun_ajaran', $schoolYear->id_tahun_ajaran)
+                ->where('tf.id_jenis_biaya', $data['id_jenis_biaya'])
+                ->where('tf.kelompok', $roster->kelompok)
+                ->where('jb.kategori', 'Bulanan')
+                ->first(['tf.id_jenis_biaya', 'tf.nominal', 'jb.nama']);
+
+            if (! $tariff) {
+                throw ValidationException::withMessages([
+                    'id_jenis_biaya' => 'Tarif bulanan tidak sesuai dengan kelompok siswa dan tahun ajaran aktif.',
+                ]);
+            }
+
+            $exists = DB::table('tagihan')
+                ->where('id_rombel', $roster->id_rombel)
+                ->where('id_jenis_biaya', $tariff->id_jenis_biaya)
+                ->whereDate('periode', $period)
+                ->exists();
+            if ($exists) {
+                throw ValidationException::withMessages([
+                    'periode' => 'Tagihan untuk siswa, jenis biaya, dan periode tersebut sudah ada.',
+                ]);
+            }
+
+            DB::table('tagihan')->insert([
+                'id_rombel' => $roster->id_rombel,
+                'id_jenis_biaya' => $tariff->id_jenis_biaya,
+                'periode' => $period,
+                'nominal' => $tariff->nominal,
+                'diskon' => 0,
+                'jatuh_tempo' => $data['jatuh_tempo'],
+                'created_at' => now(),
+            ]);
+        });
+
+        return back()->with('status', 'Tagihan siswa berhasil dibuat sesuai tarif bulanan aktif.');
+    }
+
+    public function linkParentToFamily(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_keluarga' => ['required', 'integer', Rule::exists('keluarga', 'id_keluarga')],
+            'id_user' => ['required', 'integer', Rule::exists('users', 'id_user')],
+        ]);
+
+        DB::transaction(function () use ($data): void {
+            $family = DB::table('keluarga')
+                ->where('id_keluarga', $data['id_keluarga'])
+                ->lockForUpdate()
+                ->first();
+            abort_unless($family, 404);
+
+            if ($family->id_user !== null) {
+                throw ValidationException::withMessages([
+                    'id_keluarga' => 'Data keluarga ini sudah terhubung ke akun.',
+                ]);
+            }
+
+            $parent = DB::table('users')
+                ->where('id_user', $data['id_user'])
+                ->where('role', 'orang_tua')
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+            if (! $parent) {
+                throw ValidationException::withMessages([
+                    'id_user' => 'Pilih akun orang tua yang aktif.',
+                ]);
+            }
+
+            if (DB::table('keluarga')->where('id_user', $parent->id_user)->exists()) {
+                throw ValidationException::withMessages([
+                    'id_user' => 'Akun orang tua ini sudah terhubung ke data keluarga lain.',
+                ]);
+            }
+
+            if (! DB::table('siswa')->where('id_keluarga', $family->id_keluarga)->exists()) {
+                throw ValidationException::withMessages([
+                    'id_keluarga' => 'Data keluarga belum memiliki siswa.',
+                ]);
+            }
+
+            DB::table('keluarga')
+                ->where('id_keluarga', $family->id_keluarga)
+                ->whereNull('id_user')
+                ->update([
+                    'id_user' => $parent->id_user,
+                    'updated_at' => now(),
+                ]);
+        });
+
+        return redirect()->route('dashboard.feature', ['section' => 'keluarga'])
+            ->with('status', 'Akun orang tua berhasil dihubungkan ke data keluarga.');
     }
 
     public function updateTariff(Request $request, int $tariffId): RedirectResponse
@@ -932,6 +1340,21 @@ class SchoolFeatureController extends Controller
         return $user;
     }
 
+    private function assertNoDeleteDependencies(int $recordId, array $references, string $entity): void
+    {
+        foreach ($references as [$table, $column, $label]) {
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column)) {
+                continue;
+            }
+
+            if (DB::table($table)->where($column, $recordId)->exists()) {
+                throw ValidationException::withMessages([
+                    'delete' => "Tidak dapat menghapus {$entity} karena masih digunakan pada {$label}.",
+                ]);
+            }
+        }
+    }
+
     private function teacherId(User $user): int
     {
         $teacherId = DB::table('guru')->where('id_user', $user->getKey())->value('id_guru');
@@ -964,5 +1387,21 @@ class SchoolFeatureController extends Controller
         abort_unless($familyId, 403, 'Akun orang tua belum terhubung ke data keluarga.');
 
         return (int) $familyId;
+    }
+
+    private function assertRegistrationDocumentsValid(int $registrationId): void
+    {
+        $requiredDocuments = array_values(config('registration.required_documents'));
+        $validDocuments = DB::table('dokumen_pendaftaran')
+            ->where('id_pendaftaran', $registrationId)
+            ->where('status_verifikasi', 'Valid')
+            ->pluck('jenis')
+            ->all();
+
+        if (array_diff($requiredDocuments, $validDocuments) !== []) {
+            throw ValidationException::withMessages([
+                'decision' => 'Semua dokumen wajib harus tersedia dan berstatus valid sebelum pendaftaran dapat diverifikasi atau diterima.',
+            ]);
+        }
     }
 }

@@ -99,26 +99,32 @@
                 </fieldset>
 
                 <fieldset>
-                    <legend>Dokumen pendukung (opsional)</legend>
+                    <legend>Dokumen pendaftaran (5 berkas wajib)</legend>
                     <div class="registration-grid">
-                        <label>Jenis dokumen <input name="document_type" value="{{ old('document_type') }}" maxlength="50" placeholder="Contoh: Akta kelahiran"></label>
-                        <label>File (PDF/JPG/PNG, maks. 5 MB)
-                            <input
-                                id="registration-document"
-                                type="file"
-                                name="document"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                data-max-bytes="5242880"
-                                data-max-pixels="20000000"
-                                aria-describedby="registration-document-feedback"
-                            >
-                            <small
-                                id="registration-document-feedback"
-                                class="registration-upload-feedback @error('document') is-error @enderror"
-                                role="status"
-                                aria-live="polite"
-                            >@error('document'){{ $message }}@else File maksimal 5 MB. Gambar maksimal 20 megapiksel.@enderror</small>
-                        </label>
+                        @foreach ($requiredDocuments as $documentKey => $documentLabel)
+                            @php
+                                $documentInputId = 'registration-document-'.$documentKey;
+                                $documentFeedbackId = $documentInputId.'-feedback';
+                            @endphp
+                            <label for="{{ $documentInputId }}">{{ $documentLabel }} (PDF/JPG/PNG, maks. 5 MB)
+                                <input
+                                    id="{{ $documentInputId }}"
+                                    type="file"
+                                    name="documents[{{ $documentKey }}]"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    data-max-bytes="5242880"
+                                    data-max-pixels="20000000"
+                                    aria-describedby="{{ $documentFeedbackId }}"
+                                    required
+                                >
+                                <small
+                                    id="{{ $documentFeedbackId }}"
+                                    class="registration-upload-feedback @error('documents.'.$documentKey) is-error @enderror"
+                                    role="status"
+                                    aria-live="polite"
+                                >@error('documents.'.$documentKey){{ $message }}@else Wajib diunggah. Gambar maksimal 20 megapiksel.@enderror</small>
+                            </label>
+                        @endforeach
                     </div>
                 </fieldset>
 
