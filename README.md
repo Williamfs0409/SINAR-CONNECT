@@ -452,18 +452,16 @@ Sesuai ruang lingkup laporan:
 
 ## 🤝 Tim Kelompok 6
 
-<!-- Isi nama dan NIM anggota -->
-
 | No | Nama | NIM | Peran |
 |---:|---|---|---|
-| 1 | _isi nama_ | _isi NIM_ | _isi peran_ |
-| 2 | _isi nama_ | _isi NIM_ | _isi peran_ |
-| 3 | _isi nama_ | _isi NIM_ | _isi peran_ |
-| 4 | _isi nama_ | _isi NIM_ | _isi peran_ |
-| 5 | _isi nama_ | _isi NIM_ | _isi peran_ |
+| 1 | Farel Yamotaro Hia | 251402069 | Project Manager |
+| 2 | Ray Nathan Geereno Saragih | 251402046 | Frontend |
+| 3 | Naufal Muhammad Dzaki | 251402128 | Backend |
+| 4 | William Fransisco Sihotang | 251402052 | Frontend |
+| 5 | Yabesh Day Siahaan | 251402004 | Hosting (Hostinger) |
 
 **Dosen pengampu:** Bapak Dedy Arisandi, S.T., M.Kom.
-**Mitra:** TK Najmah Rugayah Darus, Medan
+**Mitra:** TK Najmah Rugayah Darus, Medan, Sumatera Utara
 
 ---
 
