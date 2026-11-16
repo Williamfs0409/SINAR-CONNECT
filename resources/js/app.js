@@ -355,6 +355,74 @@ document.querySelectorAll('[data-max-bytes][data-max-pixels]').forEach((fileInpu
     });
 });
 
+document.querySelectorAll('[data-activity-photo-input]').forEach((fileInput) => {
+    const form = fileInput.form;
+    const previewGrid = form?.querySelector('[data-activity-photo-previews]');
+    const photoCount = form?.querySelector('[data-activity-photo-count]');
+    const maxFiles = Number(fileInput.dataset.maxFiles ?? 10);
+    let previewUrls = [];
+
+    if (!form || !previewGrid || !photoCount) {
+        return;
+    }
+
+    const renderPreviews = () => {
+        previewUrls.forEach((url) => URL.revokeObjectURL(url));
+        previewUrls = [];
+        previewGrid.replaceChildren();
+
+        const files = Array.from(fileInput.files ?? []);
+        previewGrid.hidden = files.length === 0;
+        fileInput.setCustomValidity(files.length > maxFiles ? `Pilih maksimal ${maxFiles} foto.` : '');
+        photoCount.classList.toggle('is-error', files.length > maxFiles);
+        if (files.length > maxFiles) {
+            photoCount.textContent = `Maksimal ${maxFiles} foto per unggahan.`;
+        } else if (files.length > 0) {
+            photoCount.textContent = `${files.length} foto dipilih. Maksimal ${maxFiles} foto, 5 MB per foto.`;
+        } else {
+            photoCount.textContent = `Pilih hingga ${maxFiles} foto sekaligus (maksimal 5 MB per foto).`;
+        }
+
+        files.forEach((file, index) => {
+            const card = document.createElement('figure');
+            const image = document.createElement('img');
+            const removeButton = document.createElement('button');
+            const caption = document.createElement('figcaption');
+            const objectUrl = URL.createObjectURL(file);
+
+            card.className = 'activity-photo-preview-card';
+            image.src = objectUrl;
+            image.alt = `Pratinjau ${file.name}`;
+            previewUrls.push(objectUrl);
+            removeButton.className = 'activity-photo-preview-remove';
+            removeButton.type = 'button';
+            removeButton.setAttribute('aria-label', `Hapus foto ${file.name}`);
+            removeButton.title = 'Hapus foto';
+            removeButton.textContent = '×';
+            caption.textContent = file.name;
+
+            removeButton.addEventListener('click', () => {
+                const remainingFiles = new DataTransfer();
+                Array.from(fileInput.files ?? []).forEach((selectedFile, selectedIndex) => {
+                    if (selectedIndex !== index) {
+                        remainingFiles.items.add(selectedFile);
+                    }
+                });
+                fileInput.files = remainingFiles.files;
+                renderPreviews();
+            });
+
+            card.append(image, removeButton, caption);
+            previewGrid.append(card);
+        });
+    };
+
+    fileInput.addEventListener('change', renderPreviews);
+    window.addEventListener('pagehide', () => {
+        previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    }, { once: true });
+});
+
 document.querySelector('#google-login')?.addEventListener('click', () => {
     document.querySelector('#login-feedback').textContent = 'Login Google belum dihubungkan.';
 });

@@ -337,7 +337,7 @@ class SchoolDataController extends Controller
 
         $scope = $this->scopeFor($user, $role);
         $module = $section === 'ringkasan' ? null : $this->moduleDefinition($section, $role);
-        $records = $module ? $this->recordsFor($section, $module, $scope, $role) : null;
+        $records = $module ? $this->recordsFor($section, $module, $scope, $role, $user) : null;
         $messageCenterReady = Schema::hasTable('messages');
 
         return view('dashboard.school-dashboard', [
@@ -374,7 +374,10 @@ class SchoolDataController extends Controller
             ->orderByDesc('ta.tahun_mulai')
             ->orderBy('k.nama_kelas');
 
-        if ($role === 'teacher' || $role === 'parent') {
+        if ($role === 'teacher' && $section === 'kegiatan') {
+            $classes->where('ta.is_aktif', true)
+                ->where('k.nama_kelas', '<>', 'Belum Ditentukan');
+        } elseif ($role === 'parent' || $role === 'teacher') {
             $classes->whereIn('k.id_kelas', $scope['classIds']);
         }
         $data['classes'] = $classes->get();
@@ -582,7 +585,7 @@ class SchoolDataController extends Controller
             $activities = DB::table('v_laporan_kegiatan')
                 ->orderByDesc('tanggal');
             if (in_array($role, ['teacher', 'parent'], true)) {
-                $activities->where(function (Builder $where) use ($scope): void {
+                $activities->where(function (Builder $where) use ($scope, $role, $user): void {
                     $where->where('seluruh_sekolah', true)
                         ->orWhereExists(function (Builder $activityClass) use ($scope): void {
                             $activityClass->selectRaw('1')
@@ -590,6 +593,14 @@ class SchoolDataController extends Controller
                                 ->whereColumn('kk.id_kegiatan', 'v_laporan_kegiatan.id_kegiatan')
                                 ->whereIn('kk.id_kelas', $scope['classIds']);
                         });
+                    if ($role === 'teacher') {
+                        $where->orWhereExists(function (Builder $createdActivity) use ($user): void {
+                            $createdActivity->selectRaw('1')
+                                ->from('kegiatan as k')
+                                ->whereColumn('k.id_kegiatan', 'v_laporan_kegiatan.id_kegiatan')
+                                ->where('k.id_user_pembuat', $user->getKey());
+                        });
+                    }
                 });
             }
             $data['activities'] = $activities->get([
@@ -598,8 +609,12 @@ class SchoolDataController extends Controller
             $data['activityPhotos'] = DB::table('dokumentasi_kegiatan as d')
                 ->join('kegiatan as k', 'k.id_kegiatan', '=', 'd.id_kegiatan')
                 ->leftJoin('kegiatan_kelas as kk', 'kk.id_kegiatan', '=', 'k.id_kegiatan')
-                ->where(function (Builder $query) use ($role, $scope): void {
-                    if (in_array($role, ['teacher', 'parent'], true)) {
+                ->where(function (Builder $query) use ($role, $scope, $user): void {
+                    if ($role === 'teacher') {
+                        $query->where('k.seluruh_sekolah', true)
+                            ->orWhereIn('kk.id_kelas', $scope['classIds'])
+                            ->orWhere('k.id_user_pembuat', $user->getKey());
+                    } elseif ($role === 'parent') {
                         $query->where('k.seluruh_sekolah', true)
                             ->orWhereIn('kk.id_kelas', $scope['classIds']);
                     }
@@ -771,14 +786,14 @@ class SchoolDataController extends Controller
         };
     }
 
-    private function recordsFor(string $section, array $module, array $scope, string $role): mixed
+    private function recordsFor(string $section, array $module, array $scope, string $role, User $user): mixed
     {
         $query = match ($section) {
             'kelas' => $this->classQuery($scope, $role),
             'pembelajaran' => $this->lessonQuery($scope, $role),
             'nilai' => $this->iqroQuery($scope, $role),
             'perkembangan' => $this->portfolioQuery($scope, $role),
-            'kegiatan' => $this->activityQuery($scope, $role),
+            'kegiatan' => $this->activityQuery($scope, $role, $user->getKey()),
             'pembayaran' => $role === 'parent'
                 ? $this->parentPaymentsQuery($scope)
                 : DB::table('v_pembayaran_detail')
@@ -926,7 +941,7 @@ class SchoolDataController extends Controller
         return $query->orderByDesc('p.tanggal');
     }
 
-    private function activityQuery(array $scope, string $role): Builder
+    private function activityQuery(array $scope, string $role, int $userId): Builder
     {
         $query = DB::table('v_laporan_kegiatan')->select([
             'nama_kegiatan', 'jenis', 'tanggal', 'lokasi', 'kelas_terlibat',
@@ -934,7 +949,7 @@ class SchoolDataController extends Controller
         ]);
 
         if (in_array($role, ['teacher', 'parent'], true)) {
-            $query->where(function (Builder $where) use ($scope): void {
+            $query->where(function (Builder $where) use ($scope, $role, $userId): void {
                 $where->where('seluruh_sekolah', true)
                     ->orWhereExists(function (Builder $classActivity) use ($scope): void {
                         $classActivity->selectRaw('1')
@@ -942,6 +957,14 @@ class SchoolDataController extends Controller
                             ->whereColumn('kk.id_kegiatan', 'v_laporan_kegiatan.id_kegiatan')
                             ->whereIn('kk.id_kelas', $scope['classIds']);
                     });
+                if ($role === 'teacher') {
+                    $where->orWhereExists(function (Builder $createdActivity) use ($userId): void {
+                        $createdActivity->selectRaw('1')
+                            ->from('kegiatan as k')
+                            ->whereColumn('k.id_kegiatan', 'v_laporan_kegiatan.id_kegiatan')
+                            ->where('k.id_user_pembuat', $userId);
+                    });
+                }
             });
         }
 
