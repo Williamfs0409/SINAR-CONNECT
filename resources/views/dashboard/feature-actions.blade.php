@@ -379,6 +379,14 @@
 
         @if ($section === 'pembayaran')
             <div class="database-section-heading"><div><h2>{{ $role === 'parent' ? 'Kirim pembayaran' : 'Catat pembayaran' }}</h2><p>Pembayaran transfer membutuhkan bukti; transaksi tunai oleh administrator langsung tercatat.</p></div></div>
+            @if ($role === 'parent')
+                <div class="database-bank-details" role="note" aria-label="Informasi rekening pembayaran">
+                    <div><span>Bank</span><strong>Bank Syariah Indonesia (BSI)</strong></div>
+                    <div><span>Nomor rekening</span><strong>7276048637</strong></div>
+                    <div><span>Atas nama</span><strong>Sri Hariati · Kepala Sekolah</strong></div>
+                    <p>Transfer sesuai jumlah tagihan, lalu unggah bukti transfer agar pembayaran dapat diverifikasi.</p>
+                </div>
+            @endif
             <form method="POST" action="{{ route('database.payment.store') }}" enctype="multipart/form-data" class="database-form-grid">
                 @csrf
                 <label>Tagihan<select name="id_tagihan" required>
