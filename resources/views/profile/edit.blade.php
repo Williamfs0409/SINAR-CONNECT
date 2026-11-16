@@ -8,7 +8,7 @@
         <header class="profile-settings-header">
             <a class="database-brand" href="{{ route('dashboard') }}">
                 <span class="database-brand-mark">S</span>
-                <span><strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
+                <span> <strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
             </a>
             <a class="profile-back-link" href="{{ route('dashboard') }}">Kembali ke dashboard</a>
         </header>
