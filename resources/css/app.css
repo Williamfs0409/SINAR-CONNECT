@@ -983,15 +983,32 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .database-form-wide { grid-column: 1 / -1; }
 .database-bank-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; margin-bottom: 14px; padding: 14px; border: 1px solid #d6e7dc; border-radius: 9px; color: #315f43; background: #f4faf5; }
 .database-bank-details > div { display: flex; flex-direction: column; gap: 4px; }
+.database-bank-details .database-copy-button { align-self: flex-start; }
 .database-bank-details span { color: #70877a; font-size: 10px; }
 .database-bank-details strong { font-size: 12px; overflow-wrap: anywhere; }
 .database-bank-details p { grid-column: 1 / -1; margin: 0; color: #587261; font-size: 10px; }
+.database-subsection-heading { margin-top: 21px; }
 .database-button { display: inline-flex; min-height: 35px; align-items: center; justify-content: center; padding: 0 13px; border: 1px solid #2876df; border-radius: 7px; color: #fff; background: #2876df; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .database-button:hover { background: #1765cf; }
 .database-button-secondary { border-color: #c9dced; color: #3e6e98; background: #f7fbff; }
 .database-button-secondary:hover { color: #245c8d; background: #edf6ff; }
 .database-button-danger { border-color: #edcaca; color: #a34343; background: #fff8f8; }
 .database-button-danger:hover { background: #ffeded; }
+.database-row-actions { display: flex; align-items: flex-start; gap: 7px; }
+.database-row-actions form { margin: 0; }
+.database-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid #dce5ed; border-radius: 8px; color: #5b7184; background: #f8fafc; cursor: pointer; }
+.database-icon-button:hover { border-color: #c8d6e2; color: #3e5b72; background: #eef3f7; }
+.database-icon-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
+.database-icon-button-danger { border-color: #e8dddd; color: #916d6d; background: #fbf8f8; }
+.database-icon-button-danger:hover { border-color: #ddc9c9; color: #815757; background: #f7eeee; }
+.database-row-editor { min-width: 32px; }
+.database-row-editor > summary { list-style: none; cursor: pointer; }
+.database-row-editor > summary::-webkit-details-marker { display: none; }
+.database-row-editor-form { display: grid; min-width: 230px; gap: 9px; margin-top: 8px; padding: 12px; border: 1px solid #dce5ed; border-radius: 9px; background: #fff; box-shadow: 0 8px 24px rgba(34, 57, 78, .09); }
+.database-row-editor-form label { display: grid; gap: 4px; color: #526b81; font-size: 10px; font-weight: 700; }
+.database-row-editor-form input, .database-row-editor-form select, .database-row-editor-form textarea { width: 100%; padding: 8px; border: 1px solid #d8e2eb; border-radius: 7px; color: #32485b; background: #fff; font: inherit; }
+.database-row-editor-form small { color: #75899b; font-size: 10px; }
+.database-row-editor-form .database-button { justify-self: start; }
 .database-action-row, .database-action-form { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid #edf1f5; }
 .database-action-row > div:first-child, .database-action-form > strong { display: flex; min-width: 155px; flex: 1; flex-direction: column; gap: 4px; color: #34536e; font-size: 10px; }
 .database-action-row small { color: #8292a1; font-size: 9px; font-weight: 400; }
@@ -999,7 +1016,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .database-inline-form { display: flex; align-items: end; flex-wrap: wrap; gap: 9px; margin: 9px 0 14px; }
 .database-inline-form > input, .database-inline-form > select { width: auto; min-width: 145px; }
 .database-inline-form > strong { margin-right: auto; color: #34536e; font-size: 10px; }
-.database-registration-review { display: grid; grid-template-columns: minmax(150px, 1.4fr) minmax(100px, .7fr) minmax(160px, 1fr) minmax(130px, .7fr) minmax(140px, 1fr) auto; }
+.database-registration-review { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: start; gap: 14px; }
+.database-registration-review > div:first-child { min-width: 0; }
+.database-registration-controls { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.database-registration-controls > * { width: 100%; min-width: 0; }
+.database-registration-controls > button { grid-column: 1 / -1; justify-self: start; width: auto; }
 .database-registration-details { margin-top: 7px; color: #526b81; }
 .database-registration-details summary { color: #2876df; font-size: 9px; font-weight: 700; cursor: pointer; }
 .database-registration-details dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 12px; margin: 8px 0 0; }
@@ -1059,7 +1080,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
     .database-form-wide { grid-column: auto; }
     .database-action-row, .database-inline-form { align-items: stretch; flex-direction: column; }
     .database-action-row > input, .database-action-row > select, .database-inline-form > input, .database-inline-form > select { max-width: none; width: 100%; }
-    .database-registration-review { display: flex; }
+    .database-registration-review { grid-template-columns: minmax(0, 1fr); }
+    .database-registration-controls { grid-template-columns: minmax(0, 1fr); }
+    .database-registration-controls > button { grid-column: auto; justify-self: stretch; width: 100%; }
     .database-attendance-row { grid-template-columns: 1fr 1fr; }
     .database-attendance-row strong { grid-column: 1 / -1; }
     .database-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

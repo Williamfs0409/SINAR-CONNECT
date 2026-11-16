@@ -3,13 +3,84 @@
     $rosterOptions = $actions['rosters'] ?? collect();
 @endphp
 
+@if ($section === 'pendaftaran' && $role === 'parent')
+    <section class="database-action-panel">
+        <div class="database-section-heading">
+            <div><h2>Kelengkapan dokumen pendaftaran</h2><p>Unggah dokumen yang belum ada atau ganti dokumen yang ditolak admin. Berkas yang sedang diperiksa tidak perlu diunggah ulang.</p></div>
+        </div>
+        @forelse ($actions['parentApplications'] ?? [] as $application)
+            <div class="database-action-row">
+                <div>
+                    <strong>{{ $application->nama_lengkap }}</strong>
+                    <small>Status pendaftaran: {{ $application->status }}</small>
+                    <ul>
+                        @foreach ($application->requiredDocuments as $requiredDocument)
+                            @php
+                                $document = $requiredDocument['document'];
+                            @endphp
+                            <li>
+                                {{ $requiredDocument['label'] }}:
+                                @if (! $document)
+                                    Belum diunggah
+                                @else
+                                    {{ $document->status_verifikasi }}
+                                    @if ($document->catatan)
+                                        — {{ $document->catatan }}
+                                    @endif
+                                    · <a href="{{ route('database.registration.document.file', ['document' => $document->id_dokumen]) }}" target="_blank" rel="noopener">Lihat berkas</a>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+                @php
+                    $documentsToUpload = $application->requiredDocuments->filter(function ($item) {
+                        return ! $item['document'] || $item['document']->status_verifikasi === 'Tidak Valid';
+                    });
+                @endphp
+                @if ($documentsToUpload->isNotEmpty())
+                    <form method="POST" action="{{ route('database.registration.documents.upload', ['registration' => $application->id_pendaftaran]) }}" enctype="multipart/form-data" class="database-form-grid">
+                        @csrf
+                        @foreach ($documentsToUpload as $requiredDocument)
+                            @php
+                                $documentKey = $requiredDocument['key'];
+                                $documentError = $errors->first('documents.'.$documentKey);
+                            @endphp
+                            <label>{{ $requiredDocument['label'] }} (PDF/JPG/PNG, maks. 5 MB)
+                                <input
+                                    type="file"
+                                    name="documents[{{ $documentKey }}]"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    data-max-bytes="5242880"
+                                    data-max-pixels="20000000"
+                                >
+                                @if ($documentError)
+                                    <small class="registration-upload-feedback is-error">{{ $documentError }}</small>
+                                @endif
+                            </label>
+                        @endforeach
+                        <div class="database-form-wide">
+                            <small>Pilih minimal satu dokumen untuk diunggah atau diperbaiki.</small>
+                            <button class="database-button" type="submit">Unggah dokumen</button>
+                        </div>
+                    </form>
+                @else
+                    <small>Semua dokumen yang perlu diunggah sudah tersedia dan sedang menunggu pemeriksaan atau telah valid.</small>
+                @endif
+            </div>
+        @empty
+            <p class="database-empty-note">Tidak ada pendaftaran aktif yang memerlukan dokumen tambahan.</p>
+        @endforelse
+    </section>
+@endif
+
 @if ($section === 'siswa' && $role === 'admin')
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div><h2>Kelola profil siswa</h2><p>Perbarui informasi siswa yang sudah terdaftar. Data hanya dapat dikelola administrator.</p></div>
         </div>
         @forelse ($actions['studentProfiles'] ?? [] as $student)
-            <details class="database-student-editor">
+            <details class="database-student-editor" id="student-profile-editor-{{ $student->id_siswa }}">
                 <summary>{{ $student->nama_lengkap }} <small>Ubah profil</small></summary>
                 <form method="POST" action="{{ route('database.student.profile', ['student' => $student->id_siswa]) }}" class="database-form-grid">
                     @csrf
@@ -80,7 +151,7 @@
                 @csrf
                 <div>
                     <strong>{{ $application->nama_lengkap }}</strong>
-                    <small>{{ $application->no_pendaftaran }} · {{ $application->kelompok }} · {{ $application->tahun_ajaran }} · {{ $application->dokumen_valid }}/{{ $application->dokumen_diunggah }} dokumen valid</small>
+                    <small>{{ $application->no_pendaftaran }} · {{ $application->kelompok }} · {{ $application->tahun_ajaran }} · {{ $application->dokumen_valid }}/{{ count(config('registration.required_documents')) }} dokumen wajib valid ({{ $application->dokumen_diunggah }} diunggah)</small>
                     <details class="database-registration-details">
                         <summary>Lihat data calon siswa dan wali</summary>
                         <dl>
@@ -95,22 +166,24 @@
                         </dl>
                     </details>
                 </div>
-                <select name="decision" required aria-label="Keputusan pendaftaran">
-                    <option value="verify" @selected($application->status === 'Diajukan')>Verifikasi</option>
-                    <option value="accept" @selected($application->status === 'Diverifikasi')>Terima</option>
-                    <option value="reject">Tolak</option>
-                </select>
-                <select name="class_id" aria-label="Kelas penerimaan">
-                    <option value="">Pilih kelas jika menerima</option>
-                    @foreach ($classOptions as $class)
-                        <option value="{{ $class->id_kelas }}" @disabled($class->kelompok !== $application->kelompok || $class->tahun_ajaran !== $application->tahun_ajaran)>
-                            {{ $class->tahun_ajaran }} · {{ $class->kelompok }} · {{ $class->nama_kelas }}
-                        </option>
-                    @endforeach
-                </select>
-                <input type="date" name="due_date" aria-label="Jatuh tempo biaya pendaftaran">
-                <input name="note" maxlength="255" placeholder="Catatan verifikasi">
-                <button class="database-button" type="submit">Simpan keputusan</button>
+                <div class="database-registration-controls">
+                    <select name="decision" required aria-label="Keputusan pendaftaran">
+                        <option value="verify" @selected($application->status === 'Diajukan')>Verifikasi</option>
+                        <option value="accept" @selected($application->status === 'Diverifikasi')>Terima</option>
+                        <option value="reject">Tolak</option>
+                    </select>
+                    <select name="class_id" aria-label="Kelas penerimaan">
+                        <option value="">Pilih kelas jika menerima</option>
+                        @foreach ($classOptions as $class)
+                            <option value="{{ $class->id_kelas }}" @disabled($class->kelompok !== $application->kelompok || $class->tahun_ajaran !== $application->tahun_ajaran)>
+                                {{ $class->tahun_ajaran }} · {{ $class->kelompok }} · {{ $class->nama_kelas }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <input type="date" name="due_date" aria-label="Jatuh tempo biaya pendaftaran">
+                    <input name="note" maxlength="255" placeholder="Catatan verifikasi">
+                    <button class="database-button" type="submit">Simpan keputusan</button>
+                </div>
             </form>
         @empty
             <p class="database-empty-note">Tidak ada pendaftaran yang menunggu proses.</p>
@@ -355,9 +428,46 @@
                 <label>Jatuh tempo<input type="date" name="jatuh_tempo" required></label>
                 <button class="database-button" type="submit">Buat tagihan</button>
             </form>
+
+            <div class="database-section-heading database-subsection-heading"><div><h2>Buat tagihan untuk satu siswa</h2><p>Nominal mengikuti tarif bulanan aktif dan hanya berlaku untuk siswa yang dipilih.</p></div></div>
+            @if (! ($actions['activeSchoolYear'] ?? null))
+                <p class="database-empty-note">Tahun ajaran aktif belum tersedia.</p>
+            @elseif (($actions['billRosters'] ?? collect())->isEmpty())
+                <p class="database-empty-note">Belum ada siswa aktif di kelas pada tahun ajaran ini.</p>
+            @elseif (($actions['monthlyTariffs'] ?? collect())->isEmpty())
+                <p class="database-empty-note">Tarif bulanan untuk tahun ajaran aktif belum tersedia.</p>
+            @else
+                <form method="POST" action="{{ route('database.bills.store') }}" class="database-form-grid">
+                    @csrf
+                    <label>Siswa<select name="id_rombel" required>
+                        <option value="">Pilih siswa aktif</option>
+                        @foreach ($actions['billRosters'] as $roster)
+                            <option value="{{ $roster->id_rombel }}" @selected(old('id_rombel') == $roster->id_rombel)>{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }} · {{ $roster->kelompok }}</option>
+                        @endforeach
+                    </select></label>
+                    <label>Jenis tarif<select name="id_jenis_biaya" required>
+                        <option value="">Pilih tarif bulanan</option>
+                        @foreach ($actions['monthlyTariffs'] as $tariff)
+                            <option value="{{ $tariff->id_jenis_biaya }}" @selected(old('id_jenis_biaya') == $tariff->id_jenis_biaya)>{{ $tariff->nama }} · {{ $tariff->kelompok }} · Rp{{ number_format($tariff->nominal, 0, ',', '.') }}</option>
+                        @endforeach
+                    </select></label>
+                    <label>Periode<input type="month" name="periode" value="{{ old('periode', now('Asia/Jakarta')->format('Y-m')) }}" required></label>
+                    <label>Jatuh tempo<input type="date" name="jatuh_tempo" value="{{ old('jatuh_tempo', now('Asia/Jakarta')->endOfMonth()->toDateString()) }}" required></label>
+                    <div class="database-form-wide"><button class="database-button" type="submit">Buat tagihan siswa</button></div>
+                </form>
+            @endif
         @endif
 
         @if ($role === 'admin' && $section === 'pembayaran')
+            <div class="database-section-heading"><div><h2>Rekening pembayaran</h2><p>Informasi ini ditampilkan kepada orang tua sebelum transfer.</p></div></div>
+            <form method="POST" action="{{ route('database.payment-settings.update') }}" class="database-form-grid">
+                @csrf
+                @method('PATCH')
+                <label>Bank<input name="bank_name" value="{{ old('bank_name', $actions['paymentSettings']->bank_name ?? '') }}" maxlength="100" required></label>
+                <label>Atas nama<input name="account_holder" value="{{ old('account_holder', $actions['paymentSettings']->account_holder ?? '') }}" maxlength="150" required></label>
+                <label>Nomor rekening<input name="account_number" value="{{ old('account_number', $actions['paymentSettings']->account_number ?? '') }}" maxlength="40" required></label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Simpan rekening</button></div>
+            </form>
             <div class="database-section-heading"><div><h2>Verifikasi pembayaran</h2><p>Periksa bukti transfer sebelum menyetujui transaksi.</p></div></div>
             @forelse ($actions['pendingPayments'] ?? [] as $payment)
                 <form method="POST" action="{{ route('database.payment.review', ['payment' => $payment->id_pembayaran]) }}" class="database-action-row">
@@ -378,27 +488,75 @@
         @if ($section === 'pembayaran')
             <div class="database-section-heading"><div><h2>{{ $role === 'parent' ? 'Kirim pembayaran' : 'Catat pembayaran' }}</h2><p>Pembayaran transfer membutuhkan bukti; transaksi tunai oleh administrator langsung tercatat.</p></div></div>
             @if ($role === 'parent')
-                <div class="database-bank-details" role="note" aria-label="Informasi rekening pembayaran">
-                    <div><span>Bank</span><strong>Bank Syariah Indonesia (BSI)</strong></div>
-                    <div><span>Nomor rekening</span><strong>7276048637</strong></div>
-                    <div><span>Atas nama</span><strong>Sri Hariati · Kepala Sekolah</strong></div>
-                    <p>Transfer sesuai jumlah tagihan, lalu unggah bukti transfer agar pembayaran dapat diverifikasi.</p>
-                </div>
+                @if ($actions['paymentSettings'] ?? null)
+                    <div class="database-bank-details" role="note" aria-label="Informasi rekening pembayaran">
+                        <div><span>Bank</span><strong>{{ $actions['paymentSettings']->bank_name }}</strong></div>
+                        <div>
+                            <span>Nomor rekening</span>
+                            <strong id="payment-account-number">{{ $actions['paymentSettings']->account_number }}</strong>
+                            <button type="button" class="database-button database-button-secondary database-copy-button" data-copy-target="payment-account-number" data-copy-status="payment-account-copy-status">Salin nomor</button>
+                            <span id="payment-account-copy-status" aria-live="polite"></span>
+                        </div>
+                        <div><span>Atas nama</span><strong>{{ $actions['paymentSettings']->account_holder }}</strong></div>
+                        <p>Transfer sesuai sisa tagihan, lalu unggah bukti transfer agar pembayaran dapat diverifikasi.</p>
+                    </div>
+                @else
+                    <p class="database-form-errors">Informasi rekening belum disiapkan. Hubungi administrator sebelum membayar.</p>
+                @endif
             @endif
-            <form method="POST" action="{{ route('database.payment.store') }}" enctype="multipart/form-data" class="database-form-grid">
-                @csrf
-                <label>Tagihan<select name="id_tagihan" required>
-                    @foreach ($actions['bills'] ?? [] as $bill)
-                        @if ((float) $bill->sisa > 0)
+            @if (($actions['payableBills'] ?? collect())->isEmpty())
+                <p class="database-empty-note">Belum ada tagihan dengan sisa pembayaran yang dapat dibayar.</p>
+            @else
+                <form method="POST" action="{{ route('database.payment.store') }}" enctype="multipart/form-data" class="database-form-grid">
+                    @csrf
+                    <label>Tagihan<select name="id_tagihan" required>
+                        @foreach ($actions['payableBills'] as $bill)
                             <option value="{{ $bill->id_tagihan }}">{{ $bill->nama_lengkap }} · {{ $bill->jenis_biaya }} · Sisa Rp {{ number_format($bill->sisa, 0, ',', '.') }}</option>
+                        @endforeach
+                    </select></label>
+                    <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
+                    <label>Metode<select name="metode" required>
+                        @if ($role === 'parent')
+                            <option value="Transfer" selected>Transfer</option>
+                        @else
+                            <option value="Tunai">Tunai</option><option value="Transfer">Transfer</option>
                         @endif
+                    </select></label>
+                    <label>Bukti transfer (wajib untuk transfer)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" @required($role === 'parent')></label>
+                    <label class="database-form-wide">Catatan<input name="catatan" maxlength="255"></label>
+                    <div class="database-form-wide"><button class="database-button" type="submit">Simpan pembayaran</button></div>
+                </form>
+            @endif
+            @if ($role === 'parent')
+                <p class="database-empty-note">Status pembayaran: <strong>Menunggu Verifikasi</strong> sedang diperiksa admin, <strong>Terverifikasi</strong> sudah disetujui, dan <strong>Ditolak</strong> perlu ditindaklanjuti.</p>
+            @endif
+        @endif
+    </section>
+@endif
+
+@if ($section === 'keluarga' && $role === 'admin')
+    <section class="database-action-panel">
+        <div class="database-section-heading"><div><h2>Hubungkan akun orang tua</h2><p>Pilih akun dan data keluarga yang belum terhubung. Pengaitan ini memberi akun akses ke semua siswa dalam keluarga tersebut.</p></div></div>
+        @if (($actions['unlinkedParents'] ?? collect())->isEmpty())
+            <p class="database-empty-note">Tidak ada akun orang tua aktif yang belum terhubung.</p>
+        @elseif (($actions['unlinkedFamilies'] ?? collect())->isEmpty())
+            <p class="database-empty-note">Tidak ada data keluarga berisi siswa yang belum terhubung.</p>
+        @else
+            <form method="POST" action="{{ route('database.family.link-parent') }}" class="database-form-grid">
+                @csrf
+                <label>Akun orang tua<select name="id_user" required>
+                    <option value="">Pilih akun orang tua</option>
+                    @foreach ($actions['unlinkedParents'] as $parent)
+                        <option value="{{ $parent->id_user }}" @selected(old('id_user') == $parent->id_user)>{{ $parent->name }} · {{ $parent->email }}</option>
                     @endforeach
                 </select></label>
-                <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
-                <label>Metode<select name="metode" required><option value="Tunai">Tunai</option><option value="Transfer">Transfer</option></select></label>
-                <label>Bukti transfer (wajib untuk transfer)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf"></label>
-                <label class="database-form-wide">Catatan<input name="catatan" maxlength="255"></label>
-                <div class="database-form-wide"><button class="database-button" type="submit">Simpan pembayaran</button></div>
+                <label>Data keluarga<select name="id_keluarga" required>
+                    <option value="">Pilih data keluarga</option>
+                    @foreach ($actions['unlinkedFamilies'] as $family)
+                        <option value="{{ $family->id_keluarga }}" @selected(old('id_keluarga') == $family->id_keluarga)>Keluarga #{{ $family->id_keluarga }} · {{ $family->studentNames }}</option>
+                    @endforeach
+                </select></label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Hubungkan akun</button></div>
             </form>
         @endif
     </section>
@@ -459,8 +617,30 @@
             <label>Nama<input name="name" maxlength="100" required></label>
             <label>Email<input type="email" name="email" maxlength="150" required></label>
             <label>Peran<select name="role"><option value="teacher">Guru</option><option value="principal">Kepala sekolah</option><option value="parent">Orang tua</option><option value="admin">Administrator</option></select></label>
-            <label>Kata sandi<input type="password" name="password" minlength="8" required></label>
-            <label>Ulangi kata sandi<input type="password" name="password_confirmation" minlength="8" required></label>
+            <label>Kata sandi
+                <span class="registration-password-wrap">
+                    <input id="database-user-password" type="password" name="password" minlength="8" autocomplete="new-password" required>
+                    <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="2"/>
+                            <path class="password-eye-slash" d="m4 4 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </span>
+            </label>
+            <label>Ulangi kata sandi
+                <span class="registration-password-wrap">
+                    <input id="database-user-password-confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required>
+                    <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password-confirmation" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="2"/>
+                            <path class="password-eye-slash" d="m4 4 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </span>
+            </label>
             <div class="database-form-wide"><button class="database-button" type="submit">Buat akun</button></div>
         </form>
     </section>

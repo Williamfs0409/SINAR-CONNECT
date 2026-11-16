@@ -233,6 +233,54 @@ document.querySelectorAll('.password-toggle').forEach((passwordToggle) => {
     });
 });
 
+document.querySelectorAll('.database-copy-button').forEach((button) => {
+    const target = document.getElementById(button.dataset.copyTarget);
+    const status = document.getElementById(button.dataset.copyStatus);
+
+    if (!target || !status) {
+        console.error('Payment account copy control is missing its target or status element.');
+        return;
+    }
+
+    button.addEventListener('click', async () => {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+            status.textContent = 'Tidak dapat menyalin otomatis. Silakan salin nomor rekening secara manual.';
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(target.textContent.trim());
+            status.textContent = 'Nomor rekening berhasil disalin.';
+        } catch (error) {
+            console.error('Unable to copy the payment account number.', error);
+            status.textContent = 'Tidak dapat menyalin otomatis. Silakan salin nomor rekening secara manual.';
+        }
+    });
+});
+
+document.querySelectorAll('form[data-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+        if (!window.confirm(form.dataset.confirm)) {
+            event.preventDefault();
+        }
+    });
+});
+
+document.querySelectorAll('[data-open-editor]').forEach((button) => {
+    const editor = document.getElementById(button.dataset.openEditor);
+
+    if (!editor) {
+        console.error('Student profile editor was not found.');
+        return;
+    }
+
+    button.addEventListener('click', () => {
+        editor.open = true;
+        editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        editor.querySelector('input, textarea, select')?.focus();
+    });
+});
+
 document.querySelectorAll('[data-max-bytes][data-max-pixels]').forEach((fileInput) => {
     const feedback = document.getElementById(fileInput.getAttribute('aria-describedby'));
     const form = fileInput.form;
