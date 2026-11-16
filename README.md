@@ -14,13 +14,14 @@ Aplikasi web berbasis Laravel 12 untuk proyek SINAR-CONNECT.
 composer install
 copy .env.example .env
 php artisan key:generate
-php artisan migrate
+# Atur DB_CONNECTION dan ADMIN_BOOTSTRAP_PASSWORD di .env terlebih dahulu.
+php artisan migrate --seed
 npm install
 npm run build
 php artisan serve
 ```
 
-Buka `http://127.0.0.1:8000` setelah server berjalan. Atur koneksi database dan variabel lain di file `.env` sesuai lingkungan lokal.
+Buka `http://127.0.0.1:8000` setelah server berjalan. Atur koneksi database dan variabel lain di file `.env` sesuai lingkungan lokal. Setiap laptop dengan database lokal sendiri perlu menjalankan proses seed agar akun awal tersedia. Git hanya mengirim kode, bukan isi database; agar data yang sama muncul di dua laptop, keduanya harus memakai database bersama. Untuk kredensial awal yang sama pada database terpisah, atur email dan kata sandi bootstrap yang sama secara lokal pada masing-masing laptop.
 
 ## Pengembangan aset
 
@@ -48,8 +49,9 @@ pratinjau ini hanya menampilkan data contoh dan tidak mengizinkan perubahan data
 ### Membuat akun administrator awal
 
 Atur `ADMIN_BOOTSTRAP_EMAIL` dan kata sandi unik minimal 12 karakter pada `.env` lokal,
-lalu jalankan `php artisan config:clear` jika konfigurasi pernah di-cache dan
-`php artisan db:seed`. Seeder hanya membuat akun jika email belum dipakai; seeder tidak
+sebelum menjalankan `php artisan migrate --seed`. Jika migrasi sudah pernah dijalankan,
+gunakan `php artisan db:seed` saja. Jalankan `php artisan config:clear` terlebih dahulu
+jika konfigurasi pernah di-cache. Seeder hanya membuat akun jika email belum dipakai; seeder tidak
 mengubah kata sandi atau peran akun yang sudah ada. Hapus nilai `ADMIN_BOOTSTRAP_PASSWORD`
 dari `.env` setelah akun berhasil dibuat.
 
