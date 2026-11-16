@@ -6,7 +6,7 @@
 @section('content')
     <main class="registration-shell">
         <header class="registration-header">
-            <a class="registration-brand" href="{{ route('home') }}"><span>S</span><strong>SINAR-CONNECT</strong></a>
+            <a class="registration-brand" href="{{ route('home') }}"><img src="{{ asset('images/sinar-school-logo.png') }}" alt=""><strong>SINAR-CONNECT</strong></a>
             <a href="{{ route('login') }}">Sudah punya akun? Masuk</a>
         </header>
 

@@ -1,7 +1,7 @@
 <div class="role-dashboard">
     <aside class="role-sidebar">
         <a class="role-brand" href="{{ route('dashboard') }}">
-            <span class="role-brand-mark" aria-hidden="true">S</span>
+            <img class="role-brand-mark" src="{{ asset('images/sinar-school-logo.png') }}" alt="">
             <strong>SINAR</strong>
             <small>TK Najmah Rugayah Darus</small>
         </a>
