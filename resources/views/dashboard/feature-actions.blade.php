@@ -303,7 +303,7 @@
 
 @if ($section === 'kegiatan' && $role === 'teacher')
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Unggah dokumentasi kegiatan</h2><p>Buat kegiatan kelas, lalu unggah foto sebelum, selama, atau sesudah kegiatan. Foto hanya dapat dilihat oleh pengguna yang terhubung dengan kelas terkait.</p></div></div>
+        <div class="database-section-heading"><div><h2>Unggah dokumentasi kegiatan</h2><p>Semua guru dapat memilih kelas, membuat kegiatan, lalu mengunggah foto. Orang tua yang terhubung dengan kelas tersebut dapat melihat dokumentasinya.</p></div></div>
         <form method="POST" action="{{ route('database.activity.store') }}" class="database-form-grid">
             @csrf
             <label>Kelas<select name="id_kelas" required>@foreach ($classOptions as $class)<option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>@endforeach</select></label>
@@ -320,9 +320,11 @@
                 @csrf
                 <strong>{{ $activity->nama_kegiatan }} · {{ $activity->tanggal }}</strong>
                 <select name="tahap"><option>Selama</option><option>Sebelum</option><option>Sesudah</option></select>
-                <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" required>
+                <input type="file" name="foto[]" aria-label="Pilih foto dokumentasi" accept="image/jpeg,image/png,image/webp" multiple required data-activity-photo-input data-max-files="10">
                 <input name="keterangan" maxlength="255" placeholder="Keterangan foto">
                 <button class="database-button" type="submit">Upload foto</button>
+                <div class="activity-photo-preview-grid" data-activity-photo-previews hidden aria-live="polite"></div>
+                <small class="database-empty-note" data-activity-photo-count>Pilih hingga 10 foto sekaligus (maksimal 5 MB per foto).</small>
             </form>
         @endforeach
     </section>

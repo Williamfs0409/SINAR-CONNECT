@@ -193,9 +193,16 @@ class SchoolFeatureController extends Controller
             'attendance.*.status' => ['required', Rule::in(['Hadir', 'Izin', 'Sakit', 'Alfa'])],
             'attendance.*.keterangan' => ['nullable', 'string', 'max:255'],
         ]);
+        if (DB::table('kelas')
+            ->where('id_kelas', $data['id_kelas'])
+            ->where('nama_kelas', 'Belum Ditentukan')
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'id_kelas' => 'Pilih kelas yang sudah ditentukan.',
+            ]);
+        }
 
-        $teacherId = $this->teacherId($user);
-        $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
+        $this->teacherId($user);
         $roster = DB::table('rombel_siswa')
             ->where('id_kelas', $data['id_kelas'])
             ->where('status', 'Aktif')
@@ -485,8 +492,21 @@ class SchoolFeatureController extends Controller
     public function storeActivity(Request $request): RedirectResponse
     {
         $user = $this->userFor(['teacher']);
+        $activeYearId = DB::table('tahun_ajaran')
+            ->where('is_aktif', true)
+            ->value('id_tahun_ajaran');
+        if ($activeYearId === null) {
+            throw ValidationException::withMessages([
+                'id_kelas' => 'Tahun ajaran aktif belum ditentukan.',
+            ]);
+        }
+
         $data = $request->validate([
-            'id_kelas' => ['required', 'integer', Rule::exists('kelas', 'id_kelas')],
+            'id_kelas' => [
+                'required',
+                'integer',
+                Rule::exists('kelas', 'id_kelas')->where('id_tahun_ajaran', $activeYearId),
+            ],
             'nama_kegiatan' => ['required', 'string', 'max:150'],
             'jenis' => ['required', Rule::in(['Dalam Kelas', 'Luar Kelas', 'Field Trip'])],
             'tanggal' => ['required', 'date'],
@@ -522,7 +542,8 @@ class SchoolFeatureController extends Controller
         $data = $request->validate([
             'tahap' => ['required', Rule::in(['Sebelum', 'Selama', 'Sesudah'])],
             'keterangan' => ['nullable', 'string', 'max:255'],
-            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'foto' => ['required', 'array', 'min:1', 'max:10'],
+            'foto.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
         $teacherId = $this->teacherId($user);
         $activity = DB::table('kegiatan as k')
@@ -535,19 +556,35 @@ class SchoolFeatureController extends Controller
             })
             ->exists();
         abort_unless($activity, 403);
-        $path = $this->imageUploads->store($request->file('foto'), 'kegiatan', 'foto');
 
-        DB::table('dokumentasi_kegiatan')->insert([
-            'id_kegiatan' => $activityId,
-            'tahap' => $data['tahap'],
-            'tipe' => 'Foto',
-            'file_path' => $path,
-            'keterangan' => $data['keterangan'] ?? null,
-            'id_user_upload' => $user->getKey(),
-            'created_at' => now(),
-        ]);
+        $storedPaths = [];
+        $documents = [];
 
-        return back()->with('status', 'Foto kegiatan berhasil diunggah.');
+        try {
+            foreach ($data['foto'] as $photo) {
+                $path = $this->imageUploads->store($photo, 'kegiatan', 'foto');
+                $storedPaths[] = $path;
+                $documents[] = [
+                    'id_kegiatan' => $activityId,
+                    'tahap' => $data['tahap'],
+                    'tipe' => 'Foto',
+                    'file_path' => $path,
+                    'keterangan' => $data['keterangan'] ?? null,
+                    'id_user_upload' => $user->getKey(),
+                    'created_at' => now(),
+                ];
+            }
+
+            DB::table('dokumentasi_kegiatan')->insert($documents);
+        } catch (\Throwable $exception) {
+            if ($storedPaths !== [] && ! Storage::disk('local')->delete($storedPaths)) {
+                throw new \RuntimeException('Unable to clean up activity photos after upload failed.', 0, $exception);
+            }
+
+            throw $exception;
+        }
+
+        return back()->with('status', count($documents).' foto kegiatan berhasil diunggah.');
     }
 
     public function activityPhoto(int $documentId): StreamedResponse

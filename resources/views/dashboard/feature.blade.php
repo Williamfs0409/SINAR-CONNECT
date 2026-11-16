@@ -38,10 +38,6 @@
     @endforeach
 </section>
 
-@if ($dashboardSection === 'kegiatan')
-    @include('dashboard.preview-activity-documents')
-@endif
-
 <section class="role-panel role-feature-table-panel">
     <div class="role-panel-heading">
         <div>
