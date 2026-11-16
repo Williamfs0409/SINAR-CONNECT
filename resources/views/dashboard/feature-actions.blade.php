@@ -303,7 +303,7 @@
 
 @if ($section === 'kegiatan' && $role === 'teacher')
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Activity Photo Tracker</h2><p>Buat kegiatan kelas, lalu unggah foto sebelum, selama, atau sesudah kegiatan. Tidak menggunakan pelacakan GPS.</p></div></div>
+        <div class="database-section-heading"><div><h2>Unggah dokumentasi kegiatan</h2><p>Buat kegiatan kelas, lalu unggah foto sebelum, selama, atau sesudah kegiatan. Foto hanya dapat dilihat oleh pengguna yang terhubung dengan kelas terkait.</p></div></div>
         <form method="POST" action="{{ route('database.activity.store') }}" class="database-form-grid">
             @csrf
             <label>Kelas<select name="id_kelas" required>@foreach ($classOptions as $class)<option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>@endforeach</select></label>
@@ -314,7 +314,7 @@
             <label class="database-form-wide">Keterangan<textarea name="deskripsi" rows="3"></textarea></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Buat kegiatan</button></div>
         </form>
-        <h3 class="database-subheading">Unggah foto kegiatan</h3>
+        <h3 class="database-subheading">Pilih kegiatan dan upload foto</h3>
         @foreach ($actions['activities'] ?? [] as $activity)
             <form method="POST" action="{{ route('database.activity.photo.store', ['activity' => $activity->id_kegiatan]) }}" enctype="multipart/form-data" class="database-inline-form">
                 @csrf
@@ -322,7 +322,7 @@
                 <select name="tahap"><option>Selama</option><option>Sebelum</option><option>Sesudah</option></select>
                 <input type="file" name="foto" accept="image/jpeg,image/png,image/webp" required>
                 <input name="keterangan" maxlength="255" placeholder="Keterangan foto">
-                <button class="database-button" type="submit">Unggah foto</button>
+                <button class="database-button" type="submit">Upload foto</button>
             </form>
         @endforeach
     </section>

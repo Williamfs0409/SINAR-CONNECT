@@ -57,6 +57,6 @@
         <div class="role-panel-heading"><div><h2>Dokumentasi Kegiatan</h2><p>Cerita belajar Arka dari sekolah</p></div></div>
         <div class="role-document-card"><strong>Bermain &amp; Belajar di Kebun</strong><p>Mengenal tanaman bersama teman dan belajar merawat lingkungan.</p><small>12 foto · 13 November 2026</small><b>›</b></div>
         <div class="role-document-caption"><strong>Wali kelas: Ibu Dewi Puspita</strong><p>Dokumentasi hanya untuk orang tua yang terhubung dengan anak.</p></div>
-        <a class="role-link" href="#dokumentasi">Lihat dokumentasi →</a>
+        <a class="role-link" href="{{ route('dashboard.feature', ['section' => 'kegiatan']) }}">Lihat semua dokumentasi →</a>
     </section>
 </div>

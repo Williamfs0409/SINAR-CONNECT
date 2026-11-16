@@ -10,7 +10,7 @@
         ['id' => 'tabungan', 'label' => 'Tabungan Anak'],
         ['id' => 'tugas', 'label' => 'Tugas Anak'],
         ['id' => 'rapor', 'label' => 'Rapor Anak'],
-        ['id' => 'dokumentasi', 'label' => 'Dokumentasi Kegiatan'],
+        ['id' => 'kegiatan', 'label' => 'Dokumentasi Kegiatan'],
         ['id' => 'siswa', 'label' => 'Data Siswa'],
     ];
     $dashboardNotifications = [
@@ -25,7 +25,7 @@
         'tabungan' => ['description' => 'Riwayat setoran dan saldo tabungan anak.', 'stats' => [['Saldo saat ini', 'Rp850.000'], ['Setoran terakhir', 'Rp50.000'], ['Bulan ini', 'November']], 'columns' => ['Tanggal', 'Transaksi', 'Saldo'], 'rows' => [['10 November 2026', 'Setoran', 'Rp850.000'], ['10 Oktober 2026', 'Setoran Rp50.000', 'Rp800.000'], ['10 September 2026', 'Setoran Rp50.000', 'Rp750.000']]],
         'tugas' => ['description' => 'Tugas belajar anak yang dapat didampingi di rumah.', 'stats' => [['Tugas aktif', '2'], ['Tugas berikutnya', '17 Nov'], ['Sudah dikumpulkan', '3']], 'columns' => ['Nama tugas', 'Batas waktu', 'Status'], 'rows' => [['Kolase daun kering', '17 November · Seni & kreativitas', 'Belum dikumpulkan'], ['Bercerita bersama keluarga', '20 November · Bahasa', 'Belum dikumpulkan'], ['Mengenal tanaman', '13 November · Sains', 'Dikumpulkan']]],
         'rapor' => ['description' => 'Lihat ringkasan rapor dan perkembangan semester anak.', 'stats' => [['Periode', 'Semester ganjil'], ['Catatan tersedia', '4 aspek'], ['Status rapor', 'Berjalan']], 'columns' => ['Aspek', 'Perkembangan', 'Catatan guru'], 'rows' => [['Bahasa & literasi', 'Sesuai harapan', 'Senang mendengarkan cerita'], ['Sosial emosional', 'Sangat baik', 'Mulai percaya diri bercerita'], ['Motorik halus', 'Sesuai harapan', 'Aktif membuat kolase']]],
-        'dokumentasi' => ['description' => 'Foto dan cerita kegiatan belajar anak di sekolah.', 'stats' => [['Album tersedia', '4'], ['Foto terbaru', '12'], ['Diperbarui', '13 Nov 2026']], 'columns' => ['Kegiatan', 'Tanggal', 'Dokumentasi'], 'rows' => [['Bermain & belajar di kebun', '13 November 2026', '12 foto'], ['Kolase daun', '12 November 2026', '8 foto'], ['Membaca bersama', '10 November 2026', '6 foto']]],
+        'kegiatan' => ['description' => 'Foto dan cerita kegiatan belajar anak di sekolah.', 'stats' => [['Album tersedia', '4'], ['Foto terbaru', '12'], ['Diperbarui', '13 Nov 2026']], 'columns' => ['Kegiatan', 'Tanggal', 'Dokumentasi'], 'rows' => [['Bermain & belajar di kebun', '13 November 2026', '12 foto'], ['Kolase daun', '12 November 2026', '8 foto'], ['Membaca bersama', '10 November 2026', '6 foto']]],
         'siswa' => ['description' => 'Informasi siswa dan kelompok belajar yang terhubung ke akun orang tua.', 'stats' => [['Nama siswa', 'Arka Pratama'], ['Kelompok', 'A1 · Melati'], ['Wali kelas', 'Dewi Puspita']], 'columns' => ['Informasi siswa', 'Detail', 'Status'], 'rows' => [['Nama', 'Arka Pratama', 'Aktif'], ['Kelompok belajar', 'A1 · Melati', 'Tahun ajaran 2026/2027'], ['Wali kelas', 'Ibu Dewi Puspita', 'Terhubung']]],
     ];
 @endphp

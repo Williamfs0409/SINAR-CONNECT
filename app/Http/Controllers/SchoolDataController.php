@@ -755,7 +755,7 @@ class SchoolDataController extends Controller
                 'nama_lengkap' => 'Nama siswa', 'kategori' => 'Kategori', 'indikator' => 'Indikator',
                 'semester_1' => 'Ganjil', 'semester_2' => 'Genap',
             ]],
-            'kegiatan' => ['title' => 'Kegiatan Sekolah', 'description' => 'Kegiatan dan kelengkapan dokumentasi.', 'columns' => [
+            'kegiatan' => ['title' => 'Dokumentasi Kegiatan', 'description' => 'Foto kegiatan kelas yang diunggah guru dan dapat dilihat oleh orang tua siswa terkait.', 'columns' => [
                 'nama_kegiatan' => 'Kegiatan', 'jenis' => 'Jenis', 'tanggal' => 'Tanggal', 'lokasi' => 'Lokasi',
                 'kelas_terlibat' => 'Kelas', 'laporan_sebelum' => 'Sebelum', 'laporan_selama' => 'Selama',
                 'laporan_sesudah' => 'Sesudah',
