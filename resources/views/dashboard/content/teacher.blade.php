@@ -52,7 +52,7 @@
         <div class="role-progress-heading"><span>Kelengkapan draf rapor</span><strong>12 / 16 siswa</strong></div><div class="role-progress"><span style="width:75%"></span></div>
         <div class="role-note"><strong>Arka Pratama · Sosial emosional</strong><p>Mulai percaya diri bercerita dan membantu teman.</p></div>
         <div class="role-panel-foot"><span class="text-warning">4 observasi perlu dilengkapi</span><a href="#rapor">Lanjutkan rapor →</a></div>
-        <div id="dokumentasi" class="role-inline-row"><span><strong>Dokumentasi kegiatan</strong><small>12 foto · Bermain di kebun sekolah</small></span><a href="#dokumentasi">Kelola →</a></div>
+        <div id="dokumentasi" class="role-inline-row"><span><strong>Dokumentasi kegiatan</strong><small>12 foto · Bermain di kebun sekolah</small></span><a href="{{ route('dashboard.feature', ['section' => 'kegiatan']) }}">Kelola &amp; upload →</a></div>
     </section>
     <section id="pembelajaran" class="role-panel">
         <div class="role-panel-heading"><div><h2>Rencana Belajar &amp; Tugas</h2><p>Minggu ini · Tema Lingkunganku</p></div></div>
