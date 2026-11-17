@@ -66,6 +66,7 @@ class SchoolFinancialWorkflowTest extends TestCase
             ->assertSessionHasErrors('metode');
     }
 
+<<<<<<< HEAD
     public function test_admin_payment_review_is_single_use_and_records_the_verifier(): void
     {
         Schema::create('pembayaran', function (Blueprint $table): void {
@@ -103,6 +104,8 @@ class SchoolFinancialWorkflowTest extends TestCase
         ]);
     }
 
+=======
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
     public function test_admin_can_link_an_unlinked_parent_to_a_family_with_students(): void
     {
         Schema::create('keluarga', function (Blueprint $table): void {
@@ -132,6 +135,7 @@ class SchoolFinancialWorkflowTest extends TestCase
         $this->assertDatabaseHas('keluarga', ['id_keluarga' => 1, 'id_user' => $parent->id_user]);
     }
 
+<<<<<<< HEAD
     public function test_admin_can_create_and_link_a_parent_account_to_an_existing_family(): void
     {
         Schema::create('keluarga', function (Blueprint $table): void {
@@ -257,6 +261,8 @@ class SchoolFinancialWorkflowTest extends TestCase
         $this->assertDatabaseHas('keluarga', ['id_keluarga' => 1, 'id_user' => null]);
     }
 
+=======
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
     public function test_admin_can_update_parent_payment_account_details(): void
     {
         $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);

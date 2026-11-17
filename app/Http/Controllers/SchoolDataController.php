@@ -747,6 +747,7 @@ class SchoolDataController extends Controller
                 ]);
         }
 
+<<<<<<< HEAD
         if ($section === 'kegiatan' && $role === 'admin') {
             $data['fieldTrips'] = DB::table('kegiatan as k')
                 ->where('k.jenis', 'Field Trip')
@@ -767,6 +768,8 @@ class SchoolDataController extends Controller
                 ->get();
         }
 
+=======
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
         if ($section === 'pembayaran') {
             $data['paymentSettings'] = DB::table('payment_settings')->where('id', 1)->first();
             $data['payableBills'] = collect($data['bills'] ?? [])
@@ -1071,6 +1074,7 @@ class SchoolDataController extends Controller
                 'nama_wali'
             )
             ->selectSub(
+<<<<<<< HEAD
                 DB::table('wali as w')
                     ->whereColumn('w.id_keluarga', 'f.id_keluarga')
                     ->orderBy('w.id_wali')
@@ -1101,6 +1105,38 @@ class SchoolDataController extends Controller
                     ->limit(1)
                     ->select('k.nomor'),
                 'edit_primary_phone'
+=======
+                    DB::table('wali as w')
+                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('w.id_wali')
+                        ->limit(1)
+                        ->select('w.id_wali'),
+                    'edit_wali_id'
+            )
+            ->selectSub(
+                    DB::table('wali as w')
+                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('w.id_wali')
+                        ->limit(1)
+                        ->select('w.nama_lengkap'),
+                    'edit_wali_name'
+            )
+            ->selectSub(
+                    DB::table('wali as w')
+                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('w.id_wali')
+                        ->limit(1)
+                        ->select('w.hubungan'),
+                    'edit_wali_relationship'
+            )
+            ->selectSub(
+                    DB::table('kontak_keluarga as k')
+                        ->whereColumn('k.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('k.urutan')
+                        ->limit(1)
+                        ->select('k.nomor'),
+                    'edit_primary_phone'
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
             )
             ->orderBy('f.id_keluarga');
     }

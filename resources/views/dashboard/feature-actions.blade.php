@@ -570,6 +570,7 @@
 
 @if ($section === 'keluarga' && $role === 'admin')
     <section class="database-action-panel">
+<<<<<<< HEAD
         <div class="database-section-heading"><div><h2>Buat akun orang tua untuk keluarga lama</h2><p>Buat akun memakai email yang diberikan orang tua lalu hubungkan langsung ke keluarga yang benar. Akun hanya mendapat akses ke siswa dalam keluarga tersebut.</p></div></div>
         @if (($actions['unlinkedFamilies'] ?? collect())->isEmpty())
             <p class="database-empty-note">Tidak ada data keluarga berisi siswa yang belum terhubung.</p>
@@ -607,6 +608,22 @@
                         <option value="{{ $parent->id_user }}" @selected(old('id_user') == $parent->id_user)>{{ $parent->name }} · {{ $parent->email }}</option>
                     @endforeach
                 </select></label>
+=======
+        <div class="database-section-heading"><div><h2>Hubungkan akun orang tua</h2><p>Pilih akun dan data keluarga yang belum terhubung. Pengaitan ini memberi akun akses ke semua siswa dalam keluarga tersebut.</p></div></div>
+        @if (($actions['unlinkedParents'] ?? collect())->isEmpty())
+            <p class="database-empty-note">Tidak ada akun orang tua aktif yang belum terhubung.</p>
+        @elseif (($actions['unlinkedFamilies'] ?? collect())->isEmpty())
+            <p class="database-empty-note">Tidak ada data keluarga berisi siswa yang belum terhubung.</p>
+        @else
+            <form method="POST" action="{{ route('database.family.link-parent') }}" class="database-form-grid">
+                @csrf
+                <label>Akun orang tua<select name="id_user" required>
+                    <option value="">Pilih akun orang tua</option>
+                    @foreach ($actions['unlinkedParents'] as $parent)
+                        <option value="{{ $parent->id_user }}" @selected(old('id_user') == $parent->id_user)>{{ $parent->name }} · {{ $parent->email }}</option>
+                    @endforeach
+                </select></label>
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
                 <label>Data keluarga<select name="id_keluarga" required>
                     <option value="">Pilih data keluarga</option>
                     @foreach ($actions['unlinkedFamilies'] as $family)
@@ -676,7 +693,11 @@
             <label>Peran<select name="role"><option value="teacher">Guru</option><option value="principal">Kepala sekolah</option><option value="parent">Orang tua</option><option value="admin">Administrator</option></select></label>
             <label>Kata sandi
                 <span class="registration-password-wrap">
+<<<<<<< HEAD
                     <input id="database-user-password" type="password" name="password" minlength="12" autocomplete="new-password" required>
+=======
+                    <input id="database-user-password" type="password" name="password" minlength="8" autocomplete="new-password" required>
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
                     <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password" aria-pressed="false">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -688,7 +709,11 @@
             </label>
             <label>Ulangi kata sandi
                 <span class="registration-password-wrap">
+<<<<<<< HEAD
                     <input id="database-user-password-confirmation" type="password" name="password_confirmation" minlength="12" autocomplete="new-password" required>
+=======
+                    <input id="database-user-password-confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required>
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
                     <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password-confirmation" aria-pressed="false">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

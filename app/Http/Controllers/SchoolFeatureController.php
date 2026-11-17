@@ -881,9 +881,15 @@ class SchoolFeatureController extends Controller
             }
 
             DB::table('dokumentasi_kegiatan')->insert($documents);
+<<<<<<< HEAD
         } catch (Throwable $exception) {
             if ($storedPaths !== [] && ! Storage::disk('local')->delete($storedPaths)) {
                 throw new RuntimeException('Unable to clean up activity photos after upload failed.', 0, $exception);
+=======
+        } catch (\Throwable $exception) {
+            if ($storedPaths !== [] && ! Storage::disk('local')->delete($storedPaths)) {
+                throw new \RuntimeException('Unable to clean up activity photos after upload failed.', 0, $exception);
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
             }
 
             throw $exception;
@@ -1390,6 +1396,7 @@ class SchoolFeatureController extends Controller
             ->with('status', 'Akun orang tua berhasil dihubungkan ke data keluarga.');
     }
 
+<<<<<<< HEAD
     public function createAndLinkParent(Request $request): RedirectResponse
     {
         $this->userFor(['admin']);
@@ -1437,6 +1444,8 @@ class SchoolFeatureController extends Controller
             ->with('status', 'Akun orang tua berhasil dibuat dan dihubungkan ke data keluarga.');
     }
 
+=======
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
     public function updateTariff(Request $request, int $tariffId): RedirectResponse
     {
         $this->userFor(['admin']);

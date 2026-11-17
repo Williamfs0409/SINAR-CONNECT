@@ -10,7 +10,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+<<<<<<< HEAD
 use Illuminate\Validation\Rules\Password;
+=======
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
@@ -46,7 +49,11 @@ class RegistrationController extends Controller
             'family_address' => ['required', 'string', 'max:2000'],
             'family_card_number' => ['nullable', 'digits:16'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
+<<<<<<< HEAD
             'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+=======
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+>>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
             'documents' => ['required', 'array:'.implode(',', array_keys($requiredDocuments))],
         ];
         $messages = [
