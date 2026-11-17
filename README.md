@@ -171,15 +171,15 @@ Aturan berikut kami dapat langsung dari pihak sekolah dan sudah tertanam di basi
 
 ## 🗄️ Perancangan Database
 
-Basis data **`db_tk_final`** terdiri dari **30 tabel**, **22 view**, **14 function**, **17 stored procedure**, dan **34 trigger**.
+Basis data **`db_tk_final`** terdiri dari **31 tabel**, **25 view**, **14 function**, **18 stored procedure**, dan **36 trigger**.
 
 | Objek | Jumlah |
 |---|---:|
-| Tabel | 30 |
-| View | 22 |
+| Tabel | 31 |
+| View | 25 |
 | Stored function | 14 |
-| Stored procedure | 17 |
-| Trigger | 34 |
+| Stored procedure | 18 |
+| Trigger | 36 |
 
 ### ERD
 
@@ -205,6 +205,7 @@ erDiagram
     tugas ||--o{ pengumpulan_tugas : dikumpulkan
     jenis_biaya ||--o{ tarif : memiliki
     jenis_biaya ||--o{ tagihan : jenis
+    diskon ||--o{ rombel_siswa : diterapkan
     tagihan ||--o{ alokasi_pembayaran : dilunasi
     pembayaran ||--o{ alokasi_pembayaran : membayar
     indikator_iqro ||--o{ nilai_iqro : indikator
@@ -214,14 +215,14 @@ erDiagram
 
 > **Kunci rancangan:** `rombel_siswa` (penempatan siswa di kelas) menjadi pusat relasi. Absensi, tagihan, rapor, nilai IQRO, portofolio, dan pengumpulan tugas semuanya menunjuk ke rombel, sehingga siswa dan kelasnya selalu konsisten.
 
-### Daftar 30 Tabel
+### Daftar 31 Tabel
 
 | Kelompok | Tabel |
 |---|---|
 | Pengguna dan keluarga | `users`, `keluarga`, `kontak_keluarga`, `wali`, `siswa` |
 | Guru dan akademik | `guru`, `tahun_ajaran`, `kelas`, `guru_kelas`, `rombel_siswa`, `absensi` |
 | Pendaftaran | `pendaftaran`, `dokumen_pendaftaran` |
-| Keuangan | `jenis_biaya`, `tarif`, `tagihan`, `pembayaran`, `alokasi_pembayaran`, `transaksi_tabungan` |
+| Keuangan | `jenis_biaya`, `tarif`, `diskon`, `tagihan`, `pembayaran`, `alokasi_pembayaran`, `transaksi_tabungan` |
 | Pembelajaran dan penilaian | `rencana_pembelajaran`, `tugas`, `pengumpulan_tugas`, `rapor`, `indikator_iqro`, `nilai_iqro`, `portofolio` |
 | Kegiatan | `kegiatan`, `kegiatan_kelas`, `dokumentasi_kegiatan` |
 | Sistem | `audit_log` |
@@ -254,6 +255,7 @@ Contoh yang dinormalisasi adalah formulir pendaftaran siswa baru.
 | Indikator IQRO | 74 |
 | Jenis biaya | 7 |
 | Tarif SPP | 3 (KB, TK A, TK B) |
+| Jenis diskon | 2 (Anak Guru, Kurang Mampu) |
 
 ---
 
@@ -272,7 +274,7 @@ Contoh yang dinormalisasi adalah formulir pendaftaran siswa baru.
 | `fn_hitung_usia` | Usia anak dalam teks |
 | `fn_title_case` | Penyeragaman huruf nama |
 
-### Stored Procedure (17)
+### Stored Procedure (18)
 
 | Kelompok | Procedure |
 |---|---|
@@ -281,19 +283,21 @@ Contoh yang dinormalisasi adalah formulir pendaftaran siswa baru.
 | Pembayaran | `sp_catat_pembayaran`, `sp_bayar_tagihan`, `sp_verifikasi_pembayaran`, `sp_batalkan_pembayaran` |
 | Tabungan | `sp_transaksi_tabungan` |
 | Absensi dan laporan | `sp_inisialisasi_absensi`, `sp_rekap_kehadiran`, `sp_laporan_keuangan`, `sp_portal_ringkasan_anak` |
+| Penempatan kelas | `sp_tempatkan_siswa` |
 | Perawatan data | `sp_gabung_siswa`, `sp_gabung_keluarga` |
 
-### View (22)
+### View (25)
 
 | Kelompok | View |
 |---|---|
-| Siswa dan keluarga | `v_siswa_lengkap`, `v_siswa_terlindungi`, `v_siswa_guru`, `v_keluarga_lengkap`, `v_guru_lengkap` |
+| Siswa dan keluarga | `v_siswa_lengkap`, `v_siswa_terlindungi`, `v_siswa_guru`, `v_keluarga_lengkap`, `v_keluarga_tanpa_akun`, `v_guru_lengkap` |
 | Keuangan | `v_tagihan_detail`, `v_tunggakan`, `v_pembayaran_detail`, `v_rekap_pembayaran_bulanan`, `v_saldo_tabungan` |
+| Diskon dan kapasitas | `v_diskon_siswa`, `v_kapasitas_kelas` |
 | Akademik | `v_rekap_kehadiran_bulanan`, `v_pengumpulan_detail`, `v_status_pengumpulan_tugas`, `v_rapor_lengkap`, `v_rapor_iqro` |
 | Pendaftaran dan kegiatan | `v_pendaftaran_detail`, `v_rekap_pendaftar`, `v_laporan_kegiatan` |
 | Dashboard dan kualitas data | `v_dashboard_kepala_sekolah`, `v_kesiapan_data`, `v_kualitas_data`, `v_kandidat_duplikat_siswa` |
 
-### Trigger (34)
+### Trigger (36)
 
 Trigger menjaga aturan langsung di database, sehingga tetap berlaku walaupun data diubah dari luar aplikasi.
 
@@ -398,11 +402,11 @@ DB_PASSWORD=
 
 ### Migrasi Database
 
-Migrasi baseline di `database/migrations/0000_*.php` membangun skema MySQL dari `db_tk_final`: 30 tabel, 22 view, 14 function, 17 procedure, dan 34 trigger. Migrasi ini hanya membuat struktur, tidak menyalin data, dan melepas `DEFINER` lokal agar objek memakai akun MySQL yang menjalankan migrasi. Migrasi baseline hanya aktif pada MySQL; migrasi SQLite untuk pengujian tetap berjalan seperti sebelumnya.
+Migrasi baseline di `database/migrations/0000_*.php` membangun skema MySQL awal. Migrasi `2026_11_17_000002_align_db_tk_final_with_dump.php` menambahkan tabel diskon, kolom akademik dan kegiatan, serta objek SQL yang diperbarui agar skema akhir sesuai dump: 31 tabel, 25 view, 14 function, 18 procedure, dan 36 trigger. Migrasi hanya menambahkan data referensi diskon; data pribadi dari dump tidak disalin. Migrasi baseline hanya aktif pada MySQL; migrasi SQLite untuk pengujian tetap berjalan seperti sebelumnya.
 
 Jalankan `php artisan migrate` hanya pada database MySQL baru dan kosong. Pemeriksaan awal baseline memastikan skema tidak berisi tabel, view, routine, atau trigger (selain tabel pencatat Laravel) sebelum membuat objek apa pun. Database sumber tidak memiliki tabel pencatat `migrations`, jadi jangan jalankan seluruh baseline pada `db_tk_final` berisi data atau menjalankan `php artisan migrate:fresh --seed` di database tersebut.
 
-Untuk menerapkan **hanya** perubahan keamanan kata sandi pada database lama, buat backup dan verifikasi target database terlebih dahulu, lalu jalankan migration additive ini secara terpisah: `php artisan migrate --path=database/migrations/2026_11_17_000001_add_password_security_to_users_table.php`. Migration tersebut menambah penanda perubahan kata sandi, membuat tabel token bila belum ada, dan mewajibkan akun orang tua yang sudah ada mengganti kata sandi saat login berikutnya. Jangan mengganti perintah ini dengan migrasi baseline penuh.
+Untuk database lama yang sudah berisi skema, buat backup dan verifikasi target database terlebih dahulu. Jalankan migrasi additive secara terpisah, bukan baseline penuh: `php artisan migrate --path=database/migrations/2026_11_17_000002_align_db_tk_final_with_dump.php`. Jika belum pernah diterapkan, jalankan juga `php artisan migrate --path=database/migrations/2026_11_17_000001_add_password_security_to_users_table.php` untuk menambah penanda perubahan kata sandi dan tabel token. Untuk konfigurasi `SESSION_DRIVER=database`, jalankan `php artisan migrate --path=database/migrations/2026_11_17_000003_create_sessions_table_if_missing.php` agar tabel sesi tersedia. Untuk `CACHE_STORE=database`, jalankan `php artisan migrate --path=database/migrations/2026_11_17_000004_create_cache_tables_if_missing.php` agar tabel cache dan cache locks tersedia.
 
 `database/schema/db_tk_final-schema.sql` adalah snapshot SQL referensi, bukan untuk diimpor bersamaan dengan migrasi PHP. Snapshot tersebut berisi `DROP` dan `DEFINER` lokal; jangan impor ke database yang berisi data.
 

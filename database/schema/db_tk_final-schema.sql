@@ -162,6 +162,19 @@ CREATE TABLE `audit_log` (
   KEY `idx_audit_waktu` (`waktu`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `diskon`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `diskon` (
+  `id_diskon` int NOT NULL AUTO_INCREMENT,
+  `nama` varchar(60) NOT NULL,
+  `tipe` enum('Persen','Nominal') NOT NULL,
+  `nilai` decimal(12,2) NOT NULL,
+  `kategori_biaya` enum('Bulanan','Pendaftaran','Kegiatan') NOT NULL DEFAULT 'Bulanan',
+  PRIMARY KEY (`id_diskon`),
+  UNIQUE KEY `uq_diskon_nama` (`nama`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `dokumen_pendaftaran`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -315,8 +328,9 @@ DROP TABLE IF EXISTS `kegiatan`;
 CREATE TABLE `kegiatan` (
   `id_kegiatan` int NOT NULL AUTO_INCREMENT,
   `nama_kegiatan` varchar(150) NOT NULL,
-  `jenis` enum('Dalam Kelas','Luar Kelas','Field Trip') NOT NULL,
+  `jenis` enum('Dalam Kelas','Luar Kelas','Field Trip','Acara','Evaluasi','Libur') NOT NULL,
   `tanggal` date NOT NULL,
+  `tanggal_selesai` date DEFAULT NULL,
   `lokasi` varchar(150) DEFAULT NULL,
   `deskripsi` text,
   `biaya` decimal(12,2) DEFAULT NULL,
@@ -782,7 +796,9 @@ CREATE TABLE `rencana_pembelajaran` (
   `id_rencana` int NOT NULL AUTO_INCREMENT,
   `id_kelas` int NOT NULL,
   `id_guru` int NOT NULL,
+  `jenis` enum('RPPM','RPPH','Modul Ajar') NOT NULL DEFAULT 'RPPH',
   `tanggal` date NOT NULL,
+  `tanggal_selesai` date DEFAULT NULL,
   `tema` varchar(150) NOT NULL,
   `subtema` varchar(150) DEFAULT NULL,
   `tujuan` text,
@@ -807,6 +823,7 @@ CREATE TABLE `rombel_siswa` (
   `id_siswa` int NOT NULL,
   `id_kelas` int NOT NULL,
   `status` enum('Aktif','Selesai','Pindah','Keluar') NOT NULL DEFAULT 'Aktif',
+  `id_diskon` int DEFAULT NULL,
   `tanggal_masuk` date DEFAULT NULL,
   `tanggal_keluar` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -814,6 +831,8 @@ CREATE TABLE `rombel_siswa` (
   PRIMARY KEY (`id_rombel`),
   UNIQUE KEY `uq_rombel` (`id_siswa`,`id_kelas`),
   KEY `idx_rombel_kelas_status` (`id_kelas`,`status`),
+  KEY `fk_rombel_diskon` (`id_diskon`),
+  CONSTRAINT `fk_rombel_diskon` FOREIGN KEY (`id_diskon`) REFERENCES `diskon` (`id_diskon`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_rombel_kelas` FOREIGN KEY (`id_kelas`) REFERENCES `kelas` (`id_kelas`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_rombel_siswa` FOREIGN KEY (`id_siswa`) REFERENCES `siswa` (`id_siswa`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -1221,6 +1240,7 @@ CREATE TABLE `tugas` (
   `id_kelas` int NOT NULL,
   `id_guru` int NOT NULL,
   `judul` varchar(150) NOT NULL,
+  `kategori` varchar(30) DEFAULT NULL,
   `deskripsi` text,
   `tanggal_diberikan` date NOT NULL,
   `tenggat` date NOT NULL,
@@ -1241,7 +1261,7 @@ CREATE TABLE `users` (
   `id_user` int NOT NULL AUTO_INCREMENT,
   `role` enum('admin','kepala_sekolah','guru','orang_tua') NOT NULL,
   `name` varchar(100) NOT NULL,
-  `email` varchar(150) NOT NULL,
+  `email` varchar(150) DEFAULT NULL,
   `email_verified_at` timestamp NULL DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
