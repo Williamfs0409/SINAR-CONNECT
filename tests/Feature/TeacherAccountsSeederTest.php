@@ -32,7 +32,7 @@ class TeacherAccountsSeederTest extends TestCase
             $table->unsignedBigInteger('id_user')->nullable();
         });
 
-        config(['admin.teacher_bootstrap_password' => '12345']);
+        config(['admin.teacher_bootstrap_password' => 'Teacher123']);
     }
 
     public function test_it_updates_teacher_and_principal_accounts_and_skips_other_roles(): void
@@ -63,9 +63,9 @@ class TeacherAccountsSeederTest extends TestCase
 
         $this->seed(TeacherAccountsSeeder::class);
 
-        $this->assertTrue(Hash::check('12345', $teacher->fresh()->password));
+        $this->assertTrue(Hash::check('Teacher123', $teacher->fresh()->password));
         $this->assertTrue($teacher->fresh()->is_active);
-        $this->assertTrue(Hash::check('12345', $principal->fresh()->password));
+        $this->assertTrue(Hash::check('Teacher123', $principal->fresh()->password));
         $this->assertTrue($principal->fresh()->is_active);
         $this->assertSame('principal', $principal->fresh()->role);
         $this->assertTrue(Hash::check('admin-password', $admin->fresh()->password));

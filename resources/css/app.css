@@ -526,13 +526,40 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .password-security-form input { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #dce5ed; border-radius: 7px; color: #263b51; background: #fbfdff; font: inherit; font-size: 12px; }
 .password-security-form input:focus { border-color: #80aecd; outline: 3px solid rgba(40, 103, 159, .12); }
 .password-security-form small { color: #8294a7; font-size: 10px; line-height: 1.5; }
-.password-security-form button { min-height: 42px; margin-top: 8px; border: 0; border-radius: 7px; color: #fff; background: #28679f; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-.password-security-form button:hover { background: #205783; }
+.password-security-form > button[type="submit"] { min-height: 42px; margin-top: 8px; border: 0; border-radius: 7px; color: #fff; background: #28679f; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.password-security-form > button[type="submit"]:hover { background: #205783; }
 .password-security-errors { margin-top: 14px; padding: 10px 12px; border: 1px solid #f1caca; border-radius: 7px; color: #a53232; background: #fff4f4; font-size: 11px; }
 .password-security-errors ul { margin: 0; padding-left: 18px; }
 .password-security-status { padding: 10px 12px; border: 1px solid #cce8d3; border-radius: 7px; color: #28643a; background: #f0faf2; font-size: 11px; }
 .password-security-back { display: inline-block; margin-top: 16px; color: #28679f; font-size: 11px; font-weight: 700; }
 .password-security-logout { margin-top: 13px; text-align: center; }
+.password-reset-admin-page { min-height: 100vh; color: #243d57; background: #f2f6fa; }
+.password-reset-admin-shell { width: min(100% - 32px, 960px); margin: 0 auto; padding: 32px 0; }
+.password-reset-admin-back { display: inline-block; margin-bottom: 14px; color: #28679f; font-size: 11px; font-weight: 700; }
+.password-reset-admin-card { padding: 24px; border: 1px solid #e0e8ef; border-radius: 14px; background: #fff; box-shadow: 0 12px 36px rgba(27, 57, 84, .07); }
+.password-reset-admin-heading { margin-bottom: 20px; }
+.password-reset-admin-heading .password-security-eyebrow { margin-top: 0; }
+.password-reset-admin-heading h1 { margin: 0; color: #243d57; font-size: 23px; }
+.password-reset-admin-heading > p:last-child { color: #71859a; font-size: 12px; }
+.password-reset-request-list { display: grid; gap: 10px; }
+.password-reset-request { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px; border: 1px solid #e7edf3; border-radius: 9px; }
+.password-reset-request-details { display: grid; gap: 4px; min-width: 0; }
+.password-reset-request-details strong { color: #344e67; font-size: 12px; }
+.password-reset-request-details span, .password-reset-request-details small { color: #71859a; font-size: 10px; overflow-wrap: anywhere; }
+.password-reset-request-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+.password-reset-request-actions form { margin: 0; }
+.password-reset-request-status { padding: 6px 9px; border-radius: 6px; color: #657789; background: #f1f4f7; font-size: 10px; font-weight: 700; }
+.password-reset-request-status-approved { color: #8a641e; background: #fff8e6; }
+.password-reset-request-status-completed { color: #28643a; background: #f0faf2; }
+.password-reset-request-status-expired { color: #657789; background: #f1f4f7; }
+.password-reset-request-status-superseded { color: #657789; background: #f1f4f7; }
+.password-reset-request-status-rejected { color: #9c4141; background: #fff4f4; }
+@media (max-width: 650px) {
+    .password-reset-admin-shell { width: min(100% - 20px, 960px); padding: 18px 0; }
+    .password-reset-admin-card { padding: 16px 12px; }
+    .password-reset-request { align-items: stretch; flex-direction: column; }
+    .password-reset-request-actions { justify-content: flex-start; }
+}
 .password-security-logout button { border: 0; color: #71859a; background: transparent; font: inherit; font-size: 11px; text-decoration: underline; cursor: pointer; }
 
 /* Administrator data-management pages */

@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\ImageUploadService;
+use App\Support\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
@@ -21,17 +22,36 @@ class RegistrationController extends Controller
 
     public function create(): View
     {
-        $schoolYear = DB::table('tahun_ajaran')->where('is_aktif', true)->first();
-        abort_unless($schoolYear, 503, 'Tahun ajaran aktif belum tersedia.');
+        $registrationOpen = $this->registrationIsOpen();
+        $schoolYear = $registrationOpen
+            ? DB::table('tahun_ajaran')->where('is_aktif', true)->first()
+            : null;
+
+        if ($registrationOpen) {
+            abort_unless($schoolYear, 503, 'Tahun ajaran aktif belum tersedia.');
+        }
 
         return view('registration.create', [
             'schoolYear' => $schoolYear,
+            'registrationOpen' => $registrationOpen,
             'requiredDocuments' => config('registration.required_documents'),
         ]);
     }
 
+    public function success(Request $request): View
+    {
+        abort_unless($request->session()->has('registration_submitted'), 404);
+
+        return view('registration.success');
+    }
+
     public function store(Request $request): RedirectResponse
     {
+        if (! $this->registrationIsOpen()) {
+            return redirect()->route('registration.create')
+                ->withErrors(['registration' => 'Pendaftaran siswa baru sedang ditutup.']);
+        }
+
         $requiredDocuments = config('registration.required_documents');
         $rules = [
             'student_name' => ['required', 'string', 'max:100'],
@@ -46,12 +66,14 @@ class RegistrationController extends Controller
             'family_address' => ['required', 'string', 'max:2000'],
             'family_card_number' => ['nullable', 'digits:16'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'password' => ['required', 'confirmed', PasswordPolicy::rule()],
             'documents' => ['required', 'array:'.implode(',', array_keys($requiredDocuments))],
         ];
         $messages = [
             'student_birthdate.before_or_equal' => 'Tanggal lahir tidak boleh di masa depan.',
             'family_card_number.digits' => 'Nomor KK harus terdiri dari 16 angka.',
+            'password' => PasswordPolicy::MESSAGE,
+            'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
         ];
         foreach ($requiredDocuments as $key => $label) {
             $rules["documents.{$key}"] = ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
@@ -75,7 +97,13 @@ class RegistrationController extends Controller
                 );
             }
 
-            $user = DB::transaction(function () use ($data, $schoolYear, $documentPaths, $requiredDocuments): User {
+            DB::transaction(function () use ($data, $schoolYear, $documentPaths, $requiredDocuments): void {
+                if (! $this->registrationIsOpen(lockForUpdate: true)) {
+                    throw ValidationException::withMessages([
+                        'registration' => 'Pendaftaran siswa baru sedang ditutup.',
+                    ]);
+                }
+
                 $user = User::create([
                     'name' => $data['guardian_name'],
                     'email' => $data['email'],
@@ -132,7 +160,6 @@ class RegistrationController extends Controller
                     ]);
                 }
 
-                return $user;
             });
         } catch (Throwable $exception) {
             foreach ($documentPaths as $path) {
@@ -144,10 +171,28 @@ class RegistrationController extends Controller
             throw $exception;
         }
 
-        Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard.feature', ['section' => 'pendaftaran'])
-            ->with('status', 'Pendaftaran berhasil dikirim. Silakan pantau statusnya melalui akun ini.');
+        return redirect()->route('registration.success')
+            ->with('registration_submitted', true);
+    }
+
+    private function registrationIsOpen(bool $lockForUpdate = false): bool
+    {
+        abort_unless(
+            Schema::hasTable('registration_settings'),
+            503,
+            'Pengaturan pendaftaran belum tersedia. Terapkan migrasi terlebih dahulu.'
+        );
+
+        $query = DB::table('registration_settings')->where('id', 1);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $isOpen = $query->value('is_open');
+        abort_if($isOpen === null, 503, 'Pengaturan pendaftaran belum diinisialisasi.');
+
+        return (bool) $isOpen;
     }
 }

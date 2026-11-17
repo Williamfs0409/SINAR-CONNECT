@@ -20,7 +20,7 @@ class ParentAccountsSeederTest extends TestCase
     {
         parent::setUp();
 
-        config(['admin.parent_bootstrap_password' => 'temporary-test-password-2026']);
+        config(['admin.parent_bootstrap_password' => 'TemporaryTestPassword2026']);
         Schema::create('keluarga', function (Blueprint $table): void {
             $table->increments('id_keluarga');
             $table->unsignedBigInteger('id_user')->nullable();
@@ -59,7 +59,7 @@ class ParentAccountsSeederTest extends TestCase
         $this->assertSame('parent', $parent->role);
         $this->assertSame('Nama Orang Tua dari Database', $parent->name);
         $this->assertTrue($parent->must_change_password);
-        $this->assertTrue(Hash::check('temporary-test-password-2026', $parent->password));
+        $this->assertTrue(Hash::check('TemporaryTestPassword2026', $parent->password));
         $this->assertSame($accountCount, User::count());
         $this->assertDatabaseHas('keluarga', [
             'id_keluarga' => 1,

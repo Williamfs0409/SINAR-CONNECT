@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\PasswordResetRequestsController;
 use App\Http\Controllers\PasswordSecurityController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegistrationController;
@@ -24,12 +25,23 @@ Route::get('/pendaftaran', [RegistrationController::class, 'create'])->name('reg
 Route::post('/pendaftaran', [RegistrationController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('registration.store');
+Route::get('/pendaftaran/berhasil', [RegistrationController::class, 'success'])
+    ->name('registration.success');
 Route::get('/kata-sandi/lupa', [PasswordSecurityController::class, 'showRequestForm'])
     ->middleware('guest')
     ->name('password.request');
 Route::post('/kata-sandi/email', [PasswordSecurityController::class, 'sendResetLink'])
     ->middleware(['guest', 'throttle:5,1'])
     ->name('password.email');
+Route::get('/kata-sandi/menunggu-konfirmasi', [PasswordSecurityController::class, 'waitForAdministrator'])
+    ->middleware('throttle:30,1')
+    ->name('password.reset.waiting');
+Route::get('/kata-sandi/buat-baru', [PasswordSecurityController::class, 'showOwnerResetForm'])
+    ->middleware('throttle:30,1')
+    ->name('password.owner-reset.form');
+Route::post('/kata-sandi/buat-baru', [PasswordSecurityController::class, 'updateOwnerPassword'])
+    ->middleware('throttle:5,1')
+    ->name('password.owner-reset.update');
 Route::get('/kata-sandi/reset/{token}', [PasswordSecurityController::class, 'showResetForm'])
     ->middleware('guest')
     ->name('password.reset');
@@ -79,6 +91,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.tariff.store');
     Route::post('/dashboard/pendaftaran/{registration}/status', [SchoolFeatureController::class, 'reviewRegistration'])
         ->name('database.registration.review');
+    Route::patch('/dashboard/pendaftaran/pengaturan', [SchoolFeatureController::class, 'updateRegistrationStatus'])
+        ->name('database.registration.settings.update');
     Route::post('/dashboard/pendaftaran/{registration}/dokumen', [SchoolFeatureController::class, 'uploadRegistrationDocuments'])
         ->name('database.registration.documents.upload');
     Route::post('/dashboard/dokumen-pendaftaran/{document}/verifikasi', [SchoolFeatureController::class, 'verifyRegistrationDocument'])
@@ -139,6 +153,12 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.family.create-parent');
 });
 Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::class])->group(function () {
+    Route::get('/admin/password-reset-requests', [PasswordResetRequestsController::class, 'index'])
+        ->name('admin.password-reset-requests.index');
+    Route::post('/admin/password-reset-requests/{requestId}/approve', [PasswordResetRequestsController::class, 'approve'])
+        ->name('admin.password-reset-requests.approve');
+    Route::post('/admin/password-reset-requests/{requestId}/reject', [PasswordResetRequestsController::class, 'reject'])
+        ->name('admin.password-reset-requests.reject');
     Route::post('/admin/students', [AdminDashboardController::class, 'storeStudent'])
         ->name('admin.students.store');
     Route::post('/admin/students/{student}/activate', [AdminDashboardController::class, 'activateStudent'])

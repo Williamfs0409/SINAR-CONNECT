@@ -4,6 +4,31 @@ import axios from 'axios';
 window.axios = axios;
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
+const passwordResetWaiting = document.querySelector('[data-password-reset-waiting]');
+if (passwordResetWaiting) {
+    const pollInterval = Number(passwordResetWaiting.dataset.pollInterval) || 5000;
+    window.setTimeout(() => window.location.reload(), pollInterval);
+}
+
+const registrationSuccessNotice = document.querySelector('[data-registration-success]');
+if (registrationSuccessNotice) {
+    const countdown = registrationSuccessNotice.querySelector('[data-registration-countdown]');
+    const loginUrl = registrationSuccessNotice.dataset.loginUrl;
+    let remainingSeconds = 5;
+
+    const countdownTimer = window.setInterval(() => {
+        remainingSeconds -= 1;
+        if (countdown) {
+            countdown.textContent = String(remainingSeconds);
+        }
+
+        if (remainingSeconds <= 0) {
+            window.clearInterval(countdownTimer);
+            window.location.assign(loginUrl);
+        }
+    }, 1000);
+}
+
 document.querySelectorAll('[data-live-clock]').forEach((clock) => {
     const updateClock = () => {
         const now = new Date();
@@ -325,7 +350,9 @@ document.querySelectorAll('[data-open-editor]').forEach((button) => {
     });
 });
 
-document.querySelectorAll('[data-max-bytes][data-max-pixels]').forEach((fileInput) => {
+const uploadValidatorsByForm = new Map();
+
+document.querySelectorAll('[data-max-bytes]').forEach((fileInput) => {
     const feedback = document.getElementById(fileInput.getAttribute('aria-describedby'));
     const form = fileInput.form;
 
@@ -334,8 +361,6 @@ document.querySelectorAll('[data-max-bytes][data-max-pixels]').forEach((fileInpu
     }
 
     const maxBytes = Number(fileInput.dataset.maxBytes);
-    const maxPixels = Number(fileInput.dataset.maxPixels);
-    let submitAfterValidation = false;
 
     const formatFileSize = (bytes) => {
         const megabytes = bytes / (1024 * 1024);
@@ -357,24 +382,9 @@ document.querySelectorAll('[data-max-bytes][data-max-pixels]').forEach((fileInpu
         fileInput.setAttribute('aria-invalid', String(state === 'error'));
     };
 
-    const readImageDimensions = (file) => new Promise((resolve) => {
-        const image = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        const finish = (dimensions) => {
-            URL.revokeObjectURL(objectUrl);
-            resolve(dimensions);
-        };
-
-        image.addEventListener('load', () => {
-            finish({ width: image.naturalWidth, height: image.naturalHeight });
-        }, { once: true });
-        image.addEventListener('error', () => finish(null), { once: true });
-        image.src = objectUrl;
-    });
-
-    const validateFile = async (file) => {
+    const validateFile = (file) => {
         if (!file) {
-            showFeedback('File maksimal 5 MB. Gambar maksimal 20 megapiksel.');
+            showFeedback('File maksimal 5 MB. Resolusi gambar maksimal 20 megapiksel.');
             return true;
         }
 
@@ -391,58 +401,27 @@ document.querySelectorAll('[data-max-bytes][data-max-pixels]').forEach((fileInpu
             return false;
         }
 
-        if (['jpg', 'jpeg', 'png'].includes(extension)) {
-            showFeedback('Sedang memeriksa ukuran gambar...');
-            const dimensions = await readImageDimensions(file);
-
-            if (fileInput.files?.[0] !== file) {
-                return false;
-            }
-
-            if (!dimensions) {
-                showFeedback('Gambar tidak dapat dibaca. Pilih file gambar lain.', 'error');
-                return false;
-            }
-
-            if (dimensions.width * dimensions.height > maxPixels) {
-                showFeedback(
-                    `Resolusi gambar ${dimensions.width} × ${dimensions.height} melebihi batas 20 megapiksel. Pilih gambar lain.`,
-                    'error',
-                );
-                return false;
-            }
-        }
-
-        showFeedback(`File ${fileSize} siap diunggah.`, 'success');
+        showFeedback(`File ${fileSize} siap diunggah. Batas resolusi gambar 20 megapiksel akan diperiksa saat dikirim.`, 'success');
         return true;
     };
 
     fileInput.addEventListener('change', () => {
-        void validateFile(fileInput.files?.[0]);
+        validateFile(fileInput.files?.[0]);
     });
 
-    form.addEventListener('submit', async (event) => {
-        if (submitAfterValidation) {
-            submitAfterValidation = false;
-            return;
-        }
+    const validators = uploadValidatorsByForm.get(form) ?? [];
+    validators.push({ fileInput, validateFile });
+    uploadValidatorsByForm.set(form, validators);
+});
 
-        const file = fileInput.files?.[0];
-        if (!file) {
-            return;
-        }
-
-        event.preventDefault();
-        if (! await validateFile(file)) {
-            fileInput.reportValidity();
-            return;
-        }
-
-        submitAfterValidation = true;
-        if (event.submitter) {
-            form.requestSubmit(event.submitter);
-        } else {
-            form.requestSubmit();
+uploadValidatorsByForm.forEach((validators, form) => {
+    form.addEventListener('submit', (event) => {
+        for (const { fileInput, validateFile } of validators) {
+            if (!validateFile(fileInput.files?.[0])) {
+                event.preventDefault();
+                fileInput.reportValidity();
+                return;
+            }
         }
     });
 });

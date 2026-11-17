@@ -52,7 +52,6 @@
                                     name="documents[{{ $documentKey }}]"
                                     accept=".pdf,.jpg,.jpeg,.png"
                                     data-max-bytes="5242880"
-                                    data-max-pixels="20000000"
                                 >
                                 @if ($documentError)
                                     <small class="registration-upload-feedback is-error">{{ $documentError }}</small>
@@ -111,6 +110,23 @@
 @if ($section === 'pendaftaran' && $role === 'admin')
     <section class="database-action-panel">
         <div class="database-section-heading">
+            <div>
+                <h2>Pendaftaran umum</h2>
+                <p>Status saat ini: <strong>{{ ($actions['registrationIsOpen'] ?? false) ? 'Dibuka' : 'Ditutup' }}</strong>. Pengaturan ini mengontrol formulir pendaftaran orang tua/wali.</p>
+            </div>
+        </div>
+        <form method="POST" action="{{ route('database.registration.settings.update') }}" class="database-inline-form">
+            @csrf
+            @method('PATCH')
+            <input type="hidden" name="is_open" value="{{ ($actions['registrationIsOpen'] ?? false) ? '0' : '1' }}">
+            <button class="database-button" type="submit">
+                {{ ($actions['registrationIsOpen'] ?? false) ? 'Tutup pendaftaran' : 'Buka pendaftaran' }}
+            </button>
+        </form>
+    </section>
+
+    <section class="database-action-panel">
+        <div class="database-section-heading">
             <div><h2>Proses pendaftaran</h2><p>Periksa dokumen, verifikasi calon siswa, lalu tentukan kelas saat menerima.</p></div>
         </div>
         @forelse ($actions['registrationDocuments'] ?? [] as $document)
@@ -167,6 +183,11 @@
                     </details>
                 </div>
                 <div class="database-registration-controls">
+                    @php
+                        $eligibleClasses = $classOptions->filter(fn ($class) => $class->kelompok === $application->kelompok
+                            && $class->tahun_ajaran === $application->tahun_ajaran
+                            && $class->nama_kelas !== 'Belum Ditentukan');
+                    @endphp
                     <select name="decision" required aria-label="Keputusan pendaftaran">
                         <option value="verify" @selected($application->status === 'Diajukan')>Verifikasi</option>
                         <option value="accept" @selected($application->status === 'Diverifikasi')>Terima</option>
@@ -174,12 +195,15 @@
                     </select>
                     <select name="class_id" aria-label="Kelas penerimaan">
                         <option value="">Pilih kelas jika menerima</option>
-                        @foreach ($classOptions as $class)
-                            <option value="{{ $class->id_kelas }}" @disabled($class->kelompok !== $application->kelompok || $class->tahun_ajaran !== $application->tahun_ajaran)>
-                                {{ $class->tahun_ajaran }} · {{ $class->kelompok }} · {{ $class->nama_kelas }}
+                        @foreach ($eligibleClasses as $class)
+                            <option value="{{ $class->id_kelas }}">
+                                {{ $class->nama_kelas }}
                             </option>
                         @endforeach
                     </select>
+                    @if ($eligibleClasses->isEmpty())
+                        <small>Belum ada kelas definitif untuk {{ $application->kelompok }} tahun ajaran {{ $application->tahun_ajaran }}.</small>
+                    @endif
                     <input type="date" name="due_date" aria-label="Jatuh tempo biaya pendaftaran">
                     <input name="note" maxlength="255" placeholder="Catatan verifikasi">
                     <button class="database-button" type="submit">Simpan keputusan</button>
@@ -584,9 +608,9 @@
                 </select></label>
                 <label>Nama akun orang tua<input name="name" value="{{ old('name') }}" maxlength="100" required></label>
                 <label>Email orang tua<input type="email" name="email" value="{{ old('email') }}" maxlength="150" required autocomplete="email"></label>
-                <label>Kata sandi sementara<input type="password" name="password" minlength="12" autocomplete="new-password" required></label>
-                <label>Ulangi kata sandi<input type="password" name="password_confirmation" minlength="12" autocomplete="new-password" required></label>
-                <div class="database-form-wide"><small>Sampaikan kata sandi sementara kepada orang tua secara pribadi.</small></div>
+                <label>Kata sandi sementara<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
+                <label>Ulangi kata sandi<input type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required></label>
+                <div class="database-form-wide"><small>Minimal 8 karakter, huruf besar dan kecil, serta angka. Simbol tidak wajib. Sampaikan kata sandi sementara kepada orang tua secara pribadi.</small></div>
                 <div class="database-form-wide"><button class="database-button" type="submit">Buat akun dan hubungkan</button></div>
             </form>
         @endif
@@ -668,6 +692,12 @@
 
 @if ($section === 'pengguna' && $role === 'admin')
     <section class="database-action-panel">
+        <div class="database-section-heading">
+            <div><h2>Permintaan reset kata sandi</h2><p>Tinjau dan verifikasi permintaan orang tua tanpa mengirim tautan ke email.</p></div>
+            <a class="database-button" href="{{ route('admin.password-reset-requests.index') }}">Buka permintaan</a>
+        </div>
+    </section>
+    <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Buat akun pengguna</h2><p>Peran akun disimpan sesuai enum pengguna pada database.</p></div></div>
         <form method="POST" action="{{ route('admin.users.store') }}" class="database-form-grid">
             @csrf
@@ -676,7 +706,7 @@
             <label>Peran<select name="role"><option value="teacher">Guru</option><option value="principal">Kepala sekolah</option><option value="parent">Orang tua</option><option value="admin">Administrator</option></select></label>
             <label>Kata sandi
                 <span class="registration-password-wrap">
-                    <input id="database-user-password" type="password" name="password" minlength="12" autocomplete="new-password" required>
+                    <input id="database-user-password" type="password" name="password" minlength="8" autocomplete="new-password" required>
                     <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password" aria-pressed="false">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -685,10 +715,11 @@
                         </svg>
                     </button>
                 </span>
+                <small>Minimal 8 karakter, huruf besar dan kecil, serta angka. Simbol tidak wajib.</small>
             </label>
             <label>Ulangi kata sandi
                 <span class="registration-password-wrap">
-                    <input id="database-user-password-confirmation" type="password" name="password_confirmation" minlength="12" autocomplete="new-password" required>
+                    <input id="database-user-password-confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required>
                     <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password-confirmation" aria-pressed="false">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

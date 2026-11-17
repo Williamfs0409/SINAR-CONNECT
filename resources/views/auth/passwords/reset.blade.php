@@ -24,11 +24,29 @@
                 <input id="email" name="email" type="email" value="{{ old('email', $email) }}" autocomplete="email" required>
 
                 <label for="password">Kata sandi baru</label>
-                <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" required>
-                <small>Minimal 12 karakter, dengan huruf besar, huruf kecil, angka, dan simbol. Gunakan kata sandi unik yang tidak dipakai di akun lain.</small>
+                <span class="registration-password-wrap">
+                    <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+                    <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="password" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="2"/>
+                            <path class="password-eye-slash" d="m4 4 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </span>
+                <small>Minimal 8 karakter, dengan huruf besar, huruf kecil, dan angka. Simbol tidak wajib.</small>
 
                 <label for="password_confirmation">Ulangi kata sandi baru</label>
-                <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="12" required>
+                <span class="registration-password-wrap">
+                    <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required>
+                    <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="password_confirmation" aria-pressed="false">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="2"/>
+                            <path class="password-eye-slash" d="m4 4 16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </span>
 
                 <button type="submit">Simpan kata sandi baru</button>
             </form>

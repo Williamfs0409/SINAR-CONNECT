@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\ImageUploadService;
+use App\Support\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\HeaderUtils;
@@ -109,6 +109,35 @@ class SchoolFeatureController extends Controller
         });
 
         return back()->with('status', 'Data keluarga berhasil diperbarui.');
+    }
+
+    public function updateRegistrationStatus(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'is_open' => ['required', 'boolean'],
+        ]);
+        abort_unless(
+            Schema::hasTable('registration_settings'),
+            503,
+            'Pengaturan pendaftaran belum tersedia. Terapkan migrasi terlebih dahulu.'
+        );
+        abort_unless(
+            DB::table('registration_settings')->where('id', 1)->exists(),
+            503,
+            'Pengaturan pendaftaran belum diinisialisasi.'
+        );
+
+        DB::table('registration_settings')->where('id', 1)->update([
+            'is_open' => (bool) $data['is_open'],
+            'updated_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('dashboard.feature', ['section' => 'pendaftaran'])
+            ->with('status', $data['is_open']
+                ? 'Pendaftaran siswa baru berhasil dibuka.'
+                : 'Pendaftaran siswa baru berhasil ditutup.');
     }
 
     public function updateUserProfile(Request $request, int $userId): RedirectResponse
@@ -262,9 +291,10 @@ class SchoolFeatureController extends Controller
                 ->where('id_kelas', $data['class_id'] ?? 0)
                 ->where('id_tahun_ajaran', $application->id_tahun_ajaran)
                 ->where('kelompok', $application->kelompok)
+                ->where('nama_kelas', '<>', 'Belum Ditentukan')
                 ->first();
             if (! $class) {
-                throw ValidationException::withMessages(['class_id' => 'Pilih kelas yang sesuai dengan tahun ajaran dan kelompok pendaftar.']);
+                throw ValidationException::withMessages(['class_id' => 'Pilih kelas definitif yang sesuai dengan tahun ajaran dan kelompok pendaftar.']);
             }
 
             DB::table('rombel_siswa')->insert([
@@ -1388,7 +1418,10 @@ class SchoolFeatureController extends Controller
             'id_keluarga' => ['required', 'integer', Rule::exists('keluarga', 'id_keluarga')],
             'name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')],
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'password' => ['required', 'confirmed', PasswordPolicy::rule()],
+        ], [
+            'password' => PasswordPolicy::MESSAGE,
+            'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
         ]);
 
         DB::transaction(function () use ($data): void {

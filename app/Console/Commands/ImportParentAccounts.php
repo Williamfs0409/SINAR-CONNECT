@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Support\PasswordPolicy;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -190,8 +191,8 @@ class ImportParentAccounts extends Command
                     throw new InvalidArgumentException("CSV line {$line} has an invalid parent name.");
                 }
 
-                if (trim($password) === '') {
-                    throw new InvalidArgumentException("CSV line {$line} has an empty password.");
+                if (! PasswordPolicy::accepts($password)) {
+                    throw new InvalidArgumentException("CSV line {$line} password must be at least 8 characters with uppercase and lowercase letters and a number; symbols are optional.");
                 }
 
                 if (isset($familyIds[$familyId])) {

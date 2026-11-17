@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -132,27 +131,65 @@ class LoginTest extends TestCase
         $this->actingAs($user)
             ->put(route('password.force.update'), [
                 'current_password' => 'password',
-                'password' => 'New-ParentPass123!',
-                'password_confirmation' => 'New-ParentPass123!',
+                'password' => 'Parent12',
+                'password_confirmation' => 'Parent12',
             ])
             ->assertRedirect(route('dashboard'));
 
         $user->refresh();
         $this->assertFalse($user->must_change_password);
-        $this->assertTrue(Hash::check('New-ParentPass123!', $user->password));
+        $this->assertTrue(Hash::check('Parent12', $user->password));
     }
 
-    public function test_password_reset_mail_does_not_disclose_whether_an_email_exists(): void
+    public function test_forced_password_change_requires_eight_characters_mixed_case_and_a_number(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'parent',
+            'must_change_password' => true,
+        ]);
+
+        foreach (['Parent1', 'parent123', 'PARENT123', 'Parentabc'] as $password) {
+            $this->actingAs($user)
+                ->put(route('password.force.update'), [
+                    'current_password' => 'password',
+                    'password' => $password,
+                    'password_confirmation' => $password,
+                ])
+                ->assertSessionHasErrors('password');
+        }
+    }
+
+    public function test_password_reset_request_is_sent_to_the_admin_queue_without_emailing_the_user(): void
     {
         Notification::fake();
         $user = User::factory()->create();
 
         $this->post(route('password.email'), ['email' => $user->email])
-            ->assertSessionHas('status', 'Jika alamat email terdaftar, tautan untuk mengatur ulang kata sandi akan dikirim.');
-        Notification::assertSentTo($user, ResetPasswordNotification::class);
+            ->assertRedirect(route('password.reset.waiting'))
+            ->assertSessionHas('status', 'Jika akun terdaftar, permintaan reset telah diteruskan kepada administrator.')
+            ->assertSessionHas('password_reset_request_id');
+
+        $this->assertDatabaseHas('password_reset_requests', [
+            'user_id' => $user->getKey(),
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseCount('password_reset_requests', 1);
+        Notification::assertNothingSent();
 
         $this->post(route('password.email'), ['email' => 'unknown@example.com'])
-            ->assertSessionHas('status', 'Jika alamat email terdaftar, tautan untuk mengatur ulang kata sandi akan dikirim.');
+            ->assertRedirect(route('password.reset.waiting'))
+            ->assertSessionHas('status', 'Jika akun terdaftar, permintaan reset telah diteruskan kepada administrator.');
+        $this->assertDatabaseCount('password_reset_requests', 1);
+    }
+
+    public function test_password_reset_request_does_not_create_duplicate_pending_requests(): void
+    {
+        $user = User::factory()->create();
+
+        $this->post(route('password.email'), ['email' => $user->email]);
+        $this->post(route('password.email'), ['email' => $user->email]);
+
+        $this->assertDatabaseCount('password_reset_requests', 1);
     }
 
     public function test_password_reset_clears_the_forced_change_flag(): void

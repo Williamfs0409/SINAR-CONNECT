@@ -6,6 +6,7 @@ use App\Models\SchoolTransaction;
 use App\Models\SppInvoice;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\PasswordPolicy;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
@@ -14,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AdminDashboardController extends Controller
@@ -258,7 +258,10 @@ class AdminDashboardController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required', Rule::in(self::USER_ROLES)],
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'password' => ['required', 'confirmed', PasswordPolicy::rule()],
+        ], [
+            'password' => PasswordPolicy::MESSAGE,
+            'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
         ]);
 
         User::create([

@@ -377,6 +377,9 @@ class SchoolDataController extends Controller
         $module = $section === 'ringkasan' ? null : $this->moduleDefinition($section, $role);
         $records = $module ? $this->recordsFor($section, $module, $scope, $role, $user) : null;
         $messageCenterReady = Schema::hasTable('messages');
+        $passwordResetAttentionCount = $role === 'admin' && Schema::hasTable('password_reset_requests')
+            ? DB::table('password_reset_requests')->whereIn('status', ['pending', 'approved'])->count()
+            : 0;
 
         return view('dashboard.school-dashboard', [
             'section' => $section,
@@ -391,6 +394,7 @@ class SchoolDataController extends Controller
             'hasLinkedStudents' => $role !== 'parent' || $scope['studentIds'] !== [],
             'cards' => $section === 'ringkasan' ? $this->summaryFor($role, $scope) : [],
             'messageCenterReady' => $messageCenterReady,
+            'passwordResetAttentionCount' => $passwordResetAttentionCount,
             'unreadMessageCount' => $messageCenterReady ? Message::query()
                 ->where('recipient_id', $user->getKey())
                 ->whereNull('read_at')
@@ -470,6 +474,16 @@ class SchoolDataController extends Controller
         }
 
         if ($section === 'pendaftaran' && $role === 'admin') {
+            abort_unless(
+                Schema::hasTable('registration_settings'),
+                503,
+                'Pengaturan pendaftaran belum tersedia. Terapkan migrasi terlebih dahulu.'
+            );
+            $registrationSettings = DB::table('registration_settings')
+                ->where('id', 1)
+                ->first();
+            abort_if($registrationSettings === null, 503, 'Pengaturan pendaftaran belum diinisialisasi.');
+            $data['registrationIsOpen'] = (bool) $registrationSettings->is_open;
             $data['applications'] = DB::table('pendaftaran as p')
                 ->join('v_pendaftaran_detail as d', 'd.id_pendaftaran', '=', 'p.id_pendaftaran')
                 ->join('siswa as s', 's.id_siswa', '=', 'p.id_siswa')

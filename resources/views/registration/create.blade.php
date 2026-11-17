@@ -11,16 +11,21 @@
         </header>
 
         <section class="registration-card">
-            <p class="registration-eyebrow">Tahun ajaran {{ $schoolYear->nama }}</p>
-            <h1>Pendaftaran siswa baru</h1>
-            <p class="registration-intro">Isi data anak dan orang tua/wali. Akun orang tua akan dibuat agar status pendaftaran dapat dipantau.</p>
-
             @if ($errors->any())
                 <div class="registration-errors" role="alert">
                     <strong>Periksa kembali data berikut:</strong>
                     <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
                 </div>
             @endif
+
+            @if (! $registrationOpen)
+                <p class="registration-eyebrow">Informasi pendaftaran</p>
+                <h1>Pendaftaran siswa baru</h1>
+                <p class="registration-intro" role="status">Pendaftaran siswa baru sedang ditutup. Silakan hubungi pihak sekolah atau kunjungi kembali nanti.</p>
+            @else
+                <p class="registration-eyebrow">Tahun ajaran {{ $schoolYear->nama }}</p>
+                <h1>Pendaftaran siswa baru</h1>
+                <p class="registration-intro">Isi data anak dan orang tua/wali. Akun orang tua akan dibuat agar status pendaftaran dapat dipantau.</p>
 
             <form method="POST" action="{{ route('registration.store') }}" enctype="multipart/form-data">
                 @csrf
@@ -73,7 +78,7 @@
                         <label>Email <input type="email" name="email" value="{{ old('email') }}" maxlength="150" autocomplete="email" required></label>
                         <label>Kata sandi
                             <span class="registration-password-wrap">
-                                <input id="registration-password" type="password" name="password" minlength="12" autocomplete="new-password" required>
+                                <input id="registration-password" type="password" name="password" minlength="8" autocomplete="new-password" required>
                                 <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="registration-password" aria-pressed="false">
                                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -82,10 +87,11 @@
                                     </svg>
                                 </button>
                             </span>
+                            <small>Minimal 8 karakter, huruf besar dan kecil, serta angka. Simbol tidak wajib.</small>
                         </label>
                         <label>Ulangi kata sandi
                             <span class="registration-password-wrap">
-                                <input id="registration-password-confirmation" type="password" name="password_confirmation" minlength="12" autocomplete="new-password" required>
+                                <input id="registration-password-confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required>
                                 <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="registration-password-confirmation" aria-pressed="false">
                                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -113,7 +119,6 @@
                                     name="documents[{{ $documentKey }}]"
                                     accept=".pdf,.jpg,.jpeg,.png"
                                     data-max-bytes="5242880"
-                                    data-max-pixels="20000000"
                                     aria-describedby="{{ $documentFeedbackId }}"
                                     required
                                 >
@@ -122,7 +127,7 @@
                                     class="registration-upload-feedback @error('documents.'.$documentKey) is-error @enderror"
                                     role="status"
                                     aria-live="polite"
-                                >@error('documents.'.$documentKey){{ $message }}@else Wajib diunggah. Gambar maksimal 20 megapiksel.@enderror</small>
+                                >@error('documents.'.$documentKey){{ $message }}@else Wajib diunggah. Maksimal 5 MB dan 20 megapiksel per gambar.@enderror</small>
                             </label>
                         @endforeach
                     </div>
@@ -130,6 +135,7 @@
 
                 <button class="registration-submit" type="submit">Kirim pendaftaran</button>
             </form>
+            @endif
         </section>
     </main>
 @endsection

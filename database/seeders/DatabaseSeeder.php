@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Support\PasswordPolicy;
 use Illuminate\Database\Seeder;
 use RuntimeException;
 
@@ -27,8 +28,8 @@ class DatabaseSeeder extends Seeder
         }
 
         $password = config('admin.bootstrap_password');
-        if (! is_string($password) || strlen($password) < 12) {
-            throw new RuntimeException('Set ADMIN_BOOTSTRAP_PASSWORD to a unique password of at least 12 characters.');
+        if (! PasswordPolicy::accepts($password)) {
+            throw new RuntimeException('Set ADMIN_BOOTSTRAP_PASSWORD to a password of at least 8 characters with uppercase and lowercase letters and a number; symbols are optional.');
         }
 
         $user = User::create([

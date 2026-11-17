@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Support\PasswordPolicy;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -109,8 +110,8 @@ class ParentAccountsSeeder extends Seeder
     public function run(): void
     {
         $password = config('admin.parent_bootstrap_password');
-        if (! is_string($password) || $password === '') {
-            throw new RuntimeException('Set PARENT_BOOTSTRAP_PASSWORD before running this seeder.');
+        if (! PasswordPolicy::accepts($password)) {
+            throw new RuntimeException('Set PARENT_BOOTSTRAP_PASSWORD to a password of at least 8 characters with uppercase and lowercase letters and a number; symbols are optional.');
         }
 
         if (! Schema::hasTable('users')

@@ -19,7 +19,7 @@ class AdminBootstrapSeederTest extends TestCase
 
         config([
             'admin.bootstrap_email' => 'administrator@tkcerdasceria.com',
-            'admin.bootstrap_password' => 'test-only-password-123',
+            'admin.bootstrap_password' => 'TestOnlyPassword123',
         ]);
     }
 
@@ -31,12 +31,12 @@ class AdminBootstrapSeederTest extends TestCase
         $this->assertSame('Administrator', $admin->name);
         $this->assertSame('admin', $admin->role);
         $this->assertTrue($admin->is_active);
-        $this->assertTrue(Hash::check('test-only-password-123', $admin->password));
+        $this->assertTrue(Hash::check('TestOnlyPassword123', $admin->password));
 
-        config(['admin.bootstrap_password' => 'different-test-password-456']);
+        config(['admin.bootstrap_password' => 'DifferentTestPassword456']);
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertTrue(Hash::check('test-only-password-123', $admin->fresh()->password));
+        $this->assertTrue(Hash::check('TestOnlyPassword123', $admin->fresh()->password));
         $this->assertDatabaseCount('users', 1);
     }
 
