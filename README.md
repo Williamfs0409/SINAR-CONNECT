@@ -407,23 +407,17 @@ Migrasi baseline di `database/migrations/0000_*.php` membangun skema MySQL awal.
 Jalankan `php artisan migrate` hanya pada database MySQL baru dan kosong. Pemeriksaan awal baseline memastikan skema tidak berisi tabel, view, routine, atau trigger (selain tabel pencatat Laravel) sebelum membuat objek apa pun. Database sumber tidak memiliki tabel pencatat `migrations`, jadi jangan jalankan seluruh baseline pada `db_tk_final` berisi data atau menjalankan `php artisan migrate:fresh --seed` di database tersebut.
 
 Untuk database lama yang sudah berisi skema, buat backup dan verifikasi target database terlebih dahulu. Jalankan migrasi additive secara terpisah, bukan baseline penuh: `php artisan migrate --path=database/migrations/2026_11_17_000002_align_db_tk_final_with_dump.php`. Jika belum pernah diterapkan, jalankan juga `php artisan migrate --path=database/migrations/2026_11_17_000001_add_password_security_to_users_table.php` untuk menambah penanda perubahan kata sandi dan tabel token. Untuk konfigurasi `SESSION_DRIVER=database`, jalankan `php artisan migrate --path=database/migrations/2026_11_17_000003_create_sessions_table_if_missing.php` agar tabel sesi tersedia. Untuk `CACHE_STORE=database`, jalankan `php artisan migrate --path=database/migrations/2026_11_17_000004_create_cache_tables_if_missing.php` agar tabel cache dan cache locks tersedia.
-<<<<<<< HEAD
+### Membuat Akun Orang Tua
 
-### Impor Akun Orang Tua dari CSV
+Data keluarga dan email akun orang tua tersedia sebagai array PHP di `database/seeders/ParentAccountsSeeder.php`, tanpa CSV. Seeder mengambil nama orang tua dari tabel `wali` jika tersedia, membuat akun untuk keluarga yang belum tertaut, lalu menghubungkannya ke keluarga tersebut. Akun yang sudah tertaut dan cocok dibiarkan tanpa perubahan; konflik membatalkan seluruh proses.
 
-Perintah `app:import-parent-accounts` menerima CSV dengan salah satu header persis `id_keluarga,email,kata_sandi` atau `id_keluarga,nama_orang_tua,hubungan,email,kata_sandi`. Jika kolom nama tersedia, nilainya dipakai sebagai nama akun; kolom hubungan dibaca tetapi tidak disimpan sebagai bagian dari akun. Simpan file dengan aman karena kolom kata sandi masih berupa teks biasa. Perintah pertama hanya memvalidasi (dry-run) dan tidak menulis data:
-
-```powershell
-php artisan app:import-parent-accounts "D:\Download\akun_orang_tua.csv"
-```
-
-Setelah memeriksa target database di `.env`, backup, dan memastikan dry-run berhasil, tambahkan `--execute` untuk menjalankan impor secara transaksional:
+Atur `PARENT_BOOTSTRAP_PASSWORD` di `.env` dengan kata sandi sementara yang kuat dan jangan commit nilainya. Akun yang dibuat wajib mengganti kata sandi saat login pertama. Pastikan `.env` menunjuk database yang benar dan buat backup sebelum menjalankan seeder:
 
 ```powershell
-php artisan app:import-parent-accounts "D:\Download\akun_orang_tua.csv" --execute
+php artisan db:seed --class=ParentAccountsSeeder
 ```
 
-Akun baru di-hash, ditautkan ke keluarga yang memiliki siswa, dan ditandai wajib mengganti kata sandi pada login pertama. Akun orang tua yang sudah aktif dan terhubung ke keluarga serta email yang sama dilewati tanpa mengubah kata sandinya. Konflik email, keluarga yang sudah terhubung ke akun lain, atau baris tidak valid membatalkan impor. Migration additive `2026_11_17_000001_add_password_security_to_users_table.php` harus sudah diterapkan sebelum perintah ini dijalankan. Perintah ini tidak dijalankan selama pembuatan dokumentasi ini.
+Jalankan migrasi additive `2026_11_17_000001_add_password_security_to_users_table.php` terlebih dahulu. Seeder tidak dijalankan otomatis oleh `db:seed` dan tidak dijalankan selama perubahan kode ini.
 
 
 `database/schema/db_tk_final-schema.sql` adalah snapshot SQL referensi, bukan untuk diimpor bersamaan dengan migrasi PHP. Snapshot tersebut berisi `DROP` dan `DEFINER` lokal; jangan impor ke database yang berisi data.
