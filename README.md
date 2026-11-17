@@ -408,6 +408,22 @@ Jalankan `php artisan migrate` hanya pada database MySQL baru dan kosong. Pemeri
 
 Untuk database lama yang sudah berisi skema, buat backup dan verifikasi target database terlebih dahulu. Jalankan migrasi additive secara terpisah, bukan baseline penuh: `php artisan migrate --path=database/migrations/2026_11_17_000002_align_db_tk_final_with_dump.php`. Jika belum pernah diterapkan, jalankan juga `php artisan migrate --path=database/migrations/2026_11_17_000001_add_password_security_to_users_table.php` untuk menambah penanda perubahan kata sandi dan tabel token. Untuk konfigurasi `SESSION_DRIVER=database`, jalankan `php artisan migrate --path=database/migrations/2026_11_17_000003_create_sessions_table_if_missing.php` agar tabel sesi tersedia. Untuk `CACHE_STORE=database`, jalankan `php artisan migrate --path=database/migrations/2026_11_17_000004_create_cache_tables_if_missing.php` agar tabel cache dan cache locks tersedia.
 
+### Impor Akun Orang Tua dari CSV
+
+Perintah `app:import-parent-accounts` menerima CSV dengan salah satu header persis `id_keluarga,email,kata_sandi` atau `id_keluarga,nama_orang_tua,hubungan,email,kata_sandi`. Jika kolom nama tersedia, nilainya dipakai sebagai nama akun; kolom hubungan dibaca tetapi tidak disimpan sebagai bagian dari akun. Simpan file dengan aman karena kolom kata sandi masih berupa teks biasa. Perintah pertama hanya memvalidasi (dry-run) dan tidak menulis data:
+
+```powershell
+php artisan app:import-parent-accounts "D:\Download\akun_orang_tua.csv"
+```
+
+Setelah memeriksa target database di `.env`, backup, dan memastikan dry-run berhasil, tambahkan `--execute` untuk menjalankan impor secara transaksional:
+
+```powershell
+php artisan app:import-parent-accounts "D:\Download\akun_orang_tua.csv" --execute
+```
+
+Akun baru di-hash, ditautkan ke keluarga yang memiliki siswa, dan ditandai wajib mengganti kata sandi pada login pertama. Akun orang tua yang sudah aktif dan terhubung ke keluarga serta email yang sama dilewati tanpa mengubah kata sandinya. Konflik email, keluarga yang sudah terhubung ke akun lain, atau baris tidak valid membatalkan impor. Migration additive `2026_11_17_000001_add_password_security_to_users_table.php` harus sudah diterapkan sebelum perintah ini dijalankan. Perintah ini tidak dijalankan selama pembuatan dokumentasi ini.
+
 `database/schema/db_tk_final-schema.sql` adalah snapshot SQL referensi, bukan untuk diimpor bersamaan dengan migrasi PHP. Snapshot tersebut berisi `DROP` dan `DEFINER` lokal; jangan impor ke database yang berisi data.
 
 ### Jalankan
