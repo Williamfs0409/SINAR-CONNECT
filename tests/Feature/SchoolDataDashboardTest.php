@@ -89,12 +89,27 @@ class SchoolDataDashboardTest extends TestCase
         $parentForm = view('dashboard.feature-actions', [
             'section' => 'pembayaran',
             'role' => 'parent',
-            'actions' => [],
+            'actions' => [
+                'paymentSettings' => (object) [
+                    'bank_name' => 'Bank Syariah Indonesia (BSI)',
+                    'account_holder' => 'Sri Hariati',
+                    'account_number' => '7276048637',
+                ],
+                'payableBills' => collect([(object) [
+                    'id_tagihan' => 1,
+                    'nama_lengkap' => 'Siswa Uji',
+                    'jenis_biaya' => 'SPP',
+                    'sisa' => 350000,
+                ]]),
+            ],
         ])->render();
 
         $this->assertStringContainsString('Bank Syariah Indonesia (BSI)', $parentForm);
         $this->assertStringContainsString('7276048637', $parentForm);
         $this->assertStringContainsString('Sri Hariati', $parentForm);
+        $this->assertStringContainsString('<option value="Transfer" selected>Transfer</option>', $parentForm);
+        $this->assertStringNotContainsString('<option value="Tunai">', $parentForm);
+        $this->assertStringContainsString('data-copy-target="payment-account-number"', $parentForm);
 
         $adminForm = view('dashboard.feature-actions', [
             'section' => 'pembayaran',
@@ -103,6 +118,19 @@ class SchoolDataDashboardTest extends TestCase
         ])->render();
 
         $this->assertStringNotContainsString('7276048637', $adminForm);
+    }
+
+    public function test_admin_user_form_has_password_visibility_toggles(): void
+    {
+        $form = view('dashboard.feature-actions', [
+            'section' => 'pengguna',
+            'role' => 'admin',
+            'actions' => [],
+        ])->render();
+
+        $this->assertStringContainsString('aria-controls="database-user-password"', $form);
+        $this->assertStringContainsString('aria-controls="database-user-password-confirmation"', $form);
+        $this->assertSame(2, substr_count($form, 'class="password-toggle"'));
     }
 
     private function createSiswaData(): void

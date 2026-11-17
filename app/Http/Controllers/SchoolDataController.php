@@ -48,6 +48,7 @@ class SchoolDataController extends Controller
                 'nik_samar' => 'NIK',
                 'nisn_samar' => 'NISN',
             ],
+            'key' => 'id_siswa',
             'scope' => 'student',
             'order' => 'nama_lengkap',
         ],
@@ -315,12 +316,16 @@ class SchoolDataController extends Controller
             'description' => 'Kontak keluarga dan wali siswa.',
             'view' => 'v_keluarga_lengkap',
             'columns' => [
+                'id_keluarga' => 'ID keluarga',
+                'jumlah_siswa' => 'Jumlah siswa',
+                'akun_orangtua' => 'Akun orang tua',
                 'nama_ayah' => 'Ayah',
                 'nama_ibu' => 'Ibu',
+                'nama_wali' => 'Wali',
                 'no_hp_utama' => 'Nomor kontak',
             ],
             'scope' => 'all',
-            'order' => 'nama_ayah',
+            'order' => 'id_keluarga',
         ],
     ];
 
@@ -349,6 +354,7 @@ class SchoolDataController extends Controller
             'module' => $module,
             'records' => $records,
             'actions' => $this->actionDataFor($section, $user, $role, $scope),
+            'hasLinkedStudents' => $role !== 'parent' || $scope['studentIds'] !== [],
             'cards' => $section === 'ringkasan' ? $this->summaryFor($role, $scope) : [],
             'messageCenterReady' => $messageCenterReady,
             'unreadMessageCount' => $messageCenterReady ? Message::query()
@@ -504,6 +510,41 @@ class SchoolDataController extends Controller
                 });
         }
 
+        if ($section === 'pendaftaran' && $role === 'parent') {
+            $applications = DB::table('pendaftaran as p')
+                ->join('siswa as s', 's.id_siswa', '=', 'p.id_siswa')
+                ->whereIn('p.id_siswa', $scope['studentIds'])
+                ->whereIn('p.status', ['Diajukan', 'Diverifikasi'])
+                ->orderByDesc('p.created_at')
+                ->get([
+                    'p.id_pendaftaran',
+                    'p.status',
+                    's.nama_lengkap',
+                ]);
+            $applicationIds = $applications->pluck('id_pendaftaran')->all();
+            $documents = $applicationIds === []
+                ? collect()
+                : DB::table('dokumen_pendaftaran')
+                    ->whereIn('id_pendaftaran', $applicationIds)
+                    ->get(['id_dokumen', 'id_pendaftaran', 'jenis', 'status_verifikasi', 'catatan'])
+                    ->groupBy('id_pendaftaran');
+
+            $data['parentApplications'] = $applications->map(function ($application) use ($documents): object {
+                $applicationDocuments = $documents->get($application->id_pendaftaran, collect())->keyBy('jenis');
+                $application->requiredDocuments = collect(config('registration.required_documents'))
+                    ->map(function ($label, $key) use ($applicationDocuments): array {
+                        return [
+                            'key' => $key,
+                            'label' => $label,
+                            'document' => $applicationDocuments->get($label),
+                        ];
+                    })
+                    ->values();
+
+                return $application;
+            });
+        }
+
         if ($section === 'siswa' && $role === 'admin') {
             $data['studentProfiles'] = DB::table('siswa')
                 ->orderBy('nama_lengkap')
@@ -637,6 +678,31 @@ class SchoolDataController extends Controller
             ]);
         }
 
+        if ($section === 'tagihan' && $role === 'admin') {
+            $schoolYear = DB::table('tahun_ajaran')->where('is_aktif', true)->first();
+            $data['activeSchoolYear'] = $schoolYear;
+            $data['billRosters'] = $schoolYear
+                ? DB::table('rombel_siswa as r')
+                    ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                    ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                    ->where('r.status', 'Aktif')
+                    ->where('k.id_tahun_ajaran', $schoolYear->id_tahun_ajaran)
+                    ->orderBy('s.nama_lengkap')
+                    ->get([
+                        'r.id_rombel', 's.nama_lengkap', 'k.nama_kelas', 'k.kelompok',
+                    ])
+                : collect();
+            $data['monthlyTariffs'] = $schoolYear
+                ? DB::table('tarif as tf')
+                    ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 'tf.id_jenis_biaya')
+                    ->where('tf.id_tahun_ajaran', $schoolYear->id_tahun_ajaran)
+                    ->where('jb.kategori', 'Bulanan')
+                    ->orderBy('tf.kelompok')
+                    ->orderBy('jb.nama')
+                    ->get(['tf.id_jenis_biaya', 'tf.kelompok', 'tf.nominal', 'jb.nama'])
+                : collect();
+        }
+
         if ($section === 'pembayaran' && $role === 'admin') {
             $data['pendingPayments'] = DB::table('v_pembayaran_detail')
                 ->where('status', 'Menunggu Verifikasi')
@@ -645,6 +711,34 @@ class SchoolDataController extends Controller
                     'id_pembayaran', 'no_kuitansi', 'tanggal_bayar',
                     'metode', 'total_bayar',
                 ]);
+        }
+
+        if ($section === 'pembayaran') {
+            $data['paymentSettings'] = DB::table('payment_settings')->where('id', 1)->first();
+            $data['payableBills'] = collect($data['bills'] ?? [])
+                ->filter(fn (object $bill): bool => (float) $bill->sisa > 0)
+                ->values();
+        }
+
+        if ($section === 'keluarga' && $role === 'admin') {
+            $data['unlinkedFamilies'] = DB::table('keluarga as f')
+                ->join('siswa as s', 's.id_keluarga', '=', 'f.id_keluarga')
+                ->whereNull('f.id_user')
+                ->orderBy('f.id_keluarga')
+                ->get(['f.id_keluarga', 's.nama_lengkap'])
+                ->groupBy('id_keluarga')
+                ->map(fn ($students, $familyId): object => (object) [
+                    'id_keluarga' => $familyId,
+                    'studentNames' => $students->pluck('nama_lengkap')->filter()->implode(', '),
+                ])
+                ->values();
+            $data['unlinkedParents'] = DB::table('users as u')
+                ->leftJoin('keluarga as f', 'f.id_user', '=', 'u.id_user')
+                ->where('u.role', 'orang_tua')
+                ->where('u.is_active', true)
+                ->whereNull('f.id_keluarga')
+                ->orderBy('u.name')
+                ->get(['u.id_user', 'u.name', 'u.email']);
         }
 
         if ($section === 'tabungan' && $role === 'admin') {
@@ -790,6 +884,7 @@ class SchoolDataController extends Controller
     {
         $query = match ($section) {
             'kelas' => $this->classQuery($scope, $role),
+            'keluarga' => $this->familyQuery(),
             'pembelajaran' => $this->lessonQuery($scope, $role),
             'nilai' => $this->iqroQuery($scope, $role),
             'perkembangan' => $this->portfolioQuery($scope, $role),
@@ -836,7 +931,11 @@ class SchoolDataController extends Controller
 
     private function viewQuery(array $module, array $scope, string $role): Builder
     {
-        $query = DB::table($module['view'])->select(array_keys($module['columns']));
+        $columns = array_keys($module['columns']);
+        if (isset($module['key'])) {
+            $columns[] = $module['key'];
+        }
+        $query = DB::table($module['view'])->select(array_unique($columns));
 
         if (in_array($role, ['teacher', 'parent'], true) && ($module['scope'] ?? 'all') === 'student') {
             $query->whereIn('id_siswa', $scope['studentIds']);
@@ -845,6 +944,70 @@ class SchoolDataController extends Controller
         }
 
         return $query;
+    }
+
+    private function familyQuery(): Builder
+    {
+        return DB::table('keluarga as f')
+            ->leftJoin('v_keluarga_lengkap as vf', 'vf.id_keluarga', '=', 'f.id_keluarga')
+            ->leftJoin('users as u', 'u.id_user', '=', 'f.id_user')
+            ->select([
+                'f.id_keluarga',
+                'vf.nama_ayah',
+                'vf.nama_ibu',
+                'vf.no_hp_utama',
+                'u.name as akun_orangtua',
+                'f.no_kk',
+                'f.alamat',
+            ])
+            ->selectSub(
+                DB::table('siswa as s')
+                    ->whereColumn('s.id_keluarga', 'f.id_keluarga')
+                    ->selectRaw('COUNT(*)'),
+                'jumlah_siswa'
+            )
+            ->selectSub(
+                DB::table('wali as w')
+                    ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                    ->where('w.hubungan', 'Wali')
+                    ->orderBy('w.id_wali')
+                    ->limit(1)
+                    ->select('w.nama_lengkap'),
+                'nama_wali'
+            )
+            ->selectSub(
+                    DB::table('wali as w')
+                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('w.id_wali')
+                        ->limit(1)
+                        ->select('w.id_wali'),
+                    'edit_wali_id'
+            )
+            ->selectSub(
+                    DB::table('wali as w')
+                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('w.id_wali')
+                        ->limit(1)
+                        ->select('w.nama_lengkap'),
+                    'edit_wali_name'
+            )
+            ->selectSub(
+                    DB::table('wali as w')
+                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('w.id_wali')
+                        ->limit(1)
+                        ->select('w.hubungan'),
+                    'edit_wali_relationship'
+            )
+            ->selectSub(
+                    DB::table('kontak_keluarga as k')
+                        ->whereColumn('k.id_keluarga', 'f.id_keluarga')
+                        ->orderBy('k.urutan')
+                        ->limit(1)
+                        ->select('k.nomor'),
+                    'edit_primary_phone'
+            )
+            ->orderBy('f.id_keluarga');
     }
 
     private function classQuery(array $scope, string $role): Builder

@@ -37,12 +37,24 @@ Route::middleware('auth')->group(function () {
 
     Route::patch('/dashboard/siswa/{student}/profil', [SchoolFeatureController::class, 'updateStudentProfile'])
         ->name('database.student.profile');
+    Route::patch('/dashboard/keluarga/{family}/profil', [SchoolFeatureController::class, 'updateFamilyProfile'])
+        ->name('database.family.update');
+    Route::patch('/dashboard/pengguna/{user}/profil', [SchoolFeatureController::class, 'updateUserProfile'])
+        ->name('database.user.profile.update');
+    Route::delete('/dashboard/siswa/{student}', [SchoolFeatureController::class, 'destroyStudent'])
+        ->name('database.student.destroy');
+    Route::delete('/dashboard/keluarga/{family}', [SchoolFeatureController::class, 'destroyFamily'])
+        ->name('database.family.destroy');
+    Route::delete('/dashboard/pengguna/{user}', [SchoolFeatureController::class, 'destroyUser'])
+        ->name('database.user.destroy');
     Route::patch('/dashboard/tarif/{tariff}', [SchoolFeatureController::class, 'updateTariff'])
         ->name('database.tariff.update');
     Route::post('/dashboard/tarif', [SchoolFeatureController::class, 'storeTariff'])
         ->name('database.tariff.store');
     Route::post('/dashboard/pendaftaran/{registration}/status', [SchoolFeatureController::class, 'reviewRegistration'])
         ->name('database.registration.review');
+    Route::post('/dashboard/pendaftaran/{registration}/dokumen', [SchoolFeatureController::class, 'uploadRegistrationDocuments'])
+        ->name('database.registration.documents.upload');
     Route::post('/dashboard/dokumen-pendaftaran/{document}/verifikasi', [SchoolFeatureController::class, 'verifyRegistrationDocument'])
         ->name('database.registration.document');
     Route::get('/dashboard/dokumen-pendaftaran/{document}/file', [SchoolFeatureController::class, 'registrationDocument'])
@@ -79,6 +91,8 @@ Route::middleware('auth')->group(function () {
         ->name('database.activity.photo');
     Route::post('/dashboard/pembayaran', [SchoolFeatureController::class, 'storePayment'])
         ->name('database.payment.store');
+    Route::patch('/dashboard/pembayaran/rekening', [SchoolFeatureController::class, 'updatePaymentSettings'])
+        ->name('database.payment-settings.update');
     Route::patch('/dashboard/pembayaran/{payment}/verifikasi', [SchoolFeatureController::class, 'reviewPayment'])
         ->name('database.payment.review');
     Route::get('/dashboard/pembayaran/{payment}/bukti', [SchoolFeatureController::class, 'paymentProof'])
@@ -87,6 +101,10 @@ Route::middleware('auth')->group(function () {
         ->name('database.savings.store');
     Route::post('/dashboard/tagihan/spp', [SchoolFeatureController::class, 'generateMonthlyBills'])
         ->name('database.bills.generate');
+    Route::post('/dashboard/tagihan/siswa', [SchoolFeatureController::class, 'createStudentBill'])
+        ->name('database.bills.store');
+    Route::post('/dashboard/keluarga/tautkan', [SchoolFeatureController::class, 'linkParentToFamily'])
+        ->name('database.family.link-parent');
 });
 Route::middleware('auth')->group(function () {
     Route::post('/admin/students', [AdminDashboardController::class, 'storeStudent'])
