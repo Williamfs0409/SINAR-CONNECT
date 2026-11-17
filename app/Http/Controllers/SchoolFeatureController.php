@@ -13,6 +13,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -59,7 +60,7 @@ class SchoolFeatureController extends Controller
                 ->where('id_keluarga', $familyId)
                 ->lockForUpdate()
                 ->first();
-            abort_unless($family, 404);
+            abort_unless($family !== null, 404);
 
             DB::table('keluarga')->where('id_keluarga', $familyId)->update([
                 'no_kk' => $data['no_kk'] ?? null,
@@ -146,7 +147,7 @@ class SchoolFeatureController extends Controller
     {
         $this->userFor(['admin']);
         $family = DB::table('keluarga')->where('id_keluarga', $familyId)->first();
-        abort_unless($family, 404);
+        abort_unless($family !== null, 404);
 
         if ($family->id_user !== null) {
             throw ValidationException::withMessages([
@@ -169,7 +170,7 @@ class SchoolFeatureController extends Controller
     {
         $this->userFor(['admin']);
         $target = DB::table('users')->where('id_user', $userId)->first();
-        abort_unless($target, 404);
+        abort_unless($target !== null, 404);
 
         if ((int) auth()->id() === $userId) {
             throw ValidationException::withMessages([
@@ -218,7 +219,7 @@ class SchoolFeatureController extends Controller
                 ->where('id_pendaftaran', $registrationId)
                 ->lockForUpdate()
                 ->first();
-            abort_unless($application, 404);
+            abort_unless($application !== null, 404);
 
             if ($data['decision'] === 'verify') {
                 if ($application->status !== 'Diajukan') {
@@ -238,7 +239,7 @@ class SchoolFeatureController extends Controller
             }
 
             if ($data['decision'] === 'reject') {
-                if (! in_array($application->status, ['Diajukan', 'Diverifikasi'], true)) {
+                if (! \in_array($application->status, ['Diajukan', 'Diverifikasi'], true)) {
                     throw ValidationException::withMessages(['decision' => 'Status pendaftaran ini tidak dapat ditolak.']);
                 }
 
@@ -338,9 +339,9 @@ class SchoolFeatureController extends Controller
                     ->where('s.id_keluarga', $familyId)
                     ->lockForUpdate()
                     ->first(['p.id_pendaftaran', 'p.status']);
-                abort_unless($application, 404);
+                abort_unless($application !== null, 404);
 
-                if (! in_array($application->status, ['Diajukan', 'Diverifikasi'], true)) {
+                if (! \in_array($application->status, ['Diajukan', 'Diverifikasi'], true)) {
                     throw ValidationException::withMessages([
                         'documents' => 'Dokumen hanya dapat diperbarui selama pendaftaran masih diproses.',
                     ]);
@@ -406,7 +407,7 @@ class SchoolFeatureController extends Controller
 
     public function verifyRegistrationDocument(Request $request, int $documentId): RedirectResponse
     {
-        $user = $this->userFor(['admin']);
+        $this->userFor(['admin']);
         $data = $request->validate([
             'status_verifikasi' => ['required', Rule::in(['Valid', 'Tidak Valid'])],
             'catatan' => ['nullable', 'string', 'max:255'],
@@ -415,7 +416,7 @@ class SchoolFeatureController extends Controller
         $document = DB::table('dokumen_pendaftaran')
             ->where('id_dokumen', $documentId)
             ->first();
-        abort_unless($document, 404);
+        abort_unless($document !== null, 404);
         DB::table('dokumen_pendaftaran')
             ->where('id_dokumen', $documentId)
             ->update([
@@ -541,7 +542,7 @@ class SchoolFeatureController extends Controller
 
         $familyId = $this->familyId($user);
         $task = DB::table('tugas')->where('id_tugas', $taskId)->first();
-        abort_unless($task, 404);
+        abort_unless($task !== null, 404);
         $roster = DB::table('rombel_siswa as r')
             ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
             ->where('s.id_keluarga', $familyId)
@@ -549,7 +550,7 @@ class SchoolFeatureController extends Controller
             ->where('r.id_kelas', $task->id_kelas)
             ->where('r.status', 'Aktif')
             ->first(['r.id_rombel']);
-        abort_unless($roster, 403);
+        abort_unless($roster !== null, 403);
 
         $submission = DB::table('pengumpulan_tugas')
             ->where('id_tugas', $taskId)
@@ -594,7 +595,7 @@ class SchoolFeatureController extends Controller
             ->join('tugas as t', 't.id_tugas', '=', 'pt.id_tugas')
             ->where('pt.id_pengumpulan', $submissionId)
             ->first(['pt.id_pengumpulan', 't.id_kelas']);
-        abort_unless($submission, 404);
+        abort_unless($submission !== null, 404);
         $this->assertTeacherClass($teacherId, (int) $submission->id_kelas);
 
         DB::table('pengumpulan_tugas')->where('id_pengumpulan', $submissionId)->update([
@@ -698,7 +699,7 @@ class SchoolFeatureController extends Controller
             ->where('rp.id_rapor', $reportId)
             ->where('s.id_keluarga', $familyId)
             ->first(['rp.id_rapor']);
-        abort_unless($report, 404);
+        abort_unless($report !== null, 404);
 
         DB::table('rapor')->where('id_rapor', $reportId)->update([
             'refleksi_orang_tua' => $data['refleksi_orang_tua'] ?? null,
@@ -792,7 +793,7 @@ class SchoolFeatureController extends Controller
                 ->where('id_kegiatan', $activityId)
                 ->lockForUpdate()
                 ->first();
-            abort_unless($activity, 404);
+            abort_unless($activity !== null, 404);
 
             if ($activity->jenis !== 'Field Trip') {
                 throw ValidationException::withMessages([
@@ -820,7 +821,7 @@ class SchoolFeatureController extends Controller
     {
         $this->userFor(['admin']);
         $activity = DB::table('kegiatan')->where('id_kegiatan', $activityId)->first();
-        abort_unless($activity, 404);
+        abort_unless($activity !== null, 404);
 
         if ($activity->jenis !== 'Field Trip') {
             throw ValidationException::withMessages([
@@ -881,21 +882,15 @@ class SchoolFeatureController extends Controller
             }
 
             DB::table('dokumentasi_kegiatan')->insert($documents);
-<<<<<<< HEAD
         } catch (Throwable $exception) {
             if ($storedPaths !== [] && ! Storage::disk('local')->delete($storedPaths)) {
                 throw new RuntimeException('Unable to clean up activity photos after upload failed.', 0, $exception);
-=======
-        } catch (\Throwable $exception) {
-            if ($storedPaths !== [] && ! Storage::disk('local')->delete($storedPaths)) {
-                throw new \RuntimeException('Unable to clean up activity photos after upload failed.', 0, $exception);
->>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
             }
 
             throw $exception;
         }
 
-        return back()->with('status', count($documents).' foto kegiatan berhasil diunggah.');
+        return back()->with('status', \count($documents).' foto kegiatan berhasil diunggah.');
     }
 
     public function activityPhoto(int $documentId): StreamedResponse
@@ -905,7 +900,7 @@ class SchoolFeatureController extends Controller
             ->join('kegiatan as k', 'k.id_kegiatan', '=', 'd.id_kegiatan')
             ->where('d.id_dokumentasi', $documentId)
             ->first(['d.file_path', 'k.id_kegiatan', 'k.id_user_pembuat', 'k.seluruh_sekolah']);
-        abort_unless($document, 404);
+        abort_unless($document !== null, 404);
 
         if ($user->role === 'teacher') {
             $teacherId = $this->teacherId($user);
@@ -929,9 +924,7 @@ class SchoolFeatureController extends Controller
             abort_unless($visible, 403);
         }
 
-        abort_unless(Storage::disk('local')->exists($document->file_path), 404);
-
-        return Storage::disk('local')->response($document->file_path);
+        return $this->privateFileResponse($document->file_path);
     }
 
     public function registrationDocument(int $documentId): StreamedResponse
@@ -942,13 +935,12 @@ class SchoolFeatureController extends Controller
             ->join('siswa as s', 's.id_siswa', '=', 'p.id_siswa')
             ->where('d.id_dokumen', $documentId)
             ->first(['d.file_path', 's.id_keluarga']);
-        abort_unless($document, 404);
+        abort_unless($document !== null, 404);
         if ($user->role === 'parent') {
             abort_unless((int) $document->id_keluarga === $this->familyId($user), 403);
         }
-        abort_unless(Storage::disk('local')->exists($document->file_path), 404);
 
-        return Storage::disk('local')->response($document->file_path);
+        return $this->privateFileResponse($document->file_path);
     }
 
     public function portfolioPhoto(int $portfolioId): StreamedResponse
@@ -958,7 +950,7 @@ class SchoolFeatureController extends Controller
             ->join('rombel_siswa as r', 'r.id_rombel', '=', 'p.id_rombel')
             ->where('p.id_portofolio', $portfolioId)
             ->first(['p.foto', 'r.id_kelas', 'r.id_siswa']);
-        abort_unless($portfolio, 404);
+        abort_unless($portfolio !== null, 404);
 
         if ($user->role === 'teacher') {
             $this->assertTeacherClass($this->teacherId($user), (int) $portfolio->id_kelas);
@@ -968,19 +960,17 @@ class SchoolFeatureController extends Controller
                 ->pluck('id_siswa')
                 ->map(fn ($id): int => (int) $id)
                 ->all();
-            abort_unless(in_array((int) $portfolio->id_siswa, $studentIds, true), 403);
+            abort_unless(\in_array((int) $portfolio->id_siswa, $studentIds, true), 403);
         }
 
-        abort_unless(Storage::disk('local')->exists($portfolio->foto), 404);
-
-        return Storage::disk('local')->response($portfolio->foto);
+        return $this->privateFileResponse($portfolio->foto);
     }
 
     public function taskAttachment(int $taskId): StreamedResponse
     {
         $user = $this->userFor(['admin', 'principal', 'teacher', 'parent']);
         $task = DB::table('tugas')->where('id_tugas', $taskId)->first(['lampiran', 'id_kelas']);
-        abort_unless($task && $task->lampiran, 404);
+        abort_unless($task !== null && $task->lampiran !== null, 404);
 
         if ($user->role === 'teacher') {
             $this->assertTeacherClass($this->teacherId($user), (int) $task->id_kelas);
@@ -994,9 +984,7 @@ class SchoolFeatureController extends Controller
                 ->exists(), 403);
         }
 
-        abort_unless(Storage::disk('local')->exists($task->lampiran), 404);
-
-        return Storage::disk('local')->response($task->lampiran);
+        return $this->privateFileResponse($task->lampiran);
     }
 
     public function taskSubmissionFile(int $submissionId): StreamedResponse
@@ -1008,7 +996,7 @@ class SchoolFeatureController extends Controller
             ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
             ->where('pt.id_pengumpulan', $submissionId)
             ->first(['pt.file_path', 't.id_kelas', 's.id_keluarga']);
-        abort_unless($submission && $submission->file_path, 404);
+        abort_unless($submission !== null && $submission->file_path !== null, 404);
 
         if ($user->role === 'teacher') {
             $this->assertTeacherClass($this->teacherId($user), (int) $submission->id_kelas);
@@ -1016,9 +1004,7 @@ class SchoolFeatureController extends Controller
             abort_unless((int) $submission->id_keluarga === $this->familyId($user), 403);
         }
 
-        abort_unless(Storage::disk('local')->exists($submission->file_path), 404);
-
-        return Storage::disk('local')->response($submission->file_path);
+        return $this->privateFileResponse($submission->file_path);
     }
 
     public function paymentProof(int $paymentId): StreamedResponse
@@ -1031,13 +1017,12 @@ class SchoolFeatureController extends Controller
             ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
             ->where('p.id_pembayaran', $paymentId)
             ->first(['p.bukti_transfer', 's.id_keluarga']);
-        abort_unless($payment && $payment->bukti_transfer, 404);
+        abort_unless($payment !== null && $payment->bukti_transfer !== null, 404);
         if ($user->role === 'parent') {
             abort_unless((int) $payment->id_keluarga === $this->familyId($user), 403);
         }
-        abort_unless(Storage::disk('local')->exists($payment->bukti_transfer), 404);
 
-        return Storage::disk('local')->response($payment->bukti_transfer);
+        return $this->privateFileResponse($payment->bukti_transfer);
     }
 
     public function storePayment(Request $request): RedirectResponse
@@ -1073,7 +1058,7 @@ class SchoolFeatureController extends Controller
                     't.total_tagihan',
                     's.id_keluarga',
                 ]);
-            abort_unless($bill, 404);
+            abort_unless($bill !== null, 404);
             if ($familyId !== null && (int) $bill->id_keluarga !== $familyId) {
                 abort(403);
             }
@@ -1150,7 +1135,7 @@ class SchoolFeatureController extends Controller
                 ->where('id_pembayaran', $paymentId)
                 ->lockForUpdate()
                 ->first();
-            abort_unless($payment, 404);
+            abort_unless($payment !== null, 404);
             if ($payment->status !== 'Menunggu Verifikasi') {
                 throw ValidationException::withMessages([
                     'decision' => 'Hanya pembayaran yang menunggu verifikasi dapat diproses.',
@@ -1182,7 +1167,7 @@ class SchoolFeatureController extends Controller
 
         DB::transaction(function () use ($data, $user): void {
             $student = DB::table('siswa')->where('id_siswa', $data['id_siswa'])->lockForUpdate()->first();
-            abort_unless($student, 404);
+            abort_unless($student !== null, 404);
 
             $balance = DB::table('transaksi_tabungan')
                 ->where('id_siswa', $student->id_siswa)
@@ -1214,7 +1199,7 @@ class SchoolFeatureController extends Controller
             'jatuh_tempo' => ['required', 'date'],
         ]);
         $schoolYear = DB::table('tahun_ajaran')->where('is_aktif', true)->first();
-        abort_unless($schoolYear, 503, 'Tahun ajaran aktif belum tersedia.');
+        abort_unless($schoolYear !== null, 503, 'Tahun ajaran aktif belum tersedia.');
         $period = $data['periode'].'-01';
         if ($data['jatuh_tempo'] < $period) {
             throw ValidationException::withMessages([
@@ -1276,7 +1261,7 @@ class SchoolFeatureController extends Controller
         ]);
 
         $schoolYear = DB::table('tahun_ajaran')->where('is_aktif', true)->first();
-        abort_unless($schoolYear, 503, 'Tahun ajaran aktif belum tersedia.');
+        abort_unless($schoolYear !== null, 503, 'Tahun ajaran aktif belum tersedia.');
         $period = $data['periode'].'-01';
         if ($data['jatuh_tempo'] < $period) {
             throw ValidationException::withMessages([
@@ -1351,7 +1336,7 @@ class SchoolFeatureController extends Controller
                 ->where('id_keluarga', $data['id_keluarga'])
                 ->lockForUpdate()
                 ->first();
-            abort_unless($family, 404);
+            abort_unless($family !== null, 404);
 
             if ($family->id_user !== null) {
                 throw ValidationException::withMessages([
@@ -1396,7 +1381,6 @@ class SchoolFeatureController extends Controller
             ->with('status', 'Akun orang tua berhasil dihubungkan ke data keluarga.');
     }
 
-<<<<<<< HEAD
     public function createAndLinkParent(Request $request): RedirectResponse
     {
         $this->userFor(['admin']);
@@ -1412,7 +1396,7 @@ class SchoolFeatureController extends Controller
                 ->where('id_keluarga', $data['id_keluarga'])
                 ->lockForUpdate()
                 ->first();
-            abort_unless($family, 404);
+            abort_unless($family !== null, 404);
 
             if ($family->id_user !== null) {
                 throw ValidationException::withMessages([
@@ -1444,8 +1428,6 @@ class SchoolFeatureController extends Controller
             ->with('status', 'Akun orang tua berhasil dibuat dan dihubungkan ke data keluarga.');
     }
 
-=======
->>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
     public function updateTariff(Request $request, int $tariffId): RedirectResponse
     {
         $this->userFor(['admin']);
@@ -1495,9 +1477,37 @@ class SchoolFeatureController extends Controller
     private function userFor(array $roles): User
     {
         $user = auth()->user();
-        abort_unless($user instanceof User && in_array($user->role, $roles, true), 403);
+        abort_unless($user instanceof User && \in_array($user->role, $roles, true), 403);
 
         return $user;
+    }
+
+    private function privateFileResponse(string $path): StreamedResponse
+    {
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($path), 404);
+        $stream = $disk->readStream($path);
+
+        if (! \is_resource($stream)) {
+            throw new RuntimeException('Unable to read stored file for response.');
+        }
+
+        $mimeType = mime_content_type($disk->path($path));
+
+        return response()->stream(function () use ($stream): void {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => $mimeType !== false ? $mimeType : 'application/octet-stream',
+            'Content-Length' => (string) $disk->size($path),
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_INLINE,
+                basename($path)
+            ),
+        ]);
     }
 
     private function assertNoDeleteDependencies(int $recordId, array $references, string $entity): void

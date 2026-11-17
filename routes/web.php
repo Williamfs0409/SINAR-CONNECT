@@ -135,11 +135,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.bills.store');
     Route::post('/dashboard/keluarga/tautkan', [SchoolFeatureController::class, 'linkParentToFamily'])
         ->name('database.family.link-parent');
-<<<<<<< HEAD
     Route::post('/dashboard/keluarga/akun-orang-tua', [SchoolFeatureController::class, 'createAndLinkParent'])
         ->name('database.family.create-parent');
-=======
->>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
 });
 Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::class])->group(function () {
     Route::post('/admin/students', [AdminDashboardController::class, 'storeStudent'])

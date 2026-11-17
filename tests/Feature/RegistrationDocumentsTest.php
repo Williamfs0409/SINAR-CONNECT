@@ -78,6 +78,30 @@ class RegistrationDocumentsTest extends TestCase
         $this->assertDatabaseHas('pendaftaran', ['id_pendaftaran' => 1, 'status' => 'Diverifikasi']);
     }
 
+    public function test_parent_can_view_their_registration_document(): void
+    {
+        Storage::fake('local');
+        $this->createRegistrationTables();
+        $parent = User::factory()->create(['role' => 'parent']);
+        $this->createApplicationFor($parent, 1);
+        $path = 'pendaftaran/akta.pdf';
+        $contents = "%PDF-1.4\nakta";
+        Storage::disk('local')->put($path, $contents);
+        DB::table('dokumen_pendaftaran')->insert([
+            'id_pendaftaran' => 1,
+            'jenis' => 'Akta Kelahiran',
+            'file_path' => $path,
+            'status_verifikasi' => 'Menunggu',
+            'created_at' => now(),
+        ]);
+
+        $this->actingAs($parent)
+            ->get(route('database.registration.document.file', ['document' => 1]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertStreamedContent($contents);
+    }
+
     private function createRegistrationTables(): void
     {
         Schema::create('keluarga', function (Blueprint $table): void {

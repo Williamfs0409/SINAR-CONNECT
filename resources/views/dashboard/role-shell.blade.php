@@ -42,6 +42,7 @@
             <div class="portal-dashboard-term">
                 <span>Semester Ganjil · T.A. 2026/2027</span>
                 <strong>{{ now()->locale('id')->translatedFormat('l, d F Y') }}</strong>
+                <time data-live-clock datetime="{{ now('Asia/Jakarta')->toIso8601String() }}" aria-label="Waktu WIB">{{ now('Asia/Jakarta')->format('H:i:s') }}</time>
             </div>
             <div class="portal-dashboard-account">
                 @guest
@@ -145,6 +146,7 @@
                     <a class="{{ $dashboardRoleName === 'Kepala Sekolah' ? 'is-selected' : '' }}" href="{{ route('dashboard', ['role' => 'principal']) }}">Kepala Sekolah</a>
                     <a class="{{ $dashboardRoleName === 'Orang Tua' ? 'is-selected' : '' }}" href="{{ route('dashboard', ['role' => 'parent']) }}">Orang Tua</a>
                 </nav>
+                <p class="role-preview-greeting">Halo, {{ $dashboardDisplayName }} ({{ $dashboardRoleName }})</p>
             @endguest
             @if ($dashboardSection === 'ringkasan')
                 @include($dashboardContentView)

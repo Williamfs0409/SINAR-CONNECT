@@ -31,7 +31,8 @@ class AdminDashboardTest extends TestCase
 
     public function test_unknown_account_role_cannot_fall_back_to_the_admin_dashboard(): void
     {
-        $user = User::factory()->create(['role' => 'unknown']);
+        $user = User::factory()->create(['role' => 'admin']);
+        $user->role = 'unknown';
 
         $this->actingAs($user)
             ->get(route('dashboard'))
@@ -179,11 +180,13 @@ class AdminDashboardTest extends TestCase
             ->post(route('admin.invoices.store'), $invoiceInput)
             ->assertRedirect(route('dashboard.feature', ['section' => 'transaksi']));
 
-        $this->assertDatabaseHas('spp_invoices', [
-            'student_id' => $student->id,
-            'period_month' => now()->startOfMonth()->toDateString(),
-            'amount' => 250000,
-        ]);
+        $this->assertSame(
+            1,
+            SppInvoice::where('student_id', $student->id)
+                ->whereDate('period_month', now()->startOfMonth()->toDateString())
+                ->where('amount', 250000)
+                ->count()
+        );
 
         $this->from(route('dashboard.feature', ['section' => 'transaksi']))
             ->post(route('admin.invoices.store'), $invoiceInput)

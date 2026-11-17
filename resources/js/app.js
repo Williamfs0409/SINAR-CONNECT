@@ -4,6 +4,23 @@ import axios from 'axios';
 window.axios = axios;
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
+document.querySelectorAll('[data-live-clock]').forEach((clock) => {
+    const updateClock = () => {
+        const now = new Date();
+        clock.dateTime = now.toISOString();
+        clock.textContent = new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hourCycle: 'h23',
+        }).format(now);
+    };
+
+    updateClock();
+    window.setInterval(updateClock, 1000);
+});
+
 const databaseNavigation = document.querySelector('.database-navigation');
 const activeDatabaseLink = databaseNavigation?.querySelector('[aria-current="page"]');
 

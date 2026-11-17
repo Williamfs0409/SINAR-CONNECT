@@ -11,6 +11,7 @@ class DashboardController extends Controller
     public function show(?string $section = null): View|RedirectResponse
     {
         $user = auth()->user();
+        $section = $section === 'dokumentasi' ? 'kegiatan' : $section;
 
         if (! $user && request()->query('role') === 'admin') {
             return redirect()->route('login');

@@ -114,7 +114,6 @@ class SchoolDataDashboardTest extends TestCase
             ->assertDontSee('Siswa Lain');
     }
 
-<<<<<<< HEAD
     public function test_teacher_siswa_page_uses_the_view_without_sensitive_identity_fields(): void
     {
         $this->createSiswaData();
@@ -175,8 +174,6 @@ class SchoolDataDashboardTest extends TestCase
             ->assertDontSee('NISN');
     }
 
-=======
->>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
     public function test_parent_payment_form_displays_school_transfer_account(): void
     {
         $parentForm = view('dashboard.feature-actions', [
@@ -226,7 +223,6 @@ class SchoolDataDashboardTest extends TestCase
         $this->assertSame(2, substr_count($form, 'class="password-toggle"'));
     }
 
-<<<<<<< HEAD
     public function test_admin_can_create_a_parent_account_from_the_existing_family_page(): void
     {
         $form = view('dashboard.feature-actions', [
@@ -272,8 +268,6 @@ class SchoolDataDashboardTest extends TestCase
         $this->assertStringContainsString('Terbitkan tagihan', $form);
     }
 
-=======
->>>>>>> d177baab25805b47fc739fd939367501e00cd0bb
     private function createSiswaData(): void
     {
         Schema::create('tahun_ajaran', function (Blueprint $table): void {
