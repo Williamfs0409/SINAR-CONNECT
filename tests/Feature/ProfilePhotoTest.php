@@ -19,7 +19,7 @@ class ProfilePhotoTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('profile.photo.update'), [
-                'photo' => UploadedFile::fake()->image('profile.png', 120, 120),
+                'photo' => $this->fakePng('profile.png'),
             ])
             ->assertRedirect(route('profile.edit'))
             ->assertSessionHas('status', 'Foto profil berhasil diperbarui.');
@@ -64,7 +64,7 @@ class ProfilePhotoTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('profile.photo.update'), [
-                'photo' => UploadedFile::fake()->image('replacement.png', 100, 100),
+                'photo' => $this->fakePng('replacement.png'),
             ])
             ->assertRedirect(route('profile.edit'));
 
@@ -121,5 +121,19 @@ class ProfilePhotoTest extends TestCase
         ->assertSessionHasErrors('email');
 
         $this->assertSame('milikku@example.test', $user->fresh()->email);
+    }
+
+    private function fakePng(string $name): UploadedFile
+    {
+        $contents = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+            true,
+        );
+
+        if ($contents === false) {
+            throw new \RuntimeException('Unable to load the PNG test fixture.');
+        }
+
+        return UploadedFile::fake()->createWithContent($name, $contents);
     }
 }

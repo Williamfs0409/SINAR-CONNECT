@@ -27,6 +27,11 @@ class ImageUploadService
             ]);
         }
 
+        if (! function_exists('imagecreatefromstring')
+            || ($mime === 'image/webp' && ! function_exists('imagewebp'))) {
+            return $this->storeOriginalImage($file, $directory, $mime);
+        }
+
         $imageData = file_get_contents($file->getPathname());
         if ($imageData === false) {
             throw new RuntimeException('Unable to read uploaded image.');
@@ -112,6 +117,22 @@ class ImageUploadService
         $storedPath = $file->store($directory, 'local');
         if ($storedPath === false) {
             throw new RuntimeException('Unable to store uploaded file.');
+        }
+
+        return $storedPath;
+    }
+
+    private function storeOriginalImage(UploadedFile $file, string $directory, string $mime): string
+    {
+        $extension = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+        };
+        $storedPath = $file->storeAs(trim($directory, '/'), Str::uuid().'.'.$extension, 'local');
+
+        if ($storedPath === false) {
+            throw new RuntimeException('Unable to store uploaded image.');
         }
 
         return $storedPath;
