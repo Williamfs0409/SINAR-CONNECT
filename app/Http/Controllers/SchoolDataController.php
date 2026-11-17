@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Message;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +31,40 @@ class SchoolDataController extends Controller
         ],
         'parent' => [
             'siswa', 'pendaftaran', 'absensi', 'tugas', 'rapor', 'kegiatan', 'tagihan',
-        'pembayaran', 'tabungan', 'saldo-tabungan', 'tunggakan', 'perkembangan',
+            'pembayaran', 'tabungan', 'saldo-tabungan', 'tunggakan', 'perkembangan',
+        ],
+    ];
+
+    private const MODULE_GROUPS = [
+        'data' => [
+            'title' => 'Data Sekolah',
+            'role_titles' => ['teacher' => 'Kelas & Siswa', 'parent' => 'Anak Saya'],
+            'modules' => ['siswa', 'guru', 'kelas', 'keluarga', 'pengguna'],
+        ],
+        'admissions' => [
+            'title' => 'Penerimaan Siswa',
+            'modules' => ['pendaftaran'],
+        ],
+        'academic' => [
+            'title' => 'Akademik',
+            'role_titles' => ['parent' => 'Belajar & Perkembangan'],
+            'modules' => ['absensi', 'pembelajaran', 'tugas', 'nilai', 'perkembangan', 'rapor'],
+        ],
+        'activities' => [
+            'title' => 'Kegiatan',
+            'modules' => ['kegiatan'],
+        ],
+        'finance' => [
+            'title' => 'Keuangan',
+            'role_titles' => ['parent' => 'Keuangan Anak'],
+            'modules' => [
+                'tagihan', 'pembayaran', 'tabungan', 'saldo-tabungan', 'tunggakan',
+                'rekap-pembayaran', 'tarif',
+            ],
+        ],
+        'reports' => [
+            'title' => 'Laporan & Pengawasan',
+            'modules' => ['rekap-pendaftar', 'kesiapan', 'kualitas', 'duplikat-siswa', 'audit'],
         ],
     ];
 
@@ -351,6 +384,7 @@ class SchoolDataController extends Controller
             'roleName' => $this->roleName($role),
             'user' => $user,
             'modules' => $this->menuFor($allowedModules),
+            'moduleGroups' => $this->moduleGroupsFor($allowedModules, $role),
             'module' => $module,
             'records' => $records,
             'actions' => $this->actionDataFor($section, $user, $role, $scope),
@@ -713,6 +747,26 @@ class SchoolDataController extends Controller
                 ]);
         }
 
+        if ($section === 'kegiatan' && $role === 'admin') {
+            $data['fieldTrips'] = DB::table('kegiatan as k')
+                ->where('k.jenis', 'Field Trip')
+                ->orderByDesc('k.tanggal')
+                ->select([
+                    'k.id_kegiatan',
+                    'k.nama_kegiatan',
+                    'k.tanggal',
+                    'k.lokasi',
+                    'k.biaya',
+                ])
+                ->selectSub(
+                    DB::table('tagihan as t')
+                        ->whereColumn('t.id_kegiatan', 'k.id_kegiatan')
+                        ->selectRaw('COUNT(*)'),
+                    'tagihan_dibuat'
+                )
+                ->get();
+        }
+
         if ($section === 'pembayaran') {
             $data['paymentSettings'] = DB::table('payment_settings')->where('id', 1)->first();
             $data['payableBills'] = collect($data['bills'] ?? [])
@@ -825,8 +879,49 @@ class SchoolDataController extends Controller
         return $menu;
     }
 
+    private function moduleGroupsFor(array $allowedModules, string $role): array
+    {
+        $menu = $this->menuFor($allowedModules);
+        $groups = [];
+
+        foreach (self::MODULE_GROUPS as $group) {
+            $groupModules = [];
+            foreach ($group['modules'] as $module) {
+                if (isset($menu[$module])) {
+                    $groupModules[$module] = $menu[$module];
+                }
+            }
+
+            if ($groupModules !== []) {
+                $groups[] = [
+                    'title' => $group['role_titles'][$role] ?? $group['title'],
+                    'modules' => $groupModules,
+                ];
+            }
+        }
+
+        return $groups;
+    }
+
     private function moduleDefinition(string $section, string $role): array
     {
+        if ($section === 'siswa' && $role === 'teacher') {
+            return [
+                'title' => 'Data Siswa',
+                'description' => 'Data siswa dan kelas yang Anda ampu tanpa informasi identitas sensitif.',
+                'view' => 'v_siswa_guru',
+                'columns' => [
+                    'nama_lengkap' => 'Nama siswa',
+                    'nama_kelas' => 'Kelas',
+                    'kelompok' => 'Kelompok',
+                    'tahun_ajaran' => 'Tahun ajaran',
+                ],
+                'key' => 'id_siswa',
+                'scope' => 'student',
+                'order' => 'nama_lengkap',
+            ];
+        }
+
         if ($section === 'tugas' && $role === 'parent') {
             return [
                 'title' => 'Tugas Anak',
@@ -976,36 +1071,36 @@ class SchoolDataController extends Controller
                 'nama_wali'
             )
             ->selectSub(
-                    DB::table('wali as w')
-                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
-                        ->orderBy('w.id_wali')
-                        ->limit(1)
-                        ->select('w.id_wali'),
-                    'edit_wali_id'
+                DB::table('wali as w')
+                    ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                    ->orderBy('w.id_wali')
+                    ->limit(1)
+                    ->select('w.id_wali'),
+                'edit_wali_id'
             )
             ->selectSub(
-                    DB::table('wali as w')
-                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
-                        ->orderBy('w.id_wali')
-                        ->limit(1)
-                        ->select('w.nama_lengkap'),
-                    'edit_wali_name'
+                DB::table('wali as w')
+                    ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                    ->orderBy('w.id_wali')
+                    ->limit(1)
+                    ->select('w.nama_lengkap'),
+                'edit_wali_name'
             )
             ->selectSub(
-                    DB::table('wali as w')
-                        ->whereColumn('w.id_keluarga', 'f.id_keluarga')
-                        ->orderBy('w.id_wali')
-                        ->limit(1)
-                        ->select('w.hubungan'),
-                    'edit_wali_relationship'
+                DB::table('wali as w')
+                    ->whereColumn('w.id_keluarga', 'f.id_keluarga')
+                    ->orderBy('w.id_wali')
+                    ->limit(1)
+                    ->select('w.hubungan'),
+                'edit_wali_relationship'
             )
             ->selectSub(
-                    DB::table('kontak_keluarga as k')
-                        ->whereColumn('k.id_keluarga', 'f.id_keluarga')
-                        ->orderBy('k.urutan')
-                        ->limit(1)
-                        ->select('k.nomor'),
-                    'edit_primary_phone'
+                DB::table('kontak_keluarga as k')
+                    ->whereColumn('k.id_keluarga', 'f.id_keluarga')
+                    ->orderBy('k.urutan')
+                    ->limit(1)
+                    ->select('k.nomor'),
+                'edit_primary_phone'
             )
             ->orderBy('f.id_keluarga');
     }

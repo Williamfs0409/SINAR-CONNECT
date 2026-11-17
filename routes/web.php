@@ -4,9 +4,12 @@ use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\PasswordSecurityController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SchoolFeatureController;
+use App\Http\Middleware\EnsurePasswordChange;
+use App\Http\Middleware\SetAuditUserContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -16,14 +19,37 @@ Route::get('/', function () {
 })->name('home');
 
 Route::view('/login', 'welcome')->name('login');
-Route::post('/login', LoginController::class)->name('login.authenticate');
+Route::post('/login', LoginController::class)->middleware('throttle:5,1')->name('login.authenticate');
 Route::get('/pendaftaran', [RegistrationController::class, 'create'])->name('registration.create');
-Route::post('/pendaftaran', [RegistrationController::class, 'store'])->name('registration.store');
-Route::get('/dashboard', [DashboardController::class, 'show'])->name('dashboard');
+Route::post('/pendaftaran', [RegistrationController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('registration.store');
+Route::get('/kata-sandi/lupa', [PasswordSecurityController::class, 'showRequestForm'])
+    ->middleware('guest')
+    ->name('password.request');
+Route::post('/kata-sandi/email', [PasswordSecurityController::class, 'sendResetLink'])
+    ->middleware(['guest', 'throttle:5,1'])
+    ->name('password.email');
+Route::get('/kata-sandi/reset/{token}', [PasswordSecurityController::class, 'showResetForm'])
+    ->middleware('guest')
+    ->name('password.reset');
+Route::post('/kata-sandi/reset', [PasswordSecurityController::class, 'reset'])
+    ->middleware(['guest', 'throttle:5,1'])
+    ->name('password.update');
+Route::middleware('auth')->group(function () {
+    Route::get('/kata-sandi/wajib', [PasswordSecurityController::class, 'showForceChange'])
+        ->name('password.force');
+    Route::put('/kata-sandi/wajib', [PasswordSecurityController::class, 'forceChange'])
+        ->name('password.force.update');
+});
+Route::get('/dashboard', [DashboardController::class, 'show'])
+    ->middleware(EnsurePasswordChange::class)
+    ->name('dashboard');
 Route::get('/dashboard/{section}', [DashboardController::class, 'show'])
     ->where('section', '[a-z-]+')
+    ->middleware(EnsurePasswordChange::class)
     ->name('dashboard.feature');
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::class])->group(function () {
     Route::get('/profil', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profil', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profil/foto', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
@@ -85,6 +111,10 @@ Route::middleware('auth')->group(function () {
         ->name('database.portfolio.photo');
     Route::post('/dashboard/kegiatan', [SchoolFeatureController::class, 'storeActivity'])
         ->name('database.activity.store');
+    Route::patch('/dashboard/kegiatan/{activity}/biaya', [SchoolFeatureController::class, 'updateActivityCost'])
+        ->name('database.activity.cost.update');
+    Route::post('/dashboard/kegiatan/{activity}/tagihan', [SchoolFeatureController::class, 'generateActivityBills'])
+        ->name('database.activity.bills.generate');
     Route::post('/dashboard/kegiatan/{activity}/foto', [SchoolFeatureController::class, 'uploadActivityPhoto'])
         ->name('database.activity.photo.store');
     Route::get('/dashboard/dokumentasi/{document}/foto', [SchoolFeatureController::class, 'activityPhoto'])
@@ -105,8 +135,10 @@ Route::middleware('auth')->group(function () {
         ->name('database.bills.store');
     Route::post('/dashboard/keluarga/tautkan', [SchoolFeatureController::class, 'linkParentToFamily'])
         ->name('database.family.link-parent');
+    Route::post('/dashboard/keluarga/akun-orang-tua', [SchoolFeatureController::class, 'createAndLinkParent'])
+        ->name('database.family.create-parent');
 });
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::class])->group(function () {
     Route::post('/admin/students', [AdminDashboardController::class, 'storeStudent'])
         ->name('admin.students.store');
     Route::post('/admin/students/{student}/activate', [AdminDashboardController::class, 'activateStudent'])

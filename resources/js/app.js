@@ -212,9 +212,36 @@ if (dashboardSearch) {
             }
         });
 
+        document.querySelectorAll('[data-navigation-group], [data-module-group]').forEach((group) => {
+            const visibleLinks = Array.from(group.querySelectorAll('[data-dashboard-searchable]'))
+                .some((link) => !link.classList.contains('is-search-hidden'));
+            group.classList.toggle('is-search-hidden', !visibleLinks);
+        });
+
         navigationSearchEmpty?.classList.toggle('is-visible', query !== '' && navigationMatches === 0);
     });
 }
+
+document.querySelectorAll('[data-record-search]').forEach((input) => {
+    const section = input.closest('.database-list-section');
+    const rows = Array.from(section?.querySelectorAll('[data-record-row]') ?? []);
+    const emptyState = section?.querySelector('[data-record-search-empty]');
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim().toLocaleLowerCase();
+        let visibleRows = 0;
+
+        rows.forEach((row) => {
+            const matches = row.textContent.toLocaleLowerCase().includes(query);
+            row.hidden = !matches;
+            visibleRows += Number(matches);
+        });
+
+        if (emptyState) {
+            emptyState.hidden = visibleRows !== 0;
+        }
+    });
+});
 
 document.querySelectorAll('.password-toggle').forEach((passwordToggle) => {
     const passwordInput = document.getElementById(passwordToggle.getAttribute('aria-controls'))

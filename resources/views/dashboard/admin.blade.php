@@ -1,11 +1,11 @@
 <div class="dashboard-shell">
     @php
         $adminDashboardData = array_merge([
-            'studentCount' => 128,
-            'pendingCount' => 4,
-            'userCount' => 12,
-            'monthIncome' => 12450000,
-            'arrearsCount' => 7,
+            'studentCount' => 0,
+            'pendingCount' => 0,
+            'userCount' => 0,
+            'monthIncome' => 0,
+            'arrearsCount' => 0,
         ], $adminDashboardData);
         $adminMenu = [
             ['id' => 'ringkasan', 'icon' => '⌂', 'label' => 'Dashboard'],

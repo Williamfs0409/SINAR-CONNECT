@@ -73,7 +73,7 @@
                         <label>Email <input type="email" name="email" value="{{ old('email') }}" maxlength="150" autocomplete="email" required></label>
                         <label>Kata sandi
                             <span class="registration-password-wrap">
-                                <input id="registration-password" type="password" name="password" minlength="8" autocomplete="new-password" required>
+                                <input id="registration-password" type="password" name="password" minlength="12" autocomplete="new-password" required>
                                 <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="registration-password" aria-pressed="false">
                                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -85,7 +85,7 @@
                         </label>
                         <label>Ulangi kata sandi
                             <span class="registration-password-wrap">
-                                <input id="registration-password-confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required>
+                                <input id="registration-password-confirmation" type="password" name="password_confirmation" minlength="12" autocomplete="new-password" required>
                                 <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="registration-password-confirmation" aria-pressed="false">
                                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                         <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

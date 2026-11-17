@@ -73,20 +73,28 @@
                 <a class="{{ $section === 'ringkasan' ? 'is-active' : '' }}" data-dashboard-searchable href="{{ route('dashboard') }}" @if ($section === 'ringkasan') aria-current="page" @endif>
                     {{ $role === 'parent' ? 'Beranda' : 'Ringkasan' }}
                 </a>
-                @foreach ($modules as $key => $title)
-                    <a class="{{ $section === $key ? 'is-active' : '' }}"
-                       data-dashboard-searchable
-                       @if ($section === $key) aria-current="page" @endif
-                       href="{{ route('dashboard.feature', ['section' => $key]) }}">
-                        {{ $title }}
-                    </a>
+                @foreach ($moduleGroups as $group)
+                    <div class="database-navigation-group" data-navigation-group>
+                        <span class="database-navigation-heading">{{ $group['title'] }}</span>
+                        @foreach ($group['modules'] as $key => $title)
+                            <a class="{{ $section === $key ? 'is-active' : '' }}"
+                               data-dashboard-searchable
+                               @if ($section === $key) aria-current="page" @endif
+                               href="{{ route('dashboard.feature', ['section' => $key]) }}">
+                                {{ $title }}
+                            </a>
+                        @endforeach
+                    </div>
                 @endforeach
-                <a class="{{ request()->routeIs('messages.*') ? 'is-active' : '' }}"
-                   data-dashboard-searchable
-                   href="{{ route('messages.index') }}"
-                   @if (request()->routeIs('messages.*')) aria-current="page" @endif>
-                    Pesan
-                </a>
+                <div class="database-navigation-group" data-navigation-group>
+                    <span class="database-navigation-heading">Komunikasi</span>
+                    <a class="{{ request()->routeIs('messages.*') ? 'is-active' : '' }}"
+                       data-dashboard-searchable
+                       href="{{ route('messages.index') }}"
+                       @if (request()->routeIs('messages.*')) aria-current="page" @endif>
+                        Pesan
+                    </a>
+                </div>
             </nav>
             <p class="database-navigation-empty" data-dashboard-search-empty aria-live="polite">Menu tidak ditemukan.</p>
 
@@ -239,13 +247,20 @@
                             <p>{{ $role === 'admin' ? 'Buka modul untuk mengelola dan memantau data sekolah.' : 'Menu yang tersedia mengikuti peran dan akses akun Anda.' }}</p>
                         </div>
                     </div>
-                    <div class="database-module-grid">
-                        @foreach ($modules as $key => $title)
-                            <a class="database-module-card" data-dashboard-searchable href="{{ route('dashboard.feature', ['section' => $key]) }}">
-                                <span class="database-module-arrow">→</span>
-                                <strong>{{ $title }}</strong>
-                                <small>Lihat data {{ strtolower($title) }}</small>
-                            </a>
+                    <div class="database-module-groups">
+                        @foreach ($moduleGroups as $group)
+                            <section class="database-module-group" data-module-group>
+                                <h3>{{ $group['title'] }}</h3>
+                                <div class="database-module-grid">
+                                    @foreach ($group['modules'] as $key => $title)
+                                        <a class="database-module-card" data-dashboard-searchable href="{{ route('dashboard.feature', ['section' => $key]) }}">
+                                            <span class="database-module-arrow">→</span>
+                                            <strong>{{ $title }}</strong>
+                                            <small>Lihat data {{ strtolower($title) }}</small>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </section>
                         @endforeach
                     </div>
                 </section>
@@ -257,7 +272,13 @@
                             <h2>{{ $module['title'] }}</h2>
                             <p>{{ $module['description'] }}</p>
                         </div>
-                        <span class="database-result-count">{{ $records->total() }} data</span>
+                        <div class="database-list-controls">
+                            <label class="database-record-search">
+                                <span>Cari di halaman ini</span>
+                                <input type="search" data-record-search placeholder="Cari di halaman ini..." aria-label="Cari data pada halaman ini">
+                            </label>
+                            <span class="database-result-count">{{ $records->total() }} data total</span>
+                        </div>
                     </div>
 
                     @if ($records->isEmpty())
@@ -280,7 +301,7 @@
                         <div class="database-table-wrap">
                             <table class="database-table">
                                 <thead>
-                                    <tr>
+                                    <tr data-record-row>
                                         @foreach ($module['columns'] as $label)
                                             <th scope="col">{{ $label }}</th>
                                         @endforeach
@@ -399,6 +420,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <p class="database-filter-empty" data-record-search-empty hidden>Tidak ada data pada halaman ini yang cocok.</p>
                         <div class="database-pagination">{{ $records->links() }}</div>
                     @endif
                 </section>

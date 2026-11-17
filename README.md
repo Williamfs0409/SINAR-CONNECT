@@ -81,7 +81,9 @@ SINAR melayani empat jenis pengguna (kolom `users.role`: `admin`, `kepala_sekola
 - Kelola data siswa, keluarga, wali, guru, kelas, dan tahun ajaran
 - Verifikasi pendaftaran dan berkas
 - Atur tarif dan terbitkan tagihan
+- Buat akun orang tua untuk keluarga lama dan hubungkan tanpa menggandakan data siswa
 - Catat pembayaran tunai, verifikasi bukti transfer
+- Tetapkan biaya Field Trip dan terbitkan tagihan berdasarkan kegiatan
 - Catat tabungan siswa
 - Kelola akun pengguna
 
@@ -120,6 +122,8 @@ SINAR melayani empat jenis pengguna (kolom `users.role`: `admin`, `kepala_sekola
 
 Orang tua hanya dapat melihat anaknya sendiri, dan guru hanya kelas yang diampu. Pembatasan ini dijaga oleh Policy Laravel dan dilapisi aturan di tingkat database.
 
+Menu dashboard ditampilkan sebagai tab per modul dan dikelompokkan menurut fungsi: data sekolah, pendaftaran, akademik, kegiatan, keuangan, serta laporan dan pengawasan. Tab yang muncul mengikuti peran akun; ringkasan juga mengelompokkan pintasan modul yang sama.
+
 ### Modul Utama
 
 | Modul | Cakupan |
@@ -132,6 +136,8 @@ Orang tua hanya dapat melihat anaknya sendiri, dan guru hanya kelas yang diampu.
 | 📚 Pembelajaran | Rencana pembelajaran, tugas, pengumpulan, dan penilaian |
 | 🧾 Rapor | Narasi per aspek, pertumbuhan anak, nilai IQRO, refleksi orang tua |
 | 📸 Kegiatan | Kegiatan, field trip, dan dokumentasi foto sebelum, selama, dan sesudah |
+
+Formulir pendaftaran dan pembuatan akun menerapkan kata sandi minimal 12 karakter dengan huruf besar, huruf kecil, angka, dan simbol. Akun orang tua yang dibuat administrator serta akun orang tua lama ditandai untuk mengganti kata sandi sementara saat login pertama. Tersedia pemulihan kata sandi melalui email; aktifkan SMTP produksi pada `.env` karena mailer `log` hanya cocok untuk pengembangan.
 
 ---
 
@@ -390,18 +396,15 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
-### Import Database
+### Migrasi Database
 
-Buat database kosong bernama `db_tk_final`, lalu pilih salah satu cara.
+Migrasi baseline di `database/migrations/0000_*.php` membangun skema MySQL dari `db_tk_final`: 30 tabel, 22 view, 14 function, 17 procedure, dan 34 trigger. Migrasi ini hanya membuat struktur, tidak menyalin data, dan melepas `DEFINER` lokal agar objek memakai akun MySQL yang menjalankan migrasi. Migrasi baseline hanya aktif pada MySQL; migrasi SQLite untuk pengujian tetap berjalan seperti sebelumnya.
 
-**A. Satu file** (lebih cepat): import `database/sql/db_tk_final.sql` lewat phpMyAdmin atau terminal.
+Jalankan `php artisan migrate` hanya pada database MySQL baru dan kosong. Pemeriksaan awal baseline memastikan skema tidak berisi tabel, view, routine, atau trigger (selain tabel pencatat Laravel) sebelum membuat objek apa pun. Database sumber tidak memiliki tabel pencatat `migrations`, jadi jangan jalankan seluruh baseline pada `db_tk_final` berisi data atau menjalankan `php artisan migrate:fresh --seed` di database tersebut.
 
-```bash
-mysql -u root -p -e "CREATE DATABASE db_tk_final CHARACTER SET utf8mb4"
-mysql -u root -p db_tk_final < database/sql/db_tk_final.sql
-```
+Untuk menerapkan **hanya** perubahan keamanan kata sandi pada database lama, buat backup dan verifikasi target database terlebih dahulu, lalu jalankan migration additive ini secara terpisah: `php artisan migrate --path=database/migrations/2026_11_17_000001_add_password_security_to_users_table.php`. Migration tersebut menambah penanda perubahan kata sandi, membuat tabel token bila belum ada, dan mewajibkan akun orang tua yang sudah ada mengganti kata sandi saat login berikutnya. Jangan mengganti perintah ini dengan migrasi baseline penuh.
 
-**B. Dipecah per objek** (bila file besar bermasalah atau ingin diimport bertahap): ikuti `database/sql/dipecah/BACA_DULU.txt`. Urutannya: `01_tabel`, `02_fungsi`, `03_prosedur`, `04_view`, lalu `05_foreign_key` terakhir.
+`database/schema/db_tk_final-schema.sql` adalah snapshot SQL referensi, bukan untuk diimpor bersamaan dengan migrasi PHP. Snapshot tersebut berisi `DROP` dan `DEFINER` lokal; jangan impor ke database yang berisi data.
 
 ### Jalankan
 

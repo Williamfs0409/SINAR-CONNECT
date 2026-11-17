@@ -23,6 +23,9 @@
         </a>
         <h2 id="welcome-login-title">Selamat Datang</h2>
         <p class="welcome-login-subtitle">Masuk untuk melanjutkan ke akun Anda</p>
+        @if (session('status'))
+            <p class="login-status-alert" role="status">{{ session('status') }}</p>
+        @endif
         @error('email')
             <p class="login-error-alert" id="email-error" role="alert">{{ $message }}</p>
         @enderror
@@ -53,7 +56,7 @@
 
             <div class="login-options">
                 <label class="check-label"><input type="checkbox" name="remember"> <span>Ingat saya</span></label>
-                <a href="mailto:info@tkcerdasceria.sch.id?subject=Bantuan%20akun">Lupa kata sandi?</a>
+                <a href="{{ route('password.request') }}">Lupa kata sandi?</a>
             </div>
 
             <button class="button button-primary welcome-submit" type="submit">Masuk <span aria-hidden="true">→</span></button>

@@ -10,15 +10,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
 
 class RegistrationController extends Controller
 {
-    public function __construct(private readonly ImageUploadService $imageUploads)
-    {
-    }
+    public function __construct(private readonly ImageUploadService $imageUploads) {}
 
     public function create(): View
     {
@@ -47,7 +46,7 @@ class RegistrationController extends Controller
             'family_address' => ['required', 'string', 'max:2000'],
             'family_card_number' => ['nullable', 'digits:16'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
             'documents' => ['required', 'array:'.implode(',', array_keys($requiredDocuments))],
         ];
         $messages = [

@@ -151,7 +151,7 @@
                 <label>Peran<select name="role" required>@foreach ($adminDashboardData['roles'] as $role)<option value="{{ $role }}" @selected(old('role', 'teacher') === $role)>{{ ['admin' => 'Administrator', 'teacher' => 'Guru', 'principal' => 'Kepala Sekolah', 'parent' => 'Orang Tua'][$role] }}</option>@endforeach</select></label>
                 <label>Kata sandi
                     <span class="registration-password-wrap">
-                        <input id="admin-user-password" type="password" name="password" required minlength="8" autocomplete="new-password">
+                        <input id="admin-user-password" type="password" name="password" required minlength="12" autocomplete="new-password">
                         <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="admin-user-password" aria-pressed="false">
                             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -163,7 +163,7 @@
                 </label>
                 <label>Konfirmasi kata sandi
                     <span class="registration-password-wrap">
-                        <input id="admin-user-password-confirmation" type="password" name="password_confirmation" required minlength="8" autocomplete="new-password">
+                        <input id="admin-user-password-confirmation" type="password" name="password_confirmation" required minlength="12" autocomplete="new-password">
                         <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="admin-user-password-confirmation" aria-pressed="false">
                             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

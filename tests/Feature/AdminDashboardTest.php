@@ -34,8 +34,8 @@ class AdminDashboardTest extends TestCase
         $user = User::factory()->create(['role' => 'unknown']);
 
         $this->actingAs($user)
-        ->get(route('dashboard'))
-        ->assertForbidden();
+            ->get(route('dashboard'))
+            ->assertForbidden();
     }
 
     public function test_admin_can_open_each_data_management_page(): void
@@ -43,19 +43,19 @@ class AdminDashboardTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'admin']));
 
         $this->get(route('dashboard'))
-        ->assertOk()
-        ->assertSee('Siswa Aktif');
+            ->assertOk()
+            ->assertSee('Siswa Aktif');
 
         foreach ([
-        'pendaftaran' => 'Pendaftaran Siswa Baru',
-        'siswa' => 'Daftar Siswa',
-        'transaksi' => 'Catat Pembayaran SPP',
-        'tunggakan' => 'Tagihan Melewati Jatuh Tempo',
-        'pengguna' => 'Buat Akun Pengguna',
+            'pendaftaran' => 'Pendaftaran Siswa Baru',
+            'siswa' => 'Daftar Siswa',
+            'transaksi' => 'Catat Pembayaran SPP',
+            'tunggakan' => 'Tagihan Melewati Jatuh Tempo',
+            'pengguna' => 'Buat Akun Pengguna',
         ] as $section => $heading) {
-        $this->get(route('dashboard.feature', ['section' => $section]))
-            ->assertOk()
-            ->assertSee($heading);
+            $this->get(route('dashboard.feature', ['section' => $section]))
+                ->assertOk()
+                ->assertSee($heading);
         }
     }
 
@@ -237,14 +237,14 @@ class AdminDashboardTest extends TestCase
                 'name' => 'Dewi Guru',
                 'email' => 'dewi@example.com',
                 'role' => 'teacher',
-                'password' => 'strong-password',
-                'password_confirmation' => 'strong-password',
+                'password' => 'Secure-Admin1!',
+                'password_confirmation' => 'Secure-Admin1!',
             ])
             ->assertRedirect(route('dashboard.feature', ['section' => 'pengguna']));
 
         $teacher = User::where('email', 'dewi@example.com')->firstOrFail();
         $this->assertSame('teacher', $teacher->role);
-        $this->assertTrue(Hash::check('strong-password', $teacher->password));
+        $this->assertTrue(Hash::check('Secure-Admin1!', $teacher->password));
 
         $this->patch(route('admin.users.role', $teacher), ['role' => 'principal'])
             ->assertRedirect();

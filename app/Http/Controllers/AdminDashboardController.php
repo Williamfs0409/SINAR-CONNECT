@@ -8,12 +8,13 @@ use App\Models\Student;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AdminDashboardController extends Controller
@@ -257,7 +258,7 @@ class AdminDashboardController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required', Rule::in(self::USER_ROLES)],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
         ]);
 
         User::create([
@@ -265,6 +266,7 @@ class AdminDashboardController extends Controller
             'email' => $data['email'],
             'role' => $data['role'],
             'password' => $data['password'],
+            'must_change_password' => $data['role'] === 'parent',
         ]);
 
         return redirect()->route('dashboard.feature', ['section' => 'pengguna'])

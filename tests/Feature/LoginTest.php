@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
 class LoginTest extends TestCase
@@ -85,6 +89,90 @@ class LoginTest extends TestCase
 
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_parent_with_temporary_password_must_change_it_before_opening_the_dashboard(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'parent',
+            'must_change_password' => true,
+        ]);
+
+        $this->post(route('login.authenticate'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect(route('password.force'));
+
+        $this->get(route('dashboard'))->assertRedirect(route('password.force'));
+        $this->get(route('password.force'))
+            ->assertOk()
+            ->assertSee('Buat kata sandi pribadi');
+    }
+
+    public function test_password_security_migration_marks_existing_parent_accounts_for_a_change(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'parent',
+            'must_change_password' => false,
+        ]);
+        $migration = require database_path('migrations/2026_11_17_000001_add_password_security_to_users_table.php');
+
+        $migration->up();
+
+        $this->assertTrue($user->fresh()->must_change_password);
+    }
+
+    public function test_forced_password_change_updates_the_password_and_unlocks_dashboard_access(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'parent',
+            'must_change_password' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('password.force.update'), [
+                'current_password' => 'password',
+                'password' => 'New-ParentPass123!',
+                'password_confirmation' => 'New-ParentPass123!',
+            ])
+            ->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+        $this->assertFalse($user->must_change_password);
+        $this->assertTrue(Hash::check('New-ParentPass123!', $user->password));
+    }
+
+    public function test_password_reset_mail_does_not_disclose_whether_an_email_exists(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create();
+
+        $this->post(route('password.email'), ['email' => $user->email])
+            ->assertSessionHas('status', 'Jika alamat email terdaftar, tautan untuk mengatur ulang kata sandi akan dikirim.');
+        Notification::assertSentTo($user, ResetPasswordNotification::class);
+
+        $this->post(route('password.email'), ['email' => 'unknown@example.com'])
+            ->assertSessionHas('status', 'Jika alamat email terdaftar, tautan untuk mengatur ulang kata sandi akan dikirim.');
+    }
+
+    public function test_password_reset_clears_the_forced_change_flag(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'parent',
+            'must_change_password' => true,
+        ]);
+        $token = Password::createToken($user);
+
+        $this->post(route('password.update'), [
+            'token' => $token,
+            'email' => $user->email,
+            'password' => 'Reset-ParentPass123!',
+            'password_confirmation' => 'Reset-ParentPass123!',
+        ])->assertRedirect(route('login'));
+
+        $user->refresh();
+        $this->assertFalse($user->must_change_password);
+        $this->assertTrue(Hash::check('Reset-ParentPass123!', $user->password));
     }
 
     public function test_teacher_sees_the_teacher_dashboard_after_login(): void

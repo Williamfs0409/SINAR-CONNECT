@@ -403,6 +403,38 @@
     </section>
 @endif
 
+@if ($section === 'kegiatan' && $role === 'admin')
+    <section class="database-action-panel">
+        <div class="database-section-heading"><div><h2>Biaya dan tagihan Field Trip</h2><p>Tetapkan biaya sebelum menerbitkan tagihan. Jatuh tempo mengikuti tanggal kegiatan; biaya terkunci setelah tagihan pertama dibuat.</p></div></div>
+        @forelse ($actions['fieldTrips'] ?? [] as $activity)
+            <div class="database-action-row">
+                <div>
+                    <strong>{{ $activity->nama_kegiatan }}</strong>
+                    <small>{{ $activity->tanggal }}{{ $activity->lokasi ? ' · '.$activity->lokasi : '' }} · {{ $activity->tagihan_dibuat }} tagihan diterbitkan</small>
+                </div>
+                <div class="database-action-buttons">
+                    @if ((int) $activity->tagihan_dibuat === 0)
+                        <form method="POST" action="{{ route('database.activity.cost.update', ['activity' => $activity->id_kegiatan]) }}" class="database-inline-form">
+                            @csrf
+                            @method('PATCH')
+                            <label>Biaya per siswa (Rp)<input type="number" name="biaya" min="0.01" step="0.01" value="{{ old('biaya', $activity->biaya) }}" required></label>
+                            <button class="database-button database-button-secondary" type="submit">Simpan biaya</button>
+                        </form>
+                    @else
+                        <strong>Biaya: Rp{{ number_format((float) $activity->biaya, 0, ',', '.') }}</strong>
+                    @endif
+                    <form method="POST" action="{{ route('database.activity.bills.generate', ['activity' => $activity->id_kegiatan]) }}">
+                        @csrf
+                        <button class="database-button" type="submit" @disabled($activity->biaya === null || (float) $activity->biaya <= 0)>Terbitkan tagihan</button>
+                    </form>
+                </div>
+            </div>
+        @empty
+            <p class="database-empty-note">Belum ada kegiatan Field Trip. Guru dapat membuat kegiatan terlebih dahulu.</p>
+        @endforelse
+    </section>
+@endif
+
 @if ($section === 'kegiatan')
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Dokumentasi kegiatan</h2><p>Foto kegiatan yang dapat diakses sesuai peran dan kelas terkait.</p></div></div>
@@ -538,7 +570,30 @@
 
 @if ($section === 'keluarga' && $role === 'admin')
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Hubungkan akun orang tua</h2><p>Pilih akun dan data keluarga yang belum terhubung. Pengaitan ini memberi akun akses ke semua siswa dalam keluarga tersebut.</p></div></div>
+        <div class="database-section-heading"><div><h2>Buat akun orang tua untuk keluarga lama</h2><p>Buat akun memakai email yang diberikan orang tua lalu hubungkan langsung ke keluarga yang benar. Akun hanya mendapat akses ke siswa dalam keluarga tersebut.</p></div></div>
+        @if (($actions['unlinkedFamilies'] ?? collect())->isEmpty())
+            <p class="database-empty-note">Tidak ada data keluarga berisi siswa yang belum terhubung.</p>
+        @else
+            <form method="POST" action="{{ route('database.family.create-parent') }}" class="database-form-grid">
+                @csrf
+                <label>Data keluarga<select name="id_keluarga" required>
+                    <option value="">Pilih data keluarga</option>
+                    @foreach ($actions['unlinkedFamilies'] as $family)
+                        <option value="{{ $family->id_keluarga }}" @selected(old('id_keluarga') == $family->id_keluarga)>Keluarga #{{ $family->id_keluarga }} · {{ $family->studentNames }}</option>
+                    @endforeach
+                </select></label>
+                <label>Nama akun orang tua<input name="name" value="{{ old('name') }}" maxlength="100" required></label>
+                <label>Email orang tua<input type="email" name="email" value="{{ old('email') }}" maxlength="150" required autocomplete="email"></label>
+                <label>Kata sandi sementara<input type="password" name="password" minlength="12" autocomplete="new-password" required></label>
+                <label>Ulangi kata sandi<input type="password" name="password_confirmation" minlength="12" autocomplete="new-password" required></label>
+                <div class="database-form-wide"><small>Sampaikan kata sandi sementara kepada orang tua secara pribadi.</small></div>
+                <div class="database-form-wide"><button class="database-button" type="submit">Buat akun dan hubungkan</button></div>
+            </form>
+        @endif
+    </section>
+
+    <section class="database-action-panel">
+        <div class="database-section-heading"><div><h2>Hubungkan akun yang sudah ada</h2><p>Pilih akun orang tua aktif yang belum terhubung dan pasangkan ke data keluarga yang belum terhubung.</p></div></div>
         @if (($actions['unlinkedParents'] ?? collect())->isEmpty())
             <p class="database-empty-note">Tidak ada akun orang tua aktif yang belum terhubung.</p>
         @elseif (($actions['unlinkedFamilies'] ?? collect())->isEmpty())
@@ -621,7 +676,7 @@
             <label>Peran<select name="role"><option value="teacher">Guru</option><option value="principal">Kepala sekolah</option><option value="parent">Orang tua</option><option value="admin">Administrator</option></select></label>
             <label>Kata sandi
                 <span class="registration-password-wrap">
-                    <input id="database-user-password" type="password" name="password" minlength="8" autocomplete="new-password" required>
+                    <input id="database-user-password" type="password" name="password" minlength="12" autocomplete="new-password" required>
                     <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password" aria-pressed="false">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -633,7 +688,7 @@
             </label>
             <label>Ulangi kata sandi
                 <span class="registration-password-wrap">
-                    <input id="database-user-password-confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required>
+                    <input id="database-user-password-confirmation" type="password" name="password_confirmation" minlength="12" autocomplete="new-password" required>
                     <button type="button" class="password-toggle" aria-label="Tampilkan kata sandi" aria-controls="database-user-password-confirmation" aria-pressed="false">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

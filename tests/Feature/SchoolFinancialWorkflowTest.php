@@ -66,6 +66,43 @@ class SchoolFinancialWorkflowTest extends TestCase
             ->assertSessionHasErrors('metode');
     }
 
+    public function test_admin_payment_review_is_single_use_and_records_the_verifier(): void
+    {
+        Schema::create('pembayaran', function (Blueprint $table): void {
+            $table->increments('id_pembayaran');
+            $table->string('status');
+            $table->unsignedBigInteger('id_user_verifikator')->nullable();
+            $table->timestamp('tanggal_verifikasi')->nullable();
+            $table->string('catatan')->nullable();
+            $table->timestamp('updated_at')->nullable();
+        });
+
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        DB::table('pembayaran')->insert([
+            'id_pembayaran' => 1,
+            'status' => 'Menunggu Verifikasi',
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('database.payment.review', ['payment' => 1]), ['decision' => 'verify'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('pembayaran', [
+            'id_pembayaran' => 1,
+            'status' => 'Terverifikasi',
+            'id_user_verifikator' => $admin->getKey(),
+        ]);
+
+        $this->from(route('dashboard.feature', ['section' => 'pembayaran']))
+            ->patch(route('database.payment.review', ['payment' => 1]), ['decision' => 'reject'])
+            ->assertSessionHasErrors('decision');
+
+        $this->assertDatabaseHas('pembayaran', [
+            'id_pembayaran' => 1,
+            'status' => 'Terverifikasi',
+        ]);
+    }
+
     public function test_admin_can_link_an_unlinked_parent_to_a_family_with_students(): void
     {
         Schema::create('keluarga', function (Blueprint $table): void {
@@ -93,6 +130,131 @@ class SchoolFinancialWorkflowTest extends TestCase
         $this->post(route('database.family.link-parent'), ['id_user' => $otherParent->id_user, 'id_keluarga' => 1])
             ->assertSessionHasErrors('id_keluarga');
         $this->assertDatabaseHas('keluarga', ['id_keluarga' => 1, 'id_user' => $parent->id_user]);
+    }
+
+    public function test_admin_can_create_and_link_a_parent_account_to_an_existing_family(): void
+    {
+        Schema::create('keluarga', function (Blueprint $table): void {
+            $table->increments('id_keluarga');
+            $table->unsignedBigInteger('id_user')->nullable()->unique();
+            $table->timestamps();
+        });
+        Schema::create('siswa', function (Blueprint $table): void {
+            $table->increments('id_siswa');
+            $table->unsignedInteger('id_keluarga');
+            $table->string('nama_lengkap');
+        });
+
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        DB::table('keluarga')->insert(['id_keluarga' => 1, 'id_user' => null]);
+        DB::table('siswa')->insert(['id_siswa' => 1, 'id_keluarga' => 1, 'nama_lengkap' => 'Siswa Uji']);
+
+        $this->actingAs($admin)
+            ->post(route('database.family.create-parent'), [
+                'id_keluarga' => 1,
+                'name' => 'Orang Tua Uji',
+                'email' => 'parent@example.test',
+                'password' => 'Secure-Pass123!',
+                'password_confirmation' => 'Secure-Pass123!',
+            ])
+            ->assertRedirect(route('dashboard.feature', ['section' => 'keluarga']));
+
+        $parent = User::where('email', 'parent@example.test')->firstOrFail();
+        $this->assertSame('parent', $parent->role);
+        $this->assertTrue($parent->is_active);
+        $this->assertTrue($parent->must_change_password);
+        $this->assertTrue(password_verify('Secure-Pass123!', $parent->password));
+        $this->assertDatabaseHas('keluarga', [
+            'id_keluarga' => 1,
+            'id_user' => $parent->getKey(),
+        ]);
+    }
+
+    public function test_admin_can_set_field_trip_cost_before_bills_are_created(): void
+    {
+        Schema::create('kegiatan', function (Blueprint $table): void {
+            $table->increments('id_kegiatan');
+            $table->string('jenis');
+            $table->decimal('biaya', 12, 2)->nullable();
+            $table->timestamps();
+        });
+        Schema::create('tagihan', function (Blueprint $table): void {
+            $table->increments('id_tagihan');
+            $table->unsignedInteger('id_kegiatan')->nullable();
+        });
+
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        DB::table('kegiatan')->insert([
+            'id_kegiatan' => 1,
+            'jenis' => 'Field Trip',
+            'biaya' => null,
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('database.activity.cost.update', ['activity' => 1]), ['biaya' => 75000])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('kegiatan', ['id_kegiatan' => 1, 'biaya' => 75000]);
+    }
+
+    public function test_field_trip_cost_cannot_change_after_bills_are_created(): void
+    {
+        Schema::create('kegiatan', function (Blueprint $table): void {
+            $table->increments('id_kegiatan');
+            $table->string('jenis');
+            $table->decimal('biaya', 12, 2)->nullable();
+            $table->timestamps();
+        });
+        Schema::create('tagihan', function (Blueprint $table): void {
+            $table->increments('id_tagihan');
+            $table->unsignedInteger('id_kegiatan')->nullable();
+        });
+
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        DB::table('kegiatan')->insert([
+            'id_kegiatan' => 1,
+            'jenis' => 'Field Trip',
+            'biaya' => 75000,
+        ]);
+        DB::table('tagihan')->insert(['id_kegiatan' => 1]);
+
+        $this->actingAs($admin)
+            ->from(route('dashboard.feature', ['section' => 'kegiatan']))
+            ->patch(route('database.activity.cost.update', ['activity' => 1]), ['biaya' => 80000])
+            ->assertSessionHasErrors('biaya');
+
+        $this->assertDatabaseHas('kegiatan', ['id_kegiatan' => 1, 'biaya' => 75000]);
+    }
+
+    public function test_parent_account_is_not_created_for_a_family_without_students(): void
+    {
+        Schema::create('keluarga', function (Blueprint $table): void {
+            $table->increments('id_keluarga');
+            $table->unsignedBigInteger('id_user')->nullable()->unique();
+            $table->timestamps();
+        });
+        Schema::create('siswa', function (Blueprint $table): void {
+            $table->increments('id_siswa');
+            $table->unsignedInteger('id_keluarga');
+            $table->string('nama_lengkap');
+        });
+
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        DB::table('keluarga')->insert(['id_keluarga' => 1, 'id_user' => null]);
+
+        $this->actingAs($admin)
+            ->from(route('dashboard.feature', ['section' => 'keluarga']))
+            ->post(route('database.family.create-parent'), [
+                'id_keluarga' => 1,
+                'name' => 'Orang Tua Uji',
+                'email' => 'parent@example.test',
+                'password' => 'Secure-Pass123!',
+                'password_confirmation' => 'Secure-Pass123!',
+            ])
+            ->assertSessionHasErrors('id_keluarga');
+
+        $this->assertDatabaseMissing('users', ['email' => 'parent@example.test']);
+        $this->assertDatabaseHas('keluarga', ['id_keluarga' => 1, 'id_user' => null]);
     }
 
     public function test_admin_can_update_parent_payment_account_details(): void

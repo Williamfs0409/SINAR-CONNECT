@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -17,9 +18,7 @@ use Throwable;
 
 class SchoolFeatureController extends Controller
 {
-    public function __construct(private readonly ImageUploadService $imageUploads)
-    {
-    }
+    public function __construct(private readonly ImageUploadService $imageUploads) {}
 
     public function updateStudentProfile(Request $request, int $studentId): RedirectResponse
     {
@@ -781,6 +780,67 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Kegiatan berhasil ditambahkan.');
     }
 
+    public function updateActivityCost(Request $request, int $activityId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'biaya' => ['required', 'numeric', 'min:0.01', 'max:9999999999'],
+        ]);
+
+        DB::transaction(function () use ($activityId, $data): void {
+            $activity = DB::table('kegiatan')
+                ->where('id_kegiatan', $activityId)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($activity, 404);
+
+            if ($activity->jenis !== 'Field Trip') {
+                throw ValidationException::withMessages([
+                    'biaya' => 'Biaya hanya dapat ditetapkan untuk kegiatan Field Trip.',
+                ]);
+            }
+
+            $hasBills = DB::table('tagihan')->where('id_kegiatan', $activityId)->exists();
+            if ($hasBills && (float) $activity->biaya !== (float) $data['biaya']) {
+                throw ValidationException::withMessages([
+                    'biaya' => 'Biaya tidak dapat diubah setelah tagihan kegiatan diterbitkan.',
+                ]);
+            }
+
+            DB::table('kegiatan')->where('id_kegiatan', $activityId)->update([
+                'biaya' => $data['biaya'],
+                'updated_at' => now(),
+            ]);
+        });
+
+        return back()->with('status', 'Biaya Field Trip berhasil disimpan.');
+    }
+
+    public function generateActivityBills(int $activityId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $activity = DB::table('kegiatan')->where('id_kegiatan', $activityId)->first();
+        abort_unless($activity, 404);
+
+        if ($activity->jenis !== 'Field Trip') {
+            throw ValidationException::withMessages([
+                'activity' => 'Tagihan kegiatan hanya dapat dibuat untuk Field Trip.',
+            ]);
+        }
+        if ($activity->biaya === null || (float) $activity->biaya <= 0) {
+            throw ValidationException::withMessages([
+                'activity' => 'Tetapkan biaya Field Trip sebelum menerbitkan tagihan.',
+            ]);
+        }
+
+        $result = DB::select('CALL sp_buat_tagihan_kegiatan(?)', [$activityId]);
+        if (! isset($result[0]->tagihan_dibuat)) {
+            throw new RuntimeException('Prosedur tagihan Field Trip tidak mengembalikan jumlah tagihan.');
+        }
+
+        return back()->with('status', (int) $result[0]->tagihan_dibuat.' tagihan Field Trip berhasil diterbitkan.');
+    }
+
     public function uploadActivityPhoto(Request $request, int $activityId): RedirectResponse
     {
         $user = $this->userFor(['teacher']);
@@ -821,9 +881,9 @@ class SchoolFeatureController extends Controller
             }
 
             DB::table('dokumentasi_kegiatan')->insert($documents);
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             if ($storedPaths !== [] && ! Storage::disk('local')->delete($storedPaths)) {
-                throw new \RuntimeException('Unable to clean up activity photos after upload failed.', 0, $exception);
+                throw new RuntimeException('Unable to clean up activity photos after upload failed.', 0, $exception);
             }
 
             throw $exception;
@@ -1079,19 +1139,26 @@ class SchoolFeatureController extends Controller
             'catatan' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $payment = DB::table('pembayaran')->where('id_pembayaran', $paymentId)->first();
-        abort_unless($payment, 404);
-        if ($payment->status !== 'Menunggu Verifikasi') {
-            throw ValidationException::withMessages(['decision' => 'Hanya pembayaran yang menunggu verifikasi dapat diproses.']);
-        }
+        DB::transaction(function () use ($data, $paymentId, $user): void {
+            $payment = DB::table('pembayaran')
+                ->where('id_pembayaran', $paymentId)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($payment, 404);
+            if ($payment->status !== 'Menunggu Verifikasi') {
+                throw ValidationException::withMessages([
+                    'decision' => 'Hanya pembayaran yang menunggu verifikasi dapat diproses.',
+                ]);
+            }
 
-        DB::table('pembayaran')->where('id_pembayaran', $paymentId)->update([
-            'status' => $data['decision'] === 'verify' ? 'Terverifikasi' : 'Ditolak',
-            'id_user_verifikator' => $user->getKey(),
-            'tanggal_verifikasi' => now(),
-            'catatan' => $data['catatan'] ?? null,
-            'updated_at' => now(),
-        ]);
+            DB::table('pembayaran')->where('id_pembayaran', $paymentId)->update([
+                'status' => $data['decision'] === 'verify' ? 'Terverifikasi' : 'Ditolak',
+                'id_user_verifikator' => $user->getKey(),
+                'tanggal_verifikasi' => now(),
+                'catatan' => $data['catatan'] ?? null,
+                'updated_at' => now(),
+            ]);
+        });
 
         return back()->with('status', 'Status pembayaran berhasil diperbarui.');
     }
@@ -1321,6 +1388,53 @@ class SchoolFeatureController extends Controller
 
         return redirect()->route('dashboard.feature', ['section' => 'keluarga'])
             ->with('status', 'Akun orang tua berhasil dihubungkan ke data keluarga.');
+    }
+
+    public function createAndLinkParent(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_keluarga' => ['required', 'integer', Rule::exists('keluarga', 'id_keluarga')],
+            'name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')],
+            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+        ]);
+
+        DB::transaction(function () use ($data): void {
+            $family = DB::table('keluarga')
+                ->where('id_keluarga', $data['id_keluarga'])
+                ->lockForUpdate()
+                ->first();
+            abort_unless($family, 404);
+
+            if ($family->id_user !== null) {
+                throw ValidationException::withMessages([
+                    'id_keluarga' => 'Data keluarga ini sudah terhubung ke akun.',
+                ]);
+            }
+
+            if (! DB::table('siswa')->where('id_keluarga', $family->id_keluarga)->exists()) {
+                throw ValidationException::withMessages([
+                    'id_keluarga' => 'Data keluarga belum memiliki siswa.',
+                ]);
+            }
+
+            $parent = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => $data['password'],
+                'role' => 'parent',
+                'must_change_password' => true,
+            ]);
+
+            DB::table('keluarga')
+                ->where('id_keluarga', $family->id_keluarga)
+                ->whereNull('id_user')
+                ->update(['id_user' => $parent->getKey(), 'updated_at' => now()]);
+        });
+
+        return redirect()->route('dashboard.feature', ['section' => 'keluarga'])
+            ->with('status', 'Akun orang tua berhasil dibuat dan dihubungkan ke data keluarga.');
     }
 
     public function updateTariff(Request $request, int $tariffId): RedirectResponse
