@@ -36,6 +36,18 @@
             <button class="sidebar-toggle" type="button" aria-label="Buka menu">☰</button>
             <label class="search-box"><span aria-hidden="true">⌕</span><input type="search" placeholder="Cari..." aria-label="Cari"></label>
             <button class="notification-button" type="button" aria-label="Notifikasi">♧<i></i></button>
+            @if (($passwordResetAttentionCount ?? 0) > 0)
+                <a class="message-notifications-toggle"
+                   href="{{ route('admin.password-reset-requests.index') }}"
+                   aria-label="{{ $passwordResetAttentionCount }} permintaan reset kata sandi masih perlu ditindaklanjuti"
+                   title="Permintaan reset kata sandi masih perlu ditindaklanjuti">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M7 14a4 4 0 1 1 3.9-4.9H21v4h-3v3h-3v-3h-3.1A4 4 0 0 1 7 14Z" />
+                        <circle cx="7" cy="10" r="1" />
+                    </svg>
+                    <span class="message-unread-badge">{{ $passwordResetAttentionCount > 99 ? '99+' : $passwordResetAttentionCount }}</span>
+                </a>
+            @endif
             <div class="admin-profile">
                 <span class="admin-avatar">{{ mb_substr(auth()->user()->name, 0, 1) }}</span>
                 <span><strong>{{ auth()->user()->name }}</strong><small>Administrator</small></span>

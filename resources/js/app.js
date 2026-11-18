@@ -644,3 +644,34 @@ document.querySelectorAll('[data-schedule-widget]').forEach((widget) => {
 
     renderCalendar();
 });
+
+document.querySelectorAll('[data-iqro-roster-select]').forEach((rosterSelect) => {
+    const form = rosterSelect.closest('form');
+    const indicatorSelect = form?.querySelector('[data-iqro-indicator-select]');
+    if (!indicatorSelect) {
+        return;
+    }
+
+    const syncIndicators = () => {
+        const selectedOption = rosterSelect.options[rosterSelect.selectedIndex];
+        const kelompok = selectedOption?.dataset.kelompok ?? '';
+        let firstVisibleValue = null;
+
+        Array.from(indicatorSelect.options).forEach((option) => {
+            const matches = !kelompok || !option.dataset.kelompok || option.dataset.kelompok === kelompok;
+            option.hidden = !matches;
+            option.disabled = !matches;
+            if (matches && firstVisibleValue === null) {
+                firstVisibleValue = option.value;
+            }
+        });
+
+        const currentOption = indicatorSelect.options[indicatorSelect.selectedIndex];
+        if (currentOption?.disabled && firstVisibleValue !== null) {
+            indicatorSelect.value = firstVisibleValue;
+        }
+    };
+
+    rosterSelect.addEventListener('change', syncIndicators);
+    syncIndicators();
+});

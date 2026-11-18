@@ -67,6 +67,7 @@ return new class extends Migration
         }
 
         DB::statement('ALTER TABLE `users` MODIFY `email` VARCHAR(150) NULL DEFAULT NULL');
+        DB::statement('SET NAMES utf8mb4 COLLATE utf8mb4_0900_ai_ci');
 
         $this->installUpdatedRoutines();
         $this->installUpdatedTriggers();

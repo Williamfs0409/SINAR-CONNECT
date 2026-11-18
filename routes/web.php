@@ -73,10 +73,32 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
     Route::patch('/pesan/notifikasi/baca-semua', [MessageController::class, 'markAllNotificationsRead'])
         ->name('messages.notifications.read-all');
 
+    Route::post('/dashboard/siswa', [SchoolFeatureController::class, 'storeStudent'])
+        ->name('database.student.store');
+    Route::post('/dashboard/siswa/penempatan', [SchoolFeatureController::class, 'placeStudent'])
+        ->name('database.student.place');
     Route::patch('/dashboard/siswa/{student}/profil', [SchoolFeatureController::class, 'updateStudentProfile'])
         ->name('database.student.profile');
+    Route::post('/dashboard/keluarga', [SchoolFeatureController::class, 'storeFamily'])
+        ->name('database.family.store');
     Route::patch('/dashboard/keluarga/{family}/profil', [SchoolFeatureController::class, 'updateFamilyProfile'])
         ->name('database.family.update');
+    Route::post('/dashboard/guru', [SchoolFeatureController::class, 'storeTeacher'])
+        ->name('database.teacher.store');
+    Route::patch('/dashboard/guru/{teacher}', [SchoolFeatureController::class, 'updateTeacher'])
+        ->name('database.teacher.update');
+    Route::post('/dashboard/guru/kelas', [SchoolFeatureController::class, 'assignTeacherClass'])
+        ->name('database.teacher.assign-class');
+    Route::post('/dashboard/kelas', [SchoolFeatureController::class, 'storeClass'])
+        ->name('database.class.store');
+    Route::patch('/dashboard/kelas/{schoolClass}', [SchoolFeatureController::class, 'updateClass'])
+        ->name('database.class.update');
+    Route::post('/dashboard/tahun-ajaran', [SchoolFeatureController::class, 'storeSchoolYear'])
+        ->name('database.school-year.store');
+    Route::post('/dashboard/duplikat-siswa/gabung', [SchoolFeatureController::class, 'mergeDuplicateStudents'])
+        ->name('database.student.merge');
+    Route::post('/dashboard/keluarga/gabung', [SchoolFeatureController::class, 'mergeDuplicateFamilies'])
+        ->name('database.family.merge');
     Route::patch('/dashboard/pengguna/{user}/profil', [SchoolFeatureController::class, 'updateUserProfile'])
         ->name('database.user.profile.update');
     Route::delete('/dashboard/siswa/{student}', [SchoolFeatureController::class, 'destroyStudent'])
@@ -99,6 +121,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.registration.document');
     Route::get('/dashboard/dokumen-pendaftaran/{document}/file', [SchoolFeatureController::class, 'registrationDocument'])
         ->name('database.registration.document.file');
+    Route::post('/dashboard/absensi/inisialisasi', [SchoolFeatureController::class, 'initializeAttendance'])
+        ->name('database.attendance.init');
     Route::post('/dashboard/absensi', [SchoolFeatureController::class, 'storeAttendance'])
         ->name('database.attendance.store');
     Route::post('/dashboard/rencana-pembelajaran', [SchoolFeatureController::class, 'storeLessonPlan'])
@@ -139,6 +163,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.payment-settings.update');
     Route::patch('/dashboard/pembayaran/{payment}/verifikasi', [SchoolFeatureController::class, 'reviewPayment'])
         ->name('database.payment.review');
+    Route::patch('/dashboard/pembayaran/{payment}/batalkan', [SchoolFeatureController::class, 'cancelPayment'])
+        ->name('database.payment.cancel');
     Route::get('/dashboard/pembayaran/{payment}/bukti', [SchoolFeatureController::class, 'paymentProof'])
         ->name('database.payment.proof');
     Route::post('/dashboard/tabungan', [SchoolFeatureController::class, 'storeSavings'])

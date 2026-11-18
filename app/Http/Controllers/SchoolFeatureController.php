@@ -27,21 +27,186 @@ class SchoolFeatureController extends Controller
         $data = $request->validate([
             'nama_lengkap' => ['required', 'string', 'max:100'],
             'nama_panggilan' => ['nullable', 'string', 'max:100'],
+            'nik' => ['nullable', 'digits:16'],
+            'nisn' => ['nullable', 'digits:10'],
+            'no_induk' => ['nullable', 'string', 'max:30'],
             'tempat_lahir' => ['nullable', 'string', 'max:100'],
             'tanggal_lahir' => ['required', 'date', 'before_or_equal:today'],
             'jenis_kelamin' => ['required', Rule::in(['Laki-Laki', 'Perempuan'])],
+            'agama' => ['nullable', 'string', 'max:30'],
+            'anak_ke' => ['nullable', 'integer', 'min:1', 'max:20'],
             'alamat_domisili' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $exists = DB::table('siswa')->where('id_siswa', $studentId)->exists();
         abort_unless($exists, 404);
 
-        DB::table('siswa')->where('id_siswa', $studentId)->update([
-            ...$data,
+        $payload = [
+            'nama_lengkap' => $data['nama_lengkap'],
+            'nama_panggilan' => $data['nama_panggilan'] ?? null,
+            'tempat_lahir' => $data['tempat_lahir'] ?? null,
+            'tanggal_lahir' => $data['tanggal_lahir'],
+            'jenis_kelamin' => $data['jenis_kelamin'],
+            'alamat_domisili' => $data['alamat_domisili'] ?? null,
             'updated_at' => now(),
-        ]);
+        ];
+
+        foreach (['nik', 'nisn', 'no_induk', 'agama', 'anak_ke'] as $optionalColumn) {
+            if (array_key_exists($optionalColumn, $data) && Schema::hasColumn('siswa', $optionalColumn)) {
+                $payload[$optionalColumn] = $data[$optionalColumn];
+            }
+        }
+
+        DB::table('siswa')->where('id_siswa', $studentId)->update($payload);
 
         return back()->with('status', 'Profil siswa berhasil diperbarui.');
+    }
+
+    public function storeStudent(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_keluarga' => ['nullable', 'integer', Rule::exists('keluarga', 'id_keluarga')],
+            'nama_ayah' => ['nullable', 'string', 'max:100'],
+            'nama_ibu' => ['nullable', 'string', 'max:100'],
+            'nomor_telepon' => ['nullable', 'string', 'max:16'],
+            'no_kk' => ['nullable', 'digits:16'],
+            'nama_lengkap' => ['required', 'string', 'max:100'],
+            'nama_panggilan' => ['nullable', 'string', 'max:100'],
+            'nik' => ['nullable', 'digits:16', Rule::unique('siswa', 'nik')],
+            'nisn' => ['nullable', 'digits:10', Rule::unique('siswa', 'nisn')],
+            'no_induk' => ['nullable', 'string', 'max:30', Rule::unique('siswa', 'no_induk')],
+            'tempat_lahir' => ['nullable', 'string', 'max:100'],
+            'tanggal_lahir' => ['required', 'date', 'before_or_equal:today'],
+            'jenis_kelamin' => ['required', Rule::in(['Laki-Laki', 'Perempuan'])],
+            'agama' => ['nullable', 'string', 'max:30'],
+            'anak_ke' => ['nullable', 'integer', 'min:1', 'max:20'],
+            'alamat_domisili' => ['nullable', 'string', 'max:2000'],
+            'id_kelas' => ['nullable', 'integer', Rule::exists('kelas', 'id_kelas')],
+            'id_diskon' => ['nullable', 'integer'],
+        ]);
+
+        if (empty($data['id_keluarga']) && ! filled($data['nama_ayah'] ?? null) && ! filled($data['nama_ibu'] ?? null)) {
+            throw ValidationException::withMessages([
+                'id_keluarga' => 'Pilih keluarga yang sudah ada atau isi minimal nama Ayah/Ibu untuk membuat keluarga baru.',
+            ]);
+        }
+
+        DB::transaction(function () use ($data): void {
+            $familyId = $data['id_keluarga'] ?? null;
+            if (! $familyId) {
+                $familyId = DB::table('keluarga')->insertGetId([
+                    'no_kk' => $data['no_kk'] ?? null,
+                    'alamat' => $data['alamat_domisili'] ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                if (filled($data['nama_ayah'] ?? null)) {
+                    DB::table('wali')->insert([
+                        'id_keluarga' => $familyId,
+                        'hubungan' => 'Ayah',
+                        'nama_lengkap' => $data['nama_ayah'],
+                        'created_at' => now(),
+                    ]);
+                }
+                if (filled($data['nama_ibu'] ?? null)) {
+                    DB::table('wali')->insert([
+                        'id_keluarga' => $familyId,
+                        'hubungan' => 'Ibu',
+                        'nama_lengkap' => $data['nama_ibu'],
+                        'created_at' => now(),
+                    ]);
+                }
+                if (filled($data['nomor_telepon'] ?? null)) {
+                    DB::table('kontak_keluarga')->insert([
+                        'id_keluarga' => $familyId,
+                        'nomor' => $data['nomor_telepon'],
+                        'urutan' => 1,
+                    ]);
+                }
+            }
+
+            $studentPayload = [
+                'id_keluarga' => $familyId,
+                'nama_lengkap' => $data['nama_lengkap'],
+                'nama_panggilan' => $data['nama_panggilan'] ?? null,
+                'tempat_lahir' => $data['tempat_lahir'] ?? null,
+                'tanggal_lahir' => $data['tanggal_lahir'],
+                'jenis_kelamin' => $data['jenis_kelamin'],
+                'alamat_domisili' => $data['alamat_domisili'] ?? null,
+                'created_at' => now(),
+            ];
+            foreach (['nik', 'nisn', 'no_induk', 'agama', 'anak_ke'] as $col) {
+                if (Schema::hasColumn('siswa', $col)) {
+                    $studentPayload[$col] = $data[$col] ?? ($col === 'agama' ? 'Islam' : null);
+                }
+            }
+
+            $studentId = DB::table('siswa')->insertGetId($studentPayload);
+
+            if (! empty($data['id_kelas']) && Schema::hasTable('rombel_siswa')) {
+                $this->assertClassHasCapacity((int) $data['id_kelas'], $studentId);
+                $rombelPayload = [
+                    'id_siswa' => $studentId,
+                    'id_kelas' => (int) $data['id_kelas'],
+                    'status' => 'Aktif',
+                    'tanggal_masuk' => now()->toDateString(),
+                    'created_at' => now(),
+                ];
+                if (Schema::hasColumn('rombel_siswa', 'id_diskon')) {
+                    $rombelPayload['id_diskon'] = ($data['id_diskon'] ?? null) ?: null;
+                }
+                DB::table('rombel_siswa')->insert($rombelPayload);
+            }
+        });
+
+        return back()->with('status', 'Data siswa baru berhasil ditambahkan.');
+    }
+
+    public function placeStudent(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_siswa' => ['required', 'integer', Rule::exists('siswa', 'id_siswa')],
+            'id_kelas' => ['required', 'integer', Rule::exists('kelas', 'id_kelas')],
+            'id_diskon' => ['nullable', 'integer'],
+        ]);
+
+        DB::transaction(function () use ($data): void {
+            $this->assertClassHasCapacity((int) $data['id_kelas'], (int) $data['id_siswa']);
+
+            $activeRombel = DB::table('rombel_siswa')
+                ->where('id_siswa', $data['id_siswa'])
+                ->where('status', 'Aktif')
+                ->lockForUpdate()
+                ->first();
+
+            $updatePayload = [
+                'id_kelas' => (int) $data['id_kelas'],
+                'updated_at' => now(),
+            ];
+            if (Schema::hasColumn('rombel_siswa', 'id_diskon')) {
+                $updatePayload['id_diskon'] = ($data['id_diskon'] ?? null) ?: null;
+            }
+
+            if ($activeRombel) {
+                DB::table('rombel_siswa')
+                    ->where('id_rombel', $activeRombel->id_rombel)
+                    ->update($updatePayload);
+            } else {
+                DB::table('rombel_siswa')->insert([
+                    'id_siswa' => (int) $data['id_siswa'],
+                    'id_kelas' => (int) $data['id_kelas'],
+                    'id_diskon' => Schema::hasColumn('rombel_siswa', 'id_diskon') ? (($data['id_diskon'] ?? null) ?: null) : null,
+                    'status' => 'Aktif',
+                    'tanggal_masuk' => now()->toDateString(),
+                    'created_at' => now(),
+                ]);
+            }
+        });
+
+        return back()->with('status', 'Penempatan kelas dan kategori diskon siswa berhasil diperbarui.');
     }
 
     public function updateFamilyProfile(Request $request, int $familyId): RedirectResponse
@@ -68,24 +233,38 @@ class SchoolFeatureController extends Controller
                 'updated_at' => now(),
             ]);
 
-            $guardian = DB::table('wali')
-                ->where('id_keluarga', $familyId)
-                ->orderBy('id_wali')
-                ->first();
             if (filled($data['wali_name'] ?? null)) {
-                if ($guardian) {
-                    DB::table('wali')->where('id_wali', $guardian->id_wali)->update([
+                $matchingRelation = DB::table('wali')
+                    ->where('id_keluarga', $familyId)
+                    ->where('hubungan', $data['hubungan'])
+                    ->first();
+
+                if ($matchingRelation) {
+                    DB::table('wali')->where('id_wali', $matchingRelation->id_wali)->update([
                         'nama_lengkap' => $data['wali_name'],
-                        'hubungan' => $data['hubungan'],
                         'updated_at' => now(),
                     ]);
                 } else {
-                    DB::table('wali')->insert([
-                        'id_keluarga' => $familyId,
-                        'nama_lengkap' => $data['wali_name'],
-                        'hubungan' => $data['hubungan'],
-                        'created_at' => now(),
-                    ]);
+                    $guardianCount = DB::table('wali')->where('id_keluarga', $familyId)->count();
+                    $firstGuardian = DB::table('wali')
+                        ->where('id_keluarga', $familyId)
+                        ->orderBy('id_wali')
+                        ->first();
+
+                    if ($guardianCount === 1 && $firstGuardian) {
+                        DB::table('wali')->where('id_wali', $firstGuardian->id_wali)->update([
+                            'nama_lengkap' => $data['wali_name'],
+                            'hubungan' => $data['hubungan'],
+                            'updated_at' => now(),
+                        ]);
+                    } else {
+                        DB::table('wali')->insert([
+                            'id_keluarga' => $familyId,
+                            'nama_lengkap' => $data['wali_name'],
+                            'hubungan' => $data['hubungan'],
+                            'created_at' => now(),
+                        ]);
+                    }
                 }
             }
 
@@ -109,6 +288,55 @@ class SchoolFeatureController extends Controller
         });
 
         return back()->with('status', 'Data keluarga berhasil diperbarui.');
+    }
+
+    public function storeFamily(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'no_kk' => ['nullable', 'digits:16', Rule::unique('keluarga', 'no_kk')],
+            'alamat' => ['nullable', 'string', 'max:2000'],
+            'nama_ayah' => ['nullable', 'string', 'max:100'],
+            'nama_ibu' => ['nullable', 'string', 'max:100'],
+            'nama_wali' => ['nullable', 'string', 'max:100'],
+            'nomor' => ['nullable', 'string', 'max:16'],
+        ]);
+
+        if (! filled($data['nama_ayah'] ?? null) && ! filled($data['nama_ibu'] ?? null) && ! filled($data['nama_wali'] ?? null)) {
+            throw ValidationException::withMessages([
+                'nama_ayah' => 'Isi minimal salah satu nama orang tua/wali (Ayah, Ibu, atau Wali).',
+            ]);
+        }
+
+        DB::transaction(function () use ($data): void {
+            $familyId = DB::table('keluarga')->insertGetId([
+                'no_kk' => $data['no_kk'] ?? null,
+                'alamat' => $data['alamat'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            foreach (['Ayah' => 'nama_ayah', 'Ibu' => 'nama_ibu', 'Wali' => 'nama_wali'] as $relation => $field) {
+                if (filled($data[$field] ?? null)) {
+                    DB::table('wali')->insert([
+                        'id_keluarga' => $familyId,
+                        'hubungan' => $relation,
+                        'nama_lengkap' => $data[$field],
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+
+            if (filled($data['nomor'] ?? null)) {
+                DB::table('kontak_keluarga')->insert([
+                    'id_keluarga' => $familyId,
+                    'nomor' => $data['nomor'],
+                    'urutan' => 1,
+                ]);
+            }
+        });
+
+        return back()->with('status', 'Data keluarga baru berhasil ditambahkan.');
     }
 
     public function updateRegistrationStatus(Request $request): RedirectResponse
@@ -458,9 +686,67 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Pemeriksaan dokumen berhasil disimpan.');
     }
 
+    public function initializeAttendance(Request $request): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $data = $request->validate([
+            'id_kelas' => ['required', 'integer', Rule::exists('kelas', 'id_kelas')],
+            'tanggal' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        if (DB::table('kelas')
+            ->where('id_kelas', $data['id_kelas'])
+            ->where('nama_kelas', 'Belum Ditentukan')
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'id_kelas' => 'Pilih kelas definitif yang sudah ditentukan.',
+            ]);
+        }
+
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
+        }
+
+        $inserted = DB::transaction(function () use ($data, $user): int {
+            $rosterIds = DB::table('rombel_siswa')
+                ->where('id_kelas', $data['id_kelas'])
+                ->where('status', 'Aktif')
+                ->pluck('id_rombel')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            $count = 0;
+            foreach ($rosterIds as $rosterId) {
+                $exists = DB::table('absensi')
+                    ->where('id_rombel', $rosterId)
+                    ->whereDate('tanggal', $data['tanggal'])
+                    ->exists();
+                if ($exists) {
+                    continue;
+                }
+
+                DB::table('absensi')->insert([
+                    'id_rombel' => $rosterId,
+                    'tanggal' => $data['tanggal'],
+                    'status' => 'Hadir',
+                    'keterangan' => 'Inisialisasi kehadiran harian',
+                    'id_user_pencatat' => $user->getKey(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $count++;
+            }
+
+            return $count;
+        });
+
+        return back()->with('status', $inserted.' siswa berhasil diinisialisasi hadir untuk tanggal '.$data['tanggal'].'.');
+    }
+
     public function storeAttendance(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'id_kelas' => ['required', 'integer', Rule::exists('kelas', 'id_kelas')],
             'tanggal' => ['required', 'date', 'before_or_equal:today'],
@@ -477,7 +763,9 @@ class SchoolFeatureController extends Controller
             ]);
         }
 
-        $this->teacherId($user);
+        if ($user->role === 'teacher') {
+            $this->teacherId($user);
+        }
         $roster = DB::table('rombel_siswa')
             ->where('id_kelas', $data['id_kelas'])
             ->where('status', 'Aktif')
@@ -506,10 +794,12 @@ class SchoolFeatureController extends Controller
 
     public function storeLessonPlan(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'id_kelas' => ['required', 'integer', Rule::exists('kelas', 'id_kelas')],
+            'jenis' => ['nullable', Rule::in(['RPPH', 'RPPM', 'Modul Ajar'])],
             'tanggal' => ['required', 'date'],
+            'tanggal_selesai' => ['nullable', 'date', 'after_or_equal:tanggal'],
             'tema' => ['required', 'string', 'max:150'],
             'subtema' => ['nullable', 'string', 'max:150'],
             'tujuan' => ['nullable', 'string', 'max:5000'],
@@ -518,36 +808,64 @@ class SchoolFeatureController extends Controller
             'status' => ['required', Rule::in(['Draft', 'Final'])],
         ]);
 
-        $teacherId = $this->teacherId($user);
-        $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
-        DB::table('rencana_pembelajaran')->insert([
-            ...$data,
+        $teacherId = $this->resolveTeacherIdForClass($user, (int) $data['id_kelas']);
+        $payload = [
+            'id_kelas' => $data['id_kelas'],
             'id_guru' => $teacherId,
+            'tanggal' => $data['tanggal'],
+            'tema' => $data['tema'],
+            'subtema' => $data['subtema'] ?? null,
+            'kegiatan' => $data['kegiatan'] ?? null,
+            'alat_bahan' => $data['alat_bahan'] ?? null,
+            'status' => $data['status'],
             'created_at' => now(),
-        ]);
+        ];
+        if (Schema::hasColumn('rencana_pembelajaran', 'tujuan')) {
+            $payload['tujuan'] = $data['tujuan'] ?? null;
+        }
+        if (Schema::hasColumn('rencana_pembelajaran', 'jenis') && filled($data['jenis'] ?? null)) {
+            $payload['jenis'] = $data['jenis'];
+        }
+        if (Schema::hasColumn('rencana_pembelajaran', 'tanggal_selesai')) {
+            $payload['tanggal_selesai'] = $data['tanggal_selesai'] ?? null;
+        }
+
+        DB::table('rencana_pembelajaran')->insert($payload);
 
         return back()->with('status', 'Rencana pembelajaran berhasil disimpan.');
     }
 
     public function storeTask(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'id_kelas' => ['required', 'integer', Rule::exists('kelas', 'id_kelas')],
             'judul' => ['required', 'string', 'max:150'],
+            'kategori' => ['nullable', 'string', 'max:100'],
             'deskripsi' => ['nullable', 'string', 'max:5000'],
             'tanggal_diberikan' => ['required', 'date', 'before_or_equal:today'],
             'tenggat' => ['required', 'date', 'after_or_equal:tanggal_diberikan'],
             'lampiran' => ['nullable', 'file', 'max:10240'],
         ]);
 
-        $teacherId = $this->teacherId($user);
-        $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
+        $schoolClass = DB::table('kelas')->where('id_kelas', $data['id_kelas'])->first();
+        if (! $schoolClass || $schoolClass->nama_kelas === 'Belum Ditentukan') {
+            throw ValidationException::withMessages([
+                'id_kelas' => 'Pilih kelas definitif.',
+            ]);
+        }
+        if ($schoolClass->kelompok === 'KB') {
+            throw ValidationException::withMessages([
+                'id_kelas' => 'Kelompok Bermain (PG) tidak diberi tugas. Pilih kelas TK A atau TK B.',
+            ]);
+        }
+
+        $teacherId = $this->resolveTeacherIdForClass($user, (int) $data['id_kelas']);
         $path = $request->hasFile('lampiran')
             ? $this->imageUploads->store($request->file('lampiran'), 'tugas', 'lampiran')
             : null;
 
-        DB::table('tugas')->insert([
+        $payload = [
             'id_kelas' => $data['id_kelas'],
             'id_guru' => $teacherId,
             'judul' => $data['judul'],
@@ -556,7 +874,12 @@ class SchoolFeatureController extends Controller
             'tenggat' => $data['tenggat'],
             'lampiran' => $path,
             'created_at' => now(),
-        ]);
+        ];
+        if (Schema::hasColumn('tugas', 'kategori')) {
+            $payload['kategori'] = $data['kategori'] ?? null;
+        }
+
+        DB::table('tugas')->insert($payload);
 
         return back()->with('status', 'Tugas berhasil dibuat.');
     }
@@ -615,18 +938,17 @@ class SchoolFeatureController extends Controller
 
     public function gradeTask(Request $request, int $submissionId): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'nilai' => ['required', Rule::in(['BB', 'MB', 'BSH', 'BSB'])],
             'umpan_balik' => ['nullable', 'string', 'max:5000'],
         ]);
-        $teacherId = $this->teacherId($user);
         $submission = DB::table('pengumpulan_tugas as pt')
             ->join('tugas as t', 't.id_tugas', '=', 'pt.id_tugas')
             ->where('pt.id_pengumpulan', $submissionId)
             ->first(['pt.id_pengumpulan', 't.id_kelas']);
         abort_unless($submission !== null, 404);
-        $this->assertTeacherClass($teacherId, (int) $submission->id_kelas);
+        $teacherId = $this->resolveTeacherIdForClass($user, (int) $submission->id_kelas);
 
         DB::table('pengumpulan_tugas')->where('id_pengumpulan', $submissionId)->update([
             'nilai' => $data['nilai'],
@@ -641,7 +963,7 @@ class SchoolFeatureController extends Controller
 
     public function storeIqroGrade(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'id_rombel' => ['required', 'integer', Rule::exists('rombel_siswa', 'id_rombel')],
             'id_indikator' => ['required', 'integer', Rule::exists('indikator_iqro', 'id_indikator')],
@@ -649,17 +971,22 @@ class SchoolFeatureController extends Controller
             'skala' => ['required', Rule::in(['BB', 'MB', 'BSH', 'BSB'])],
         ]);
 
-        $teacherId = $this->teacherId($user);
-        $roster = DB::table('rombel_siswa as r')
-            ->join('guru_kelas as gk', 'gk.id_kelas', '=', 'r.id_kelas')
+        $this->resolveTeacherIdForRoster($user, (int) $data['id_rombel']);
+        $rosterClass = DB::table('rombel_siswa as r')
             ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
-            ->join('indikator_iqro as i', 'i.kelompok', '=', 'k.kelompok')
             ->where('r.id_rombel', $data['id_rombel'])
             ->where('r.status', 'Aktif')
-            ->where('gk.id_guru', $teacherId)
-            ->where('i.id_indikator', $data['id_indikator'])
-            ->exists();
-        abort_unless($roster, 403);
+            ->first(['k.kelompok']);
+        abort_unless($rosterClass !== null, 403);
+
+        $indicator = DB::table('indikator_iqro')
+            ->where('id_indikator', $data['id_indikator'])
+            ->first(['kelompok']);
+        if (! $indicator || $indicator->kelompok !== $rosterClass->kelompok) {
+            throw ValidationException::withMessages([
+                'id_indikator' => "Indikator Iqro harus sesuai dengan kelompok kelas siswa ({$rosterClass->kelompok}).",
+            ]);
+        }
 
         $key = [
             'id_rombel' => $data['id_rombel'],
@@ -676,10 +1003,11 @@ class SchoolFeatureController extends Controller
 
     public function storeReport(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'id_rombel' => ['required', 'integer', Rule::exists('rombel_siswa', 'id_rombel')],
             'semester' => ['required', Rule::in(['Ganjil', 'Genap'])],
+            'id_guru_iqro' => ['nullable', 'integer', Rule::exists('guru', 'id_guru')],
             'tanggal_rapor' => ['nullable', 'date'],
             'tinggi_badan' => ['nullable', 'numeric', 'min:30', 'max:180'],
             'berat_badan' => ['nullable', 'numeric', 'min:5', 'max:120'],
@@ -690,20 +1018,45 @@ class SchoolFeatureController extends Controller
             'status' => ['required', Rule::in(['Draft', 'Final'])],
         ]);
 
-        $teacherId = $this->teacherId($user);
-        $this->assertTeacherRoster($teacherId, (int) $data['id_rombel']);
+        if ($data['status'] === 'Final') {
+            $missingNarratives = [];
+            foreach ([
+                'narasi_agama_budi_pekerti' => 'Narasi Agama & Budi Pekerti wajib diisi untuk rapor Final.',
+                'narasi_jati_diri' => 'Narasi Jati Diri wajib diisi untuk rapor Final.',
+                'narasi_literasi_steam' => 'Narasi Literasi & STEAM wajib diisi untuk rapor Final.',
+                'narasi_p5' => 'Narasi P5 wajib diisi untuk rapor Final.',
+            ] as $field => $message) {
+                if (! filled($data[$field] ?? null)) {
+                    $missingNarratives[$field] = $message;
+                }
+            }
+            if ($missingNarratives !== []) {
+                throw ValidationException::withMessages($missingNarratives);
+            }
+            if (empty($data['tanggal_rapor'])) {
+                $data['tanggal_rapor'] = now()->toDateString();
+            }
+        }
+
+        $teacherId = $this->resolveTeacherIdForRoster($user, (int) $data['id_rombel']);
         $existing = DB::table('rapor')
             ->where('id_rombel', $data['id_rombel'])
             ->where('semester', $data['semester'])
             ->first();
-        if ($existing?->status === 'Final') {
-            throw ValidationException::withMessages(['semester' => 'Rapor final terkunci dan tidak dapat diubah.']);
+        if ($existing?->status === 'Final' && $data['status'] === 'Final') {
+            throw ValidationException::withMessages([
+                'semester' => 'Rapor final terkunci dan tidak dapat diubah. Pilih status Draft terlebih dahulu jika ingin membuka kunci.',
+            ]);
         }
 
-        $values = collect($data)->except('id_rombel')->all() + [
+        $values = collect($data)->except(['id_rombel', 'id_guru_iqro'])->all() + [
             'id_guru_kelas' => $teacherId,
             'updated_at' => now(),
         ];
+        if (Schema::hasColumn('rapor', 'id_guru_iqro')) {
+            $values['id_guru_iqro'] = $data['id_guru_iqro'] ?? ($existing->id_guru_iqro ?? $teacherId);
+        }
+
         if ($existing) {
             DB::table('rapor')->where('id_rapor', $existing->id_rapor)->update($values);
         } else {
@@ -741,15 +1094,14 @@ class SchoolFeatureController extends Controller
 
     public function storePortfolio(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'id_rombel' => ['required', 'integer', Rule::exists('rombel_siswa', 'id_rombel')],
             'tanggal' => ['required', 'date', 'before_or_equal:today'],
             'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'narasi' => ['required', 'string', 'max:5000'],
         ]);
-        $teacherId = $this->teacherId($user);
-        $this->assertTeacherRoster($teacherId, (int) $data['id_rombel']);
+        $teacherId = $this->resolveTeacherIdForRoster($user, (int) $data['id_rombel']);
         $path = $this->imageUploads->store($request->file('foto'), 'portofolio', 'foto');
 
         DB::table('portofolio')->insert([
@@ -766,7 +1118,7 @@ class SchoolFeatureController extends Controller
 
     public function storeActivity(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $activeYearId = DB::table('tahun_ajaran')
             ->where('is_aktif', true)
             ->value('id_tahun_ajaran');
@@ -788,8 +1140,10 @@ class SchoolFeatureController extends Controller
             'lokasi' => ['nullable', 'string', 'max:150'],
             'deskripsi' => ['nullable', 'string', 'max:5000'],
         ]);
-        $teacherId = $this->teacherId($user);
-        $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
+        }
 
         DB::transaction(function () use ($data, $user): void {
             $activityId = DB::table('kegiatan')->insertGetId([
@@ -874,24 +1228,28 @@ class SchoolFeatureController extends Controller
 
     public function uploadActivityPhoto(Request $request, int $activityId): RedirectResponse
     {
-        $user = $this->userFor(['teacher']);
+        $user = $this->userFor(['teacher', 'admin']);
         $data = $request->validate([
             'tahap' => ['required', Rule::in(['Sebelum', 'Selama', 'Sesudah'])],
             'keterangan' => ['nullable', 'string', 'max:255'],
             'foto' => ['required', 'array', 'min:1', 'max:10'],
             'foto.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
-        $teacherId = $this->teacherId($user);
-        $activity = DB::table('kegiatan as k')
-            ->leftJoin('kegiatan_kelas as kk', 'kk.id_kegiatan', '=', 'k.id_kegiatan')
-            ->leftJoin('guru_kelas as gk', 'gk.id_kelas', '=', 'kk.id_kelas')
-            ->where('k.id_kegiatan', $activityId)
-            ->where(function ($query) use ($teacherId, $user): void {
-                $query->where('k.id_user_pembuat', $user->getKey())
-                    ->orWhere('gk.id_guru', $teacherId);
-            })
-            ->exists();
-        abort_unless($activity, 403);
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $activity = DB::table('kegiatan as k')
+                ->leftJoin('kegiatan_kelas as kk', 'kk.id_kegiatan', '=', 'k.id_kegiatan')
+                ->leftJoin('guru_kelas as gk', 'gk.id_kelas', '=', 'kk.id_kelas')
+                ->where('k.id_kegiatan', $activityId)
+                ->where(function ($query) use ($teacherId, $user): void {
+                    $query->where('k.id_user_pembuat', $user->getKey())
+                        ->orWhere('gk.id_guru', $teacherId);
+                })
+                ->exists();
+            abort_unless($activity, 403);
+        } else {
+            abort_unless(DB::table('kegiatan')->where('id_kegiatan', $activityId)->exists(), 404);
+        }
 
         $storedPaths = [];
         $documents = [];
@@ -1184,6 +1542,37 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Status pembayaran berhasil diperbarui.');
     }
 
+    public function cancelPayment(Request $request, int $paymentId): RedirectResponse
+    {
+        $user = $this->userFor(['admin']);
+        $data = $request->validate([
+            'catatan' => ['required', 'string', 'max:255'],
+        ]);
+
+        DB::transaction(function () use ($data, $paymentId, $user): void {
+            $payment = DB::table('pembayaran')
+                ->where('id_pembayaran', $paymentId)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($payment !== null, 404);
+            if ($payment->status === 'Dibatalkan') {
+                throw ValidationException::withMessages([
+                    'catatan' => 'Pembayaran ini sudah berstatus dibatalkan.',
+                ]);
+            }
+
+            DB::table('pembayaran')->where('id_pembayaran', $paymentId)->update([
+                'status' => 'Dibatalkan',
+                'catatan' => $data['catatan'],
+                'id_user_verifikator' => $user->getKey(),
+                'tanggal_verifikasi' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        return back()->with('status', 'Kuitansi pembayaran berhasil dibatalkan.');
+    }
+
     public function storeSavings(Request $request): RedirectResponse
     {
         $user = $this->userFor(['admin']);
@@ -1238,11 +1627,16 @@ class SchoolFeatureController extends Controller
         }
 
         $created = DB::transaction(function () use ($data, $period, $schoolYear): int {
+            $rosterColumns = ['r.id_rombel', 'k.kelompok'];
+            if (Schema::hasColumn('rombel_siswa', 'id_diskon')) {
+                $rosterColumns[] = 'r.id_diskon';
+            }
             $rosters = DB::table('rombel_siswa as r')
                 ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
                 ->where('r.status', 'Aktif')
                 ->where('k.id_tahun_ajaran', $schoolYear->id_tahun_ajaran)
-                ->get(['r.id_rombel', 'k.kelompok']);
+                ->where('k.nama_kelas', '<>', 'Belum Ditentukan')
+                ->get($rosterColumns);
             $tariffs = DB::table('tarif as tf')
                 ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 'tf.id_jenis_biaya')
                 ->where('tf.id_tahun_ajaran', $schoolYear->id_tahun_ajaran)
@@ -1261,12 +1655,17 @@ class SchoolFeatureController extends Controller
                         continue;
                     }
 
+                    $discount = $this->calculateRosterDiscount(
+                        $roster->id_diskon ?? null,
+                        (float) $tariff->nominal
+                    );
+
                     DB::table('tagihan')->insert([
                         'id_rombel' => $roster->id_rombel,
                         'id_jenis_biaya' => $tariff->id_jenis_biaya,
                         'periode' => $period,
                         'nominal' => $tariff->nominal,
-                        'diskon' => 0,
+                        'diskon' => $discount,
                         'jatuh_tempo' => $data['jatuh_tempo'],
                         'created_at' => now(),
                     ]);
@@ -1300,13 +1699,17 @@ class SchoolFeatureController extends Controller
         }
 
         DB::transaction(function () use ($data, $period, $schoolYear): void {
+            $rosterColumns = ['r.id_rombel', 'k.kelompok'];
+            if (Schema::hasColumn('rombel_siswa', 'id_diskon')) {
+                $rosterColumns[] = 'r.id_diskon';
+            }
             $roster = DB::table('rombel_siswa as r')
                 ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
                 ->where('r.id_rombel', $data['id_rombel'])
                 ->where('r.status', 'Aktif')
                 ->where('k.id_tahun_ajaran', $schoolYear->id_tahun_ajaran)
                 ->lockForUpdate()
-                ->first(['r.id_rombel', 'k.kelompok']);
+                ->first($rosterColumns);
 
             if (! $roster) {
                 throw ValidationException::withMessages([
@@ -1339,12 +1742,17 @@ class SchoolFeatureController extends Controller
                 ]);
             }
 
+            $discount = $this->calculateRosterDiscount(
+                $roster->id_diskon ?? null,
+                (float) $tariff->nominal
+            );
+
             DB::table('tagihan')->insert([
                 'id_rombel' => $roster->id_rombel,
                 'id_jenis_biaya' => $tariff->id_jenis_biaya,
                 'periode' => $period,
                 'nominal' => $tariff->nominal,
-                'diskon' => 0,
+                'diskon' => $discount,
                 'jatuh_tempo' => $data['jatuh_tempo'],
                 'created_at' => now(),
             ]);
@@ -1505,6 +1913,457 @@ class SchoolFeatureController extends Controller
         ]);
 
         return back()->with('status', 'Tarif biaya berhasil ditambahkan.');
+    }
+
+    public function storeTeacher(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'nama_lengkap' => ['required', 'string', 'max:100'],
+            'gelar_belakang' => ['nullable', 'string', 'max:50'],
+            'nuptk' => ['nullable', 'string', 'max:16', Rule::unique('guru', 'nuptk')],
+            'nik' => ['nullable', 'digits:16', Rule::unique('guru', 'nik')],
+            'jenis_kelamin' => ['required', Rule::in(['Laki-Laki', 'Perempuan'])],
+            'tempat_lahir' => ['nullable', 'string', 'max:100'],
+            'tanggal_lahir' => ['nullable', 'date', 'before_or_equal:today'],
+            'no_hp' => ['nullable', 'string', 'max:16'],
+            'pendidikan' => ['nullable', 'string', 'max:30'],
+            'jabatan' => ['nullable', 'string', 'max:30'],
+            'status_kepegawaian' => ['nullable', 'string', 'max:20'],
+            'tanggal_mulai' => ['nullable', 'date'],
+            'alamat' => ['nullable', 'string', 'max:2000'],
+            'id_user' => ['nullable', 'integer', Rule::exists('users', 'id_user'), Rule::unique('guru', 'id_user')],
+        ]);
+
+        $payload = [
+            'nama_lengkap' => $data['nama_lengkap'],
+            'gelar_belakang' => $data['gelar_belakang'] ?? null,
+            'nuptk' => $data['nuptk'] ?? null,
+            'nik' => $data['nik'] ?? null,
+            'jenis_kelamin' => $data['jenis_kelamin'],
+            'tempat_lahir' => $data['tempat_lahir'] ?? null,
+            'tanggal_lahir' => $data['tanggal_lahir'] ?? null,
+            'no_hp' => $data['no_hp'] ?? null,
+            'pendidikan' => $data['pendidikan'] ?? 'Sarjana (S1/D4)',
+            'jabatan' => $data['jabatan'] ?? 'Guru',
+            'status_kepegawaian' => $data['status_kepegawaian'] ?? 'Tetap',
+            'tanggal_mulai' => $data['tanggal_mulai'] ?? now()->toDateString(),
+            'alamat' => $data['alamat'] ?? null,
+            'id_user' => ($data['id_user'] ?? null) ?: null,
+            'status' => 'Aktif',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        DB::table('guru')->insert($payload);
+
+        return back()->with('status', 'Data guru baru berhasil ditambahkan.');
+    }
+
+    public function updateTeacher(Request $request, int $teacherId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        abort_unless(DB::table('guru')->where('id_guru', $teacherId)->exists(), 404);
+
+        $data = $request->validate([
+            'nama_lengkap' => ['required', 'string', 'max:100'],
+            'gelar_belakang' => ['nullable', 'string', 'max:50'],
+            'nuptk' => ['nullable', 'string', 'max:16', Rule::unique('guru', 'nuptk')->ignore($teacherId, 'id_guru')],
+            'nik' => ['nullable', 'digits:16', Rule::unique('guru', 'nik')->ignore($teacherId, 'id_guru')],
+            'jenis_kelamin' => ['required', Rule::in(['Laki-Laki', 'Perempuan'])],
+            'no_hp' => ['nullable', 'string', 'max:16'],
+            'pendidikan' => ['nullable', 'string', 'max:30'],
+            'jabatan' => ['nullable', 'string', 'max:30'],
+            'alamat' => ['nullable', 'string', 'max:2000'],
+            'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
+            'id_user' => ['nullable', 'integer', Rule::exists('users', 'id_user'), Rule::unique('guru', 'id_user')->ignore($teacherId, 'id_guru')],
+        ]);
+
+        DB::table('guru')->where('id_guru', $teacherId)->update([
+            'nama_lengkap' => $data['nama_lengkap'],
+            'gelar_belakang' => $data['gelar_belakang'] ?? null,
+            'nuptk' => $data['nuptk'] ?? null,
+            'nik' => $data['nik'] ?? null,
+            'jenis_kelamin' => $data['jenis_kelamin'],
+            'no_hp' => $data['no_hp'] ?? null,
+            'pendidikan' => $data['pendidikan'] ?? null,
+            'jabatan' => $data['jabatan'] ?? 'Guru',
+            'alamat' => $data['alamat'] ?? null,
+            'status' => $data['status'],
+            'id_user' => ($data['id_user'] ?? null) ?: null,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Data guru berhasil diperbarui.');
+    }
+
+    public function assignTeacherClass(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_guru' => ['required', 'integer', Rule::exists('guru', 'id_guru')],
+            'id_kelas' => ['required', 'integer', Rule::exists('kelas', 'id_kelas')],
+            'peran' => ['required', Rule::in(['Wali Kelas', 'Pendamping'])],
+        ]);
+
+        DB::transaction(function () use ($data): void {
+            DB::table('guru_kelas')->updateOrInsert(
+                [
+                    'id_guru' => (int) $data['id_guru'],
+                    'id_kelas' => (int) $data['id_kelas'],
+                ],
+                [
+                    'peran' => $data['peran'],
+                ]
+            );
+        });
+
+        return back()->with('status', 'Penugasan kelas guru berhasil disimpan.');
+    }
+
+    public function storeClass(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_tahun_ajaran' => ['required', 'integer', Rule::exists('tahun_ajaran', 'id_tahun_ajaran')],
+            'kelompok' => ['required', Rule::in(['KB', 'TK A', 'TK B'])],
+            'nama_kelas' => ['required', 'string', 'max:50'],
+            'kapasitas' => ['required', 'integer', 'min:1', 'max:30'],
+            'id_wali_kelas' => ['nullable', 'integer', Rule::exists('guru', 'id_guru')],
+        ]);
+
+        $exists = DB::table('kelas')
+            ->where('id_tahun_ajaran', $data['id_tahun_ajaran'])
+            ->where('nama_kelas', $data['nama_kelas'])
+            ->exists();
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'nama_kelas' => 'Nama kelas sudah digunakan pada tahun ajaran tersebut.',
+            ]);
+        }
+
+        DB::transaction(function () use ($data): void {
+            $payload = [
+                'id_tahun_ajaran' => (int) $data['id_tahun_ajaran'],
+                'kelompok' => $data['kelompok'],
+                'nama_kelas' => $data['nama_kelas'],
+                'created_at' => now(),
+            ];
+            if (Schema::hasColumn('kelas', 'kapasitas')) {
+                $payload['kapasitas'] = (int) $data['kapasitas'];
+            }
+            $classId = DB::table('kelas')->insertGetId($payload);
+
+            if (! empty($data['id_wali_kelas']) && Schema::hasTable('guru_kelas')) {
+                DB::table('guru_kelas')->updateOrInsert(
+                    ['id_guru' => (int) $data['id_wali_kelas'], 'id_kelas' => $classId],
+                    ['peran' => 'Wali Kelas']
+                );
+            }
+        });
+
+        return back()->with('status', 'Ruang kelas baru berhasil ditambahkan.');
+    }
+
+    public function updateClass(Request $request, int $classId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $schoolClass = DB::table('kelas')->where('id_kelas', $classId)->first();
+        abort_unless($schoolClass !== null, 404);
+
+        $data = $request->validate([
+            'nama_kelas' => ['required', 'string', 'max:50'],
+            'kelompok' => ['required', Rule::in(['KB', 'TK A', 'TK B'])],
+            'kapasitas' => ['required', 'integer', 'min:1', 'max:30'],
+            'id_wali_kelas' => ['nullable', 'integer', Rule::exists('guru', 'id_guru')],
+        ]);
+
+        $activeCount = Schema::hasTable('rombel_siswa')
+            ? DB::table('rombel_siswa')->where('id_kelas', $classId)->where('status', 'Aktif')->count()
+            : 0;
+        if ((int) $data['kapasitas'] < $activeCount) {
+            throw ValidationException::withMessages([
+                'kapasitas' => "Kapasitas tidak boleh lebih kecil dari jumlah siswa aktif saat ini ({$activeCount} siswa).",
+            ]);
+        }
+
+        DB::transaction(function () use ($classId, $data): void {
+            $payload = [
+                'nama_kelas' => $data['nama_kelas'],
+                'kelompok' => $data['kelompok'],
+            ];
+            if (Schema::hasColumn('kelas', 'kapasitas')) {
+                $payload['kapasitas'] = (int) $data['kapasitas'];
+            }
+            DB::table('kelas')->where('id_kelas', $classId)->update($payload);
+
+            if (! empty($data['id_wali_kelas']) && Schema::hasTable('guru_kelas')) {
+                DB::table('guru_kelas')
+                    ->where('id_kelas', $classId)
+                    ->where('peran', 'Wali Kelas')
+                    ->where('id_guru', '<>', (int) $data['id_wali_kelas'])
+                    ->delete();
+                DB::table('guru_kelas')->updateOrInsert(
+                    ['id_guru' => (int) $data['id_wali_kelas'], 'id_kelas' => $classId],
+                    ['peran' => 'Wali Kelas']
+                );
+            }
+        });
+
+        return back()->with('status', 'Data ruang kelas berhasil diperbarui.');
+    }
+
+    public function storeSchoolYear(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'nama' => ['required', 'string', 'max:20'],
+            'tahun_mulai' => ['required', 'integer', 'min:2020', 'max:2099'],
+            'tanggal_mulai' => ['nullable', 'date'],
+            'tanggal_selesai' => ['nullable', 'date', 'after:tanggal_mulai'],
+            'is_aktif' => ['required', 'boolean'],
+        ]);
+
+        DB::transaction(function () use ($data): void {
+            if ($data['is_aktif']) {
+                DB::table('tahun_ajaran')->where('is_aktif', true)->update(['is_aktif' => false]);
+            }
+
+            $existing = DB::table('tahun_ajaran')->where('nama', $data['nama'])->first();
+            $payload = [
+                'nama' => $data['nama'],
+                'tahun_mulai' => (int) $data['tahun_mulai'],
+                'is_aktif' => (bool) $data['is_aktif'],
+            ];
+            if (Schema::hasColumn('tahun_ajaran', 'tanggal_mulai')) {
+                $payload['tanggal_mulai'] = $data['tanggal_mulai'] ?? ($data['tahun_mulai'].'-07-01');
+            }
+            if (Schema::hasColumn('tahun_ajaran', 'tanggal_selesai')) {
+                $payload['tanggal_selesai'] = $data['tanggal_selesai'] ?? (((int) $data['tahun_mulai'] + 1).'-06-30');
+            }
+
+            if ($existing) {
+                DB::table('tahun_ajaran')
+                    ->where('id_tahun_ajaran', $existing->id_tahun_ajaran)
+                    ->update($payload);
+            } else {
+                DB::table('tahun_ajaran')->insert($payload + ['created_at' => now()]);
+            }
+        });
+
+        return back()->with('status', 'Data tahun ajaran berhasil disimpan.');
+    }
+
+    public function mergeDuplicateStudents(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_siswa_utama' => ['required', 'integer', Rule::exists('siswa', 'id_siswa')],
+            'id_siswa_duplikat' => ['required', 'integer', Rule::exists('siswa', 'id_siswa'), 'different:id_siswa_utama'],
+        ]);
+
+        DB::transaction(function () use ($data): void {
+            $primaryId = (int) $data['id_siswa_utama'];
+            $duplicateId = (int) $data['id_siswa_duplikat'];
+
+            if (Schema::hasTable('transaksi_tabungan')) {
+                DB::table('transaksi_tabungan')
+                    ->where('id_siswa', $duplicateId)
+                    ->update(['id_siswa' => $primaryId]);
+            }
+
+            if (Schema::hasTable('pendaftaran')) {
+                $duplicateApps = DB::table('pendaftaran')->where('id_siswa', $duplicateId)->get();
+                foreach ($duplicateApps as $app) {
+                    $conflict = DB::table('pendaftaran')
+                        ->where('id_siswa', $primaryId)
+                        ->where('id_tahun_ajaran', $app->id_tahun_ajaran)
+                        ->exists();
+                    if ($conflict) {
+                        if (Schema::hasTable('dokumen_pendaftaran')) {
+                            DB::table('dokumen_pendaftaran')->where('id_pendaftaran', $app->id_pendaftaran)->delete();
+                        }
+                        DB::table('pendaftaran')->where('id_pendaftaran', $app->id_pendaftaran)->delete();
+                    } else {
+                        DB::table('pendaftaran')
+                            ->where('id_pendaftaran', $app->id_pendaftaran)
+                            ->update(['id_siswa' => $primaryId]);
+                    }
+                }
+            }
+
+            if (Schema::hasTable('rombel_siswa')) {
+                $hasActivePrimary = DB::table('rombel_siswa')
+                    ->where('id_siswa', $primaryId)
+                    ->where('status', 'Aktif')
+                    ->exists();
+                $duplicateRombels = DB::table('rombel_siswa')->where('id_siswa', $duplicateId)->get();
+                foreach ($duplicateRombels as $rombel) {
+                    $sameClassConflict = DB::table('rombel_siswa')
+                        ->where('id_siswa', $primaryId)
+                        ->where('id_kelas', $rombel->id_kelas)
+                        ->exists();
+                    if ($sameClassConflict) {
+                        DB::table('rombel_siswa')->where('id_rombel', $rombel->id_rombel)->delete();
+                        continue;
+                    }
+
+                    $newStatus = ($rombel->status === 'Aktif' && $hasActivePrimary) ? 'Pindah' : $rombel->status;
+                    DB::table('rombel_siswa')
+                        ->where('id_rombel', $rombel->id_rombel)
+                        ->update([
+                            'id_siswa' => $primaryId,
+                            'status' => $newStatus,
+                        ]);
+                }
+            }
+
+            DB::table('siswa')->where('id_siswa', $duplicateId)->delete();
+        });
+
+        return back()->with('status', 'Data siswa ganda berhasil digabungkan ke data siswa utama.');
+    }
+
+    public function mergeDuplicateFamilies(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_keluarga_utama' => ['required', 'integer', Rule::exists('keluarga', 'id_keluarga')],
+            'id_keluarga_duplikat' => ['required', 'integer', Rule::exists('keluarga', 'id_keluarga'), 'different:id_keluarga_utama'],
+        ]);
+
+        DB::transaction(function () use ($data): void {
+            $primaryId = (int) $data['id_keluarga_utama'];
+            $duplicateId = (int) $data['id_keluarga_duplikat'];
+
+            DB::table('siswa')->where('id_keluarga', $duplicateId)->update(['id_keluarga' => $primaryId]);
+
+            if (Schema::hasTable('wali')) {
+                $duplicateWalis = DB::table('wali')->where('id_keluarga', $duplicateId)->get();
+                foreach ($duplicateWalis as $wali) {
+                    $conflict = DB::table('wali')
+                        ->where('id_keluarga', $primaryId)
+                        ->where('hubungan', $wali->hubungan)
+                        ->exists();
+                    if ($conflict) {
+                        DB::table('wali')->where('id_wali', $wali->id_wali)->delete();
+                    } else {
+                        DB::table('wali')->where('id_wali', $wali->id_wali)->update(['id_keluarga' => $primaryId]);
+                    }
+                }
+            }
+
+            if (Schema::hasTable('kontak_keluarga')) {
+                $duplicateContacts = DB::table('kontak_keluarga')->where('id_keluarga', $duplicateId)->get();
+                foreach ($duplicateContacts as $contact) {
+                    $conflict = DB::table('kontak_keluarga')
+                        ->where('id_keluarga', $primaryId)
+                        ->where('nomor', $contact->nomor)
+                        ->exists();
+                    if ($conflict) {
+                        DB::table('kontak_keluarga')->where('id_kontak', $contact->id_kontak)->delete();
+                    } else {
+                        $nextOrder = ((int) DB::table('kontak_keluarga')->where('id_keluarga', $primaryId)->max('urutan')) + 1;
+                        DB::table('kontak_keluarga')->where('id_kontak', $contact->id_kontak)->update([
+                            'id_keluarga' => $primaryId,
+                            'urutan' => $nextOrder,
+                        ]);
+                    }
+                }
+            }
+
+            $primaryFamily = DB::table('keluarga')->where('id_keluarga', $primaryId)->first();
+            $duplicateFamily = DB::table('keluarga')->where('id_keluarga', $duplicateId)->first();
+            if ($primaryFamily && $duplicateFamily && $primaryFamily->id_user === null && $duplicateFamily->id_user !== null) {
+                DB::table('keluarga')->where('id_keluarga', $duplicateId)->update(['id_user' => null]);
+                DB::table('keluarga')->where('id_keluarga', $primaryId)->update(['id_user' => $duplicateFamily->id_user]);
+            }
+
+            DB::table('keluarga')->where('id_keluarga', $duplicateId)->delete();
+        });
+
+        return back()->with('status', 'Data keluarga ganda berhasil digabungkan.');
+    }
+
+    private function calculateRosterDiscount(?int $discountId, float $nominal): float
+    {
+        if (! $discountId || ! Schema::hasTable('diskon')) {
+            return 0.0;
+        }
+
+        $discount = DB::table('diskon')->where('id_diskon', $discountId)->first();
+        if (! $discount) {
+            return 0.0;
+        }
+
+        $type = $discount->tipe ?? $discount->jenis ?? 'Nominal';
+        if ($type === 'Persen') {
+            return round($nominal * ((float) $discount->nilai / 100), 2);
+        }
+
+        return min((float) $discount->nilai, $nominal);
+    }
+
+    private function assertClassHasCapacity(int $classId, int $studentId): void
+    {
+        $class = DB::table('kelas')->where('id_kelas', $classId)->first();
+        if (! $class) {
+            return;
+        }
+        if ($class->nama_kelas === 'Belum Ditentukan' || ! isset($class->kapasitas)) {
+            return;
+        }
+
+        $currentCount = DB::table('rombel_siswa')
+            ->where('id_kelas', $classId)
+            ->where('status', 'Aktif')
+            ->where('id_siswa', '<>', $studentId)
+            ->count();
+
+        if ($currentCount >= (int) $class->kapasitas) {
+            throw ValidationException::withMessages([
+                'id_kelas' => "Kapasitas kelas {$class->nama_kelas} sudah penuh ({$currentCount}/{$class->kapasitas}).",
+            ]);
+        }
+    }
+
+    private function resolveTeacherIdForClass(User $user, int $classId): int
+    {
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $this->assertTeacherClass($teacherId, $classId);
+
+            return $teacherId;
+        }
+
+        if (Schema::hasColumn('kelas', 'id_wali_kelas')) {
+            $waliId = DB::table('kelas')->where('id_kelas', $classId)->value('id_wali_kelas');
+            if ($waliId) {
+                return (int) $waliId;
+            }
+        }
+        if (Schema::hasTable('guru_kelas')) {
+            $assignedId = DB::table('guru_kelas')->where('id_kelas', $classId)->value('id_guru');
+            if ($assignedId) {
+                return (int) $assignedId;
+            }
+        }
+
+        return (int) (DB::table('guru')->orderBy('id_guru')->value('id_guru') ?? 1);
+    }
+
+    private function resolveTeacherIdForRoster(User $user, int $rosterId): int
+    {
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $this->assertTeacherRoster($teacherId, $rosterId);
+
+            return $teacherId;
+        }
+
+        $classId = (int) DB::table('rombel_siswa')->where('id_rombel', $rosterId)->value('id_kelas');
+
+        return $this->resolveTeacherIdForClass($user, $classId);
     }
 
     private function userFor(array $roles): User

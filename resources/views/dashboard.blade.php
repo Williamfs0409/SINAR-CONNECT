@@ -22,6 +22,7 @@
         @include('dashboard.admin', [
             'adminSection' => $adminSection ?? 'ringkasan',
             'adminDashboardData' => $adminDashboardData ?? [],
+            'passwordResetAttentionCount' => $passwordResetAttentionCount ?? 0,
         ])
     @elseif ($role === 'teacher')
         @include('dashboard.teacher')

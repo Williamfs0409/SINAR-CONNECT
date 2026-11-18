@@ -76,6 +76,97 @@
 @if ($section === 'siswa' && $role === 'admin')
     <section class="database-action-panel">
         <div class="database-section-heading">
+            <div><h2>Tambah siswa baru</h2><p>Daftarkan siswa baru ke keluarga yang sudah ada atau buat keluarga baru sekaligus menempatkan kelas aktif.</p></div>
+        </div>
+        <details class="database-student-editor">
+            <summary>Buka formulir tambah siswa baru</summary>
+            <form method="POST" action="{{ route('database.student.store') }}" class="database-form-grid">
+                @csrf
+                <label>Nama lengkap siswa<input name="nama_lengkap" maxlength="100" required></label>
+                <label>Nama panggilan<input name="nama_panggilan" maxlength="100"></label>
+                <label>NIK (16 digit)<input name="nik" maxlength="16" pattern="[0-9]{16}" placeholder="16 digit angka"></label>
+                <label>NISN (10 digit)<input name="nisn" maxlength="10" pattern="[0-9]{10}" placeholder="10 digit angka"></label>
+                <label>Nomor induk<input name="no_induk" maxlength="30"></label>
+                <label>Tempat lahir<input name="tempat_lahir" maxlength="100"></label>
+                <label>Tanggal lahir<input type="date" name="tanggal_lahir" max="{{ now()->toDateString() }}" required></label>
+                <label>Jenis kelamin
+                    <select name="jenis_kelamin" required>
+                        <option value="Laki-Laki">Laki-laki</option>
+                        <option value="Perempuan">Perempuan</option>
+                    </select>
+                </label>
+                <label>Agama<input name="agama" value="Islam" maxlength="30"></label>
+                <label>Anak ke-<input type="number" name="anak_ke" min="1" max="20"></label>
+                <label>Keluarga terdaftar (opsional)
+                    <select name="id_keluarga">
+                        <option value="">— Buat keluarga baru di bawah —</option>
+                        @foreach ($actions['families'] ?? [] as $family)
+                            <option value="{{ $family->id_keluarga }}">Keluarga #{{ $family->id_keluarga }}{{ $family->wali_names ? ' · '.$family->wali_names : '' }}{{ $family->no_kk ? ' (KK '.$family->no_kk.')' : '' }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Nomor KK baru (jika keluarga baru)<input name="no_kk" maxlength="16" pattern="[0-9]{16}"></label>
+                <label>Nama Ayah (jika keluarga baru)<input name="nama_ayah" maxlength="100"></label>
+                <label>Nama Ibu (jika keluarga baru)<input name="nama_ibu" maxlength="100"></label>
+                <label>No. HP keluarga baru<input name="nomor_telepon" maxlength="16"></label>
+                <label>Penempatan kelas aktif
+                    <select name="id_kelas">
+                        <option value="">— Pilih kelas —</option>
+                        @foreach ($actions['activeClasses'] ?? [] as $activeClass)
+                            <option value="{{ $activeClass->id_kelas }}">{{ $activeClass->nama_kelas }} · {{ $activeClass->kelompok }} (kapasitas {{ $activeClass->kapasitas }})</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Kategori diskon SPP
+                    <select name="id_diskon">
+                        <option value="">Tanpa diskon</option>
+                        @foreach ($actions['discounts'] ?? [] as $discount)
+                            <option value="{{ $discount->id_diskon }}">{{ $discount->nama }} ({{ ($discount->tipe ?? $discount->jenis ?? '') === 'Persen' ? $discount->nilai.'%' : 'Rp'.number_format($discount->nilai, 0, ',', '.') }})</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="database-form-wide">Alamat domisili<textarea name="alamat_domisili" rows="2" maxlength="2000"></textarea></label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Tambah siswa</button></div>
+            </form>
+        </details>
+    </section>
+
+    @if (($actions['studentPlacements'] ?? collect())->isNotEmpty() && ($actions['activeClasses'] ?? collect())->isNotEmpty())
+        <section class="database-action-panel">
+            <div class="database-section-heading">
+                <div><h2>Penempatan kelas &amp; diskon SPP siswa</h2><p>Tempatkan siswa dari kelas sementara (Belum Ditentukan) ke kelas definitif atau atur potongan biaya SPP (Anak Guru / Kurang Mampu).</p></div>
+            </div>
+            <form method="POST" action="{{ route('database.student.place') }}" class="database-form-grid">
+                @csrf
+                <label>Siswa
+                    <select name="id_siswa" required>
+                        @foreach ($actions['studentPlacements'] as $placement)
+                            <option value="{{ $placement->id_siswa }}">{{ $placement->nama_lengkap }} · Saat ini: {{ $placement->nama_kelas ?? 'Belum punya rombel' }}{{ $placement->kelompok ? ' ('.$placement->kelompok.')' : '' }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Kelas tujuan
+                    <select name="id_kelas" required>
+                        @foreach ($actions['activeClasses'] as $activeClass)
+                            <option value="{{ $activeClass->id_kelas }}">{{ $activeClass->nama_kelas }} · {{ $activeClass->kelompok }} ({{ $activeClass->tahun_ajaran }})</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Kategori diskon SPP
+                    <select name="id_diskon">
+                        <option value="">Tanpa diskon</option>
+                        @foreach ($actions['discounts'] ?? [] as $discount)
+                            <option value="{{ $discount->id_diskon }}">{{ $discount->nama }} ({{ ($discount->tipe ?? $discount->jenis ?? '') === 'Persen' ? $discount->nilai.'%' : 'Rp'.number_format($discount->nilai, 0, ',', '.') }})</option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Simpan penempatan kelas</button></div>
+            </form>
+        </section>
+    @endif
+
+    <section class="database-action-panel">
+        <div class="database-section-heading">
             <div><h2>Kelola profil siswa</h2><p>Perbarui informasi siswa yang sudah terdaftar. Data hanya dapat dikelola administrator.</p></div>
         </div>
         @forelse ($actions['studentProfiles'] ?? [] as $student)
@@ -86,6 +177,15 @@
                     @method('PATCH')
                     <label>Nama lengkap<input name="nama_lengkap" value="{{ $student->nama_lengkap }}" maxlength="100" required></label>
                     <label>Nama panggilan<input name="nama_panggilan" value="{{ $student->nama_panggilan }}" maxlength="100"></label>
+                    @if (property_exists($student, 'nik'))
+                        <label>NIK (16 digit)<input name="nik" value="{{ $student->nik }}" maxlength="16" pattern="[0-9]{16}"></label>
+                    @endif
+                    @if (property_exists($student, 'nisn'))
+                        <label>NISN (10 digit)<input name="nisn" value="{{ $student->nisn }}" maxlength="10" pattern="[0-9]{10}"></label>
+                    @endif
+                    @if (property_exists($student, 'no_induk'))
+                        <label>Nomor induk<input name="no_induk" value="{{ $student->no_induk }}" maxlength="30"></label>
+                    @endif
                     <label>Tempat lahir<input name="tempat_lahir" value="{{ $student->tempat_lahir }}" maxlength="100"></label>
                     <label>Tanggal lahir<input type="date" name="tanggal_lahir" value="{{ $student->tanggal_lahir }}" max="{{ now()->toDateString() }}" required></label>
                     <label>Jenis kelamin
@@ -94,6 +194,12 @@
                             <option value="Perempuan" @selected($student->jenis_kelamin === 'Perempuan')>Perempuan</option>
                         </select>
                     </label>
+                    @if (property_exists($student, 'agama'))
+                        <label>Agama<input name="agama" value="{{ $student->agama }}" maxlength="30"></label>
+                    @endif
+                    @if (property_exists($student, 'anak_ke'))
+                        <label>Anak ke-<input type="number" name="anak_ke" value="{{ $student->anak_ke }}" min="1" max="20"></label>
+                    @endif
                     <label class="database-form-wide">Alamat domisili<textarea name="alamat_domisili" rows="2" maxlength="2000">{{ $student->alamat_domisili }}</textarea></label>
                     <div class="database-form-wide"><button class="database-button" type="submit">Simpan profil</button></div>
                 </form>
@@ -104,6 +210,251 @@
         @if (($actions['studentProfiles'] ?? null) && $actions['studentProfiles']->hasPages())
             <div class="database-pagination">{{ $actions['studentProfiles']->links() }}</div>
         @endif
+    </section>
+@endif
+
+@if ($section === 'guru' && $role === 'admin')
+    <section class="database-action-panel">
+        <div class="database-section-heading">
+            <div><h2>Tambah &amp; tugaskan guru</h2><p>Kelola data pendidik dan penugasan wali kelas/pendamping pada tahun ajaran aktif.</p></div>
+        </div>
+        <details class="database-student-editor">
+            <summary>Tambah data guru baru</summary>
+            <form method="POST" action="{{ route('database.teacher.store') }}" class="database-form-grid">
+                @csrf
+                <label>Nama lengkap<input name="nama_lengkap" maxlength="100" required></label>
+                <label>Gelar akademik<input name="gelar_belakang" maxlength="50" placeholder="S.Pd."></label>
+                <label>NUPTK<input name="nuptk" maxlength="16"></label>
+                <label>NIK (16 digit)<input name="nik" maxlength="16" pattern="[0-9]{16}"></label>
+                <label>Jenis kelamin
+                    <select name="jenis_kelamin" required>
+                        <option value="Perempuan">Perempuan</option>
+                        <option value="Laki-Laki">Laki-laki</option>
+                    </select>
+                </label>
+                <label>Tempat lahir<input name="tempat_lahir" maxlength="100"></label>
+                <label>Tanggal lahir<input type="date" name="tanggal_lahir" max="{{ now()->toDateString() }}"></label>
+                <label>Nomor HP<input name="no_hp" maxlength="16"></label>
+                <label>Pendidikan terakhir<input name="pendidikan" maxlength="30" value="Sarjana (S1/D4)"></label>
+                <label>Jabatan<input name="jabatan" maxlength="30" value="Guru"></label>
+                <label>Tanggal mulai bertugas<input type="date" name="tanggal_mulai" value="{{ now()->toDateString() }}"></label>
+                <label>Akun login guru (opsional)
+                    <select name="id_user">
+                        <option value="">— Belum dihubungkan —</option>
+                        @foreach ($actions['teacherUsers'] ?? [] as $teacherUser)
+                            <option value="{{ $teacherUser->id_user }}">{{ $teacherUser->name }} · {{ $teacherUser->email }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="database-form-wide">Alamat<textarea name="alamat" rows="2" maxlength="2000"></textarea></label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Simpan guru baru</button></div>
+            </form>
+        </details>
+
+        @if (($actions['teachers'] ?? collect())->isNotEmpty() && ($actions['activeClasses'] ?? collect())->isNotEmpty())
+            <h3 class="database-subheading">Penugasan guru ke kelas aktif</h3>
+            <form method="POST" action="{{ route('database.teacher.assign-class') }}" class="database-form-grid">
+                @csrf
+                <label>Guru
+                    <select name="id_guru" required>
+                        @foreach ($actions['teachers'] as $teacher)
+                            <option value="{{ $teacher->id_guru }}">{{ $teacher->nama_lengkap }}{{ !empty($teacher->gelar_belakang) ? ', '.$teacher->gelar_belakang : '' }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Kelas
+                    <select name="id_kelas" required>
+                        @foreach ($actions['activeClasses'] as $activeClass)
+                            <option value="{{ $activeClass->id_kelas }}">{{ $activeClass->nama_kelas }} · {{ $activeClass->kelompok }} ({{ $activeClass->tahun_ajaran }})</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Peran
+                    <select name="peran" required>
+                        <option value="Wali Kelas">Wali Kelas</option>
+                        <option value="Pendamping">Pendamping</option>
+                    </select>
+                </label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Simpan penugasan</button></div>
+            </form>
+        @endif
+
+        <h3 class="database-subheading">Perbarui profil guru</h3>
+        @forelse ($actions['teachers'] ?? [] as $teacher)
+            <details class="database-student-editor">
+                <summary>{{ $teacher->nama_lengkap }}{{ !empty($teacher->gelar_belakang) ? ', '.$teacher->gelar_belakang : '' }} <small>{{ $teacher->status ?? 'Aktif' }}</small></summary>
+                <form method="POST" action="{{ route('database.teacher.update', ['teacher' => $teacher->id_guru]) }}" class="database-form-grid">
+                    @csrf
+                    @method('PATCH')
+                    <label>Nama lengkap<input name="nama_lengkap" value="{{ $teacher->nama_lengkap }}" maxlength="100" required></label>
+                    <label>Gelar<input name="gelar_belakang" value="{{ $teacher->gelar_belakang ?? '' }}" maxlength="50"></label>
+                    <label>NUPTK<input name="nuptk" value="{{ $teacher->nuptk ?? '' }}" maxlength="16"></label>
+                    <label>NIK<input name="nik" value="{{ $teacher->nik ?? '' }}" maxlength="16" pattern="[0-9]{16}"></label>
+                    <label>Jenis kelamin
+                        <select name="jenis_kelamin" required>
+                            <option value="Perempuan" @selected(($teacher->jenis_kelamin ?? 'Perempuan') === 'Perempuan')>Perempuan</option>
+                            <option value="Laki-Laki" @selected(($teacher->jenis_kelamin ?? '') === 'Laki-Laki')>Laki-laki</option>
+                        </select>
+                    </label>
+                    <label>Nomor HP<input name="no_hp" value="{{ $teacher->no_hp ?? '' }}" maxlength="16"></label>
+                    <label>Jabatan<input name="jabatan" value="{{ $teacher->jabatan ?? 'Guru' }}" maxlength="30"></label>
+                    <label>Pendidikan terakhir<input name="pendidikan" value="{{ $teacher->pendidikan ?? '' }}" maxlength="30"></label>
+                    <label>Status
+                        <select name="status" required>
+                            <option value="Aktif" @selected(($teacher->status ?? 'Aktif') === 'Aktif')>Aktif</option>
+                            <option value="Nonaktif" @selected(($teacher->status ?? '') === 'Nonaktif')>Nonaktif</option>
+                        </select>
+                    </label>
+                    <label>Akun login
+                        <select name="id_user">
+                            <option value="">— Tidak terhubung —</option>
+                            @foreach ($actions['teacherUsers'] ?? [] as $teacherUser)
+                                <option value="{{ $teacherUser->id_user }}" @selected((int) ($teacher->id_user ?? 0) === (int) $teacherUser->id_user)>{{ $teacherUser->name }} · {{ $teacherUser->email }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="database-form-wide">Alamat<textarea name="alamat" rows="2" maxlength="2000">{{ $teacher->alamat ?? '' }}</textarea></label>
+                    <div class="database-form-wide"><button class="database-button" type="submit">Simpan perubahan guru</button></div>
+                </form>
+            </details>
+        @empty
+            <p class="database-empty-note">Belum ada data guru.</p>
+        @endforelse
+    </section>
+@endif
+
+@if ($section === 'kelas' && $role === 'admin')
+    <section class="database-action-panel">
+        <div class="database-section-heading">
+            <div><h2>Kelola ruang kelas &amp; tahun ajaran</h2><p>Atur tahun ajaran aktif, tambah ruang kelas baru, atau sesuaikan kapasitas dan wali kelas.</p></div>
+        </div>
+        <div class="database-form-grid">
+            <form method="POST" action="{{ route('database.class.store') }}" class="database-form-grid">
+                @csrf
+                <h3 class="database-subheading database-form-wide">Tambah ruang kelas baru</h3>
+                <label>Tahun ajaran
+                    <select name="id_tahun_ajaran" required>
+                        @foreach ($actions['schoolYears'] ?? [] as $year)
+                            <option value="{{ $year->id_tahun_ajaran }}" @selected((bool) $year->is_aktif)>{{ $year->nama }}{{ $year->is_aktif ? ' (Aktif)' : '' }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Kelompok
+                    <select name="kelompok" required>
+                        <option value="KB">KB</option>
+                        <option value="TK A">TK A</option>
+                        <option value="TK B">TK B</option>
+                    </select>
+                </label>
+                <label>Nama kelas<input name="nama_kelas" maxlength="50" placeholder="TK A Al-Ikhlas" required></label>
+                <label>Kapasitas (maks. 30)<input type="number" name="kapasitas" min="1" max="30" value="15" required></label>
+                <label class="database-form-wide">Wali kelas
+                    <select name="id_wali_kelas">
+                        <option value="">— Pilih wali kelas —</option>
+                        @foreach ($actions['teachers'] ?? [] as $teacher)
+                            <option value="{{ $teacher->id_guru }}">{{ $teacher->nama_lengkap }}{{ !empty($teacher->gelar_belakang) ? ', '.$teacher->gelar_belakang : '' }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Tambah kelas</button></div>
+            </form>
+
+            <form method="POST" action="{{ route('database.school-year.store') }}" class="database-form-grid">
+                @csrf
+                <h3 class="database-subheading database-form-wide">Kelola tahun ajaran</h3>
+                <label>Nama tahun ajaran<input name="nama" maxlength="20" placeholder="2026-2027" required></label>
+                <label>Tahun mulai<input type="number" name="tahun_mulai" min="2020" max="2099" value="2026" required></label>
+                <label>Tanggal mulai<input type="date" name="tanggal_mulai" value="2026-07-13"></label>
+                <label>Tanggal selesai<input type="date" name="tanggal_selesai" value="2027-06-25"></label>
+                <label class="database-form-wide">Status tahun ajaran
+                    <select name="is_aktif" required>
+                        <option value="1">Jadikan tahun ajaran aktif</option>
+                        <option value="0">Simpan sebagai tidak aktif</option>
+                    </select>
+                </label>
+                <div class="database-form-wide"><button class="database-button database-button-secondary" type="submit">Simpan tahun ajaran</button></div>
+            </form>
+        </div>
+
+        @if (($actions['managedClasses'] ?? collect())->isNotEmpty())
+            <h3 class="database-subheading">Ubah kapasitas &amp; wali kelas</h3>
+            @foreach ($actions['managedClasses'] as $managedClass)
+                <details class="database-student-editor">
+                    <summary>{{ $managedClass->nama_kelas }} · {{ $managedClass->kelompok }} ({{ $managedClass->tahun_ajaran }}) <small>Kapasitas {{ $managedClass->kapasitas ?? '—' }}</small></summary>
+                    <form method="POST" action="{{ route('database.class.update', ['schoolClass' => $managedClass->id_kelas]) }}" class="database-form-grid">
+                        @csrf
+                        @method('PATCH')
+                        <label>Nama kelas<input name="nama_kelas" value="{{ $managedClass->nama_kelas }}" maxlength="50" required></label>
+                        <label>Kelompok
+                            <select name="kelompok" required>
+                                @foreach (['KB', 'TK A', 'TK B'] as $kelompokOption)
+                                    <option value="{{ $kelompokOption }}" @selected($managedClass->kelompok === $kelompokOption)>{{ $kelompokOption }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label>Kapasitas<input type="number" name="kapasitas" value="{{ $managedClass->kapasitas ?? 15 }}" min="1" max="30" required></label>
+                        <label>Wali kelas
+                            <select name="id_wali_kelas">
+                                <option value="">— Belum ditentukan —</option>
+                                @foreach ($actions['teachers'] ?? [] as $teacher)
+                                    <option value="{{ $teacher->id_guru }}" @selected((int) ($managedClass->id_wali_kelas ?? 0) === (int) $teacher->id_guru)>{{ $teacher->nama_lengkap }}{{ !empty($teacher->gelar_belakang) ? ', '.$teacher->gelar_belakang : '' }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <div class="database-form-wide"><button class="database-button" type="submit">Simpan kelas</button></div>
+                    </form>
+                </details>
+            @endforeach
+        @endif
+    </section>
+@endif
+
+@if ($section === 'duplikat-siswa' && $role === 'admin')
+    <section class="database-action-panel">
+        <div class="database-section-heading">
+            <div><h2>Gabungkan data ganda (deduplikasi)</h2><p>Pindahkan seluruh riwayat rombel, pendaftaran, dan tabungan dari data duplikat ke data utama secara aman dalam satu transaksi.</p></div>
+        </div>
+        <div class="database-form-grid">
+            <form method="POST" action="{{ route('database.student.merge') }}" class="database-form-grid" onsubmit="return confirm('Gabungkan data siswa duplikat ke siswa utama? Data duplikat akan dihapus setelah riwayatnya dipindahkan.');">
+                @csrf
+                <h3 class="database-subheading database-form-wide">Gabungkan duplikat siswa</h3>
+                <label>Siswa utama (dipertahankan)
+                    <select name="id_siswa_utama" required>
+                        @foreach ($actions['students'] ?? [] as $student)
+                            <option value="{{ $student->id_siswa }}">#{{ $student->id_siswa }} · {{ $student->nama_lengkap }} ({{ $student->tanggal_lahir }})</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Siswa duplikat (digabung &amp; dihapus)
+                    <select name="id_siswa_duplikat" required>
+                        @foreach ($actions['students'] ?? [] as $student)
+                            <option value="{{ $student->id_siswa }}">#{{ $student->id_siswa }} · {{ $student->nama_lengkap }} ({{ $student->tanggal_lahir }})</option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Gabungkan siswa</button></div>
+            </form>
+
+            <form method="POST" action="{{ route('database.family.merge') }}" class="database-form-grid" onsubmit="return confirm('Gabungkan keluarga duplikat ke keluarga utama?');">
+                @csrf
+                <h3 class="database-subheading database-form-wide">Gabungkan duplikat keluarga</h3>
+                <label>Keluarga utama (dipertahankan)
+                    <select name="id_keluarga_utama" required>
+                        @foreach ($actions['families'] ?? [] as $family)
+                            <option value="{{ $family->id_keluarga }}">Keluarga #{{ $family->id_keluarga }} · {{ $family->wali_names ?: 'Tanpa nama wali' }} ({{ $family->jumlah_siswa }} siswa)</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Keluarga duplikat (digabung &amp; dihapus)
+                    <select name="id_keluarga_duplikat" required>
+                        @foreach ($actions['families'] ?? [] as $family)
+                            <option value="{{ $family->id_keluarga }}">Keluarga #{{ $family->id_keluarga }} · {{ $family->wali_names ?: 'Tanpa nama wali' }} ({{ $family->jumlah_siswa }} siswa)</option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="database-form-wide"><button class="database-button database-button-secondary" type="submit">Gabungkan keluarga</button></div>
+            </form>
+        </div>
     </section>
 @endif
 
@@ -215,18 +566,28 @@
     </section>
 @endif
 
-@if ($section === 'absensi' && $role === 'teacher')
+@if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true))
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Catat kehadiran</h2><p>Perubahan dicatat per siswa dan tanggal sesuai kelas yang diampu.</p></div></div>
-        <form method="GET" action="{{ route('dashboard.feature', ['section' => 'absensi']) }}" class="database-inline-form database-filter-form">
-            <select name="kelas" required aria-label="Pilih kelas">
-                @foreach ($classOptions as $class)
-                    <option value="{{ $class->id_kelas }}" @selected((int) ($actions['selectedClass'] ?? 0) === (int) $class->id_kelas)>{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>
-                @endforeach
-            </select>
-            <input type="date" name="tanggal" value="{{ $actions['attendanceDate'] ?? now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
-            <button class="database-button database-button-secondary" type="submit">Tampilkan daftar</button>
-        </form>
+        <div class="database-section-heading"><div><h2>Catat kehadiran</h2><p>Perubahan dicatat per siswa dan tanggal sesuai kelas definitif.</p></div></div>
+        <div class="database-action-buttons">
+            <form method="GET" action="{{ route('dashboard.feature', ['section' => 'absensi']) }}" class="database-inline-form database-filter-form">
+                <select name="kelas" required aria-label="Pilih kelas">
+                    @foreach ($classOptions as $class)
+                        <option value="{{ $class->id_kelas }}" @selected((int) ($actions['selectedClass'] ?? 0) === (int) $class->id_kelas)>{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>
+                    @endforeach
+                </select>
+                <input type="date" name="tanggal" value="{{ $actions['attendanceDate'] ?? now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
+                <button class="database-button database-button-secondary" type="submit">Tampilkan daftar</button>
+            </form>
+            @if ($actions['selectedClass'] ?? null)
+                <form method="POST" action="{{ route('database.attendance.init') }}" class="database-inline-form">
+                    @csrf
+                    <input type="hidden" name="id_kelas" value="{{ $actions['selectedClass'] }}">
+                    <input type="hidden" name="tanggal" value="{{ $actions['attendanceDate'] ?? now()->toDateString() }}">
+                    <button class="database-button database-button-secondary" type="submit">Inisialisasi hadir sekelas</button>
+                </form>
+            @endif
+        </div>
         @if (($actions['attendanceRoster'] ?? collect())->isNotEmpty())
             <form method="POST" action="{{ route('database.attendance.store') }}">
                 @csrf
@@ -248,18 +609,37 @@
                 <button class="database-button" type="submit">Simpan absensi</button>
             </form>
         @elseif ($classOptions->isEmpty())
-            <p class="database-empty-note">Akun guru belum memiliki kelas yang ditugaskan.</p>
+            <p class="database-empty-note">Belum ada kelas aktif yang ditugaskan.</p>
         @endif
     </section>
 @endif
 
-@if ($section === 'pembelajaran' && $role === 'teacher')
+@if ($section === 'absensi' && $role === 'parent')
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Buat rencana pembelajaran</h2><p>Simpan tema, tujuan, kegiatan, serta alat dan bahan.</p></div></div>
+        <div class="database-section-heading"><div><h2>Riwayat kehadiran harian anak</h2><p>Catatan kehadiran harian per tanggal yang dicatat oleh wali kelas.</p></div></div>
+        @forelse ($actions['parentAttendanceHistory'] ?? [] as $history)
+            <div class="database-action-row">
+                <div>
+                    <strong>{{ $history->nama_lengkap }} · {{ $history->tanggal }}</strong>
+                    <small>{{ $history->nama_kelas }}{{ $history->keterangan ? ' · '.$history->keterangan : '' }}</small>
+                </div>
+                <span class="database-status">{{ $history->status }}</span>
+            </div>
+        @empty
+            <p class="database-empty-note">Belum ada riwayat kehadiran harian anak yang tercatat.</p>
+        @endforelse
+    </section>
+@endif
+
+@if ($section === 'pembelajaran' && in_array($role, ['teacher', 'admin'], true))
+    <section class="database-action-panel">
+        <div class="database-section-heading"><div><h2>Buat rencana pembelajaran</h2><p>Simpan jenis rencana (RPPH/RPPM/Modul Ajar), tema, tujuan, kegiatan, serta alat dan bahan.</p></div></div>
         <form method="POST" action="{{ route('database.lesson-plan.store') }}" class="database-form-grid">
             @csrf
             <label>Kelas<select name="id_kelas" required>@foreach ($classOptions as $class)<option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>@endforeach</select></label>
-            <label>Tanggal<input type="date" name="tanggal" value="{{ now()->toDateString() }}" required></label>
+            <label>Jenis dokumen<select name="jenis"><option value="RPPH">RPPH</option><option value="RPPM">RPPM</option><option value="Modul Ajar">Modul Ajar</option></select></label>
+            <label>Tanggal mulai<input type="date" name="tanggal" value="{{ now()->toDateString() }}" required></label>
+            <label>Tanggal selesai (opsional)<input type="date" name="tanggal_selesai"></label>
             <label>Tema<input name="tema" maxlength="150" required></label>
             <label>Subtema<input name="subtema" maxlength="150"></label>
             <label class="database-form-wide">Tujuan<textarea name="tujuan" rows="2"></textarea></label>
@@ -271,12 +651,18 @@
     </section>
 @endif
 
-@if ($section === 'tugas' && $role === 'teacher')
+@if ($section === 'tugas' && in_array($role, ['teacher', 'admin'], true))
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Buat tugas kelas</h2><p>Guru dapat membuat tugas untuk kelas yang diampu dan menilai pengumpulan.</p></div></div>
+        <div class="database-section-heading"><div><h2>Buat tugas kelas</h2><p>Buat tugas untuk kelas TK A atau TK B dan beri nilai beserta umpan balik atas pengumpulan siswa.</p></div></div>
         <form method="POST" action="{{ route('database.task.store') }}" enctype="multipart/form-data" class="database-form-grid">
             @csrf
-            <label>Kelas<select name="id_kelas" required>@foreach ($classOptions as $class)<option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>@endforeach</select></label>
+            <label>Kelas (TK A / TK B)
+                <select name="id_kelas" required>
+                    @foreach ($classOptions->filter(fn ($c) => ($c->kelompok ?? '') !== 'KB') as $class)
+                        <option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>
+                    @endforeach
+                </select>
+            </label>
             <label>Judul tugas<input name="judul" maxlength="150" required></label>
             <label>Tanggal diberikan<input type="date" name="tanggal_diberikan" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required></label>
             <label>Tenggat<input type="date" name="tenggat" required></label>
@@ -334,21 +720,33 @@
     </section>
 @endif
 
-@if ($section === 'nilai' && $role === 'teacher')
+@if ($section === 'nilai' && in_array($role, ['teacher', 'admin'], true))
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Catat perkembangan Iqro</h2><p>Indikator hanya dapat disimpan untuk kelompok siswa yang sesuai.</p></div></div>
+        <div class="database-section-heading"><div><h2>Catat perkembangan Iqro</h2><p>Indikator disesuaikan otomatis dengan kelompok kelas siswa (KB, TK A, atau TK B).</p></div></div>
         <form method="POST" action="{{ route('database.iqro.store') }}" class="database-form-grid">
             @csrf
-            <label>Siswa / kelas<select name="id_rombel" required>@foreach ($rosterOptions as $roster)<option value="{{ $roster->id_rombel }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }} ({{ $roster->kelompok }})</option>@endforeach</select></label>
-            <label>Indikator<select name="id_indikator" required>@foreach ($actions['indicators'] ?? [] as $indicator)<option value="{{ $indicator->id_indikator }}">{{ $indicator->kelompok }} · {{ $indicator->kategori }} · {{ $indicator->nama }}</option>@endforeach</select></label>
+            <label>Siswa / kelas
+                <select name="id_rombel" required data-iqro-roster-select>
+                    @foreach ($rosterOptions as $roster)
+                        <option value="{{ $roster->id_rombel }}" data-kelompok="{{ $roster->kelompok }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }} ({{ $roster->kelompok }})</option>
+                    @endforeach
+                </select>
+            </label>
+            <label>Indikator
+                <select name="id_indikator" required data-iqro-indicator-select>
+                    @foreach ($actions['indicators'] ?? [] as $indicator)
+                        <option value="{{ $indicator->id_indikator }}" data-kelompok="{{ $indicator->kelompok }}">{{ $indicator->kelompok }} · {{ $indicator->kategori }} · {{ $indicator->nama }}</option>
+                    @endforeach
+                </select>
+            </label>
             <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
-            <label>Capaian<select name="skala"><option>BB</option><option>MB</option><option>BSH</option><option>BSB</option></select></label>
+            <label>Capaian<select name="skala"><option>BB</option><option>MB</option><option value="BSH" selected>BSH</option><option>BSB</option></select></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Simpan nilai</button></div>
         </form>
     </section>
 @endif
 
-@if ($section === 'perkembangan' && $role === 'teacher')
+@if ($section === 'perkembangan' && in_array($role, ['teacher', 'admin'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Tambah portofolio perkembangan</h2><p>Unggah foto dan catatan perkembangan siswa pada kelas yang diampu.</p></div></div>
         <form method="POST" action="{{ route('database.portfolio.store') }}" enctype="multipart/form-data" class="database-form-grid">
@@ -362,17 +760,27 @@
     </section>
 @endif
 
-@if ($section === 'rapor' && $role === 'teacher')
+@if ($section === 'rapor' && in_array($role, ['teacher', 'admin'], true))
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Susun rapor</h2><p>Rapor final terkunci sesuai aturan database; simpan sebagai draft untuk melanjutkan penyuntingan.</p></div></div>
+        <div class="database-section-heading"><div><h2>Susun rapor</h2><p>Rapor final terkunci sesuai aturan database; semua 4 narasi perkembangan wajib terisi sebelum rapor difinalkan.</p></div></div>
         <form method="POST" action="{{ route('database.report.store') }}" class="database-form-grid">
             @csrf
             <label>Siswa / kelas<select name="id_rombel" required>@foreach ($rosterOptions as $roster)<option value="{{ $roster->id_rombel }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }}</option>@endforeach</select></label>
             <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
-            <label>Tanggal rapor<input type="date" name="tanggal_rapor"></label>
+            <label>Tanggal rapor<input type="date" name="tanggal_rapor" value="{{ now()->toDateString() }}"></label>
             <label>Status<select name="status"><option>Draft</option><option>Final</option></select></label>
             <label>Tinggi badan (cm)<input type="number" step="0.1" name="tinggi_badan" min="30" max="180"></label>
             <label>Berat badan (kg)<input type="number" step="0.1" name="berat_badan" min="5" max="120"></label>
+            @if (($actions['iqroTeachers'] ?? collect())->isNotEmpty())
+                <label class="database-form-wide">Guru pendamping Iqro
+                    <select name="id_guru_iqro">
+                        <option value="">— Sesuai wali kelas —</option>
+                        @foreach ($actions['iqroTeachers'] as $iqroTeacher)
+                            <option value="{{ $iqroTeacher->id_guru }}">{{ $iqroTeacher->nama_lengkap }}{{ !empty($iqroTeacher->gelar_belakang) ? ', '.$iqroTeacher->gelar_belakang : '' }}</option>
+                        @endforeach
+                    </select>
+                </label>
+            @endif
             <label class="database-form-wide">Agama dan budi pekerti<textarea name="narasi_agama_budi_pekerti" rows="2"></textarea></label>
             <label class="database-form-wide">Jati diri<textarea name="narasi_jati_diri" rows="2"></textarea></label>
             <label class="database-form-wide">Literasi dan STEAM<textarea name="narasi_literasi_steam" rows="2"></textarea></label>
@@ -382,25 +790,64 @@
     </section>
 @endif
 
+@if ($section === 'rapor' && in_array($role, ['teacher', 'principal', 'admin'], true) && ($actions['detailedReports'] ?? collect())->isNotEmpty())
+    <section class="database-action-panel">
+        <div class="database-section-heading"><div><h2>Detail isi rapor lengkap</h2><p>Buka rincian narasi perkembangan, pertumbuhan fisik, rekap ketidakhadiran, dan refleksi orang tua.</p></div></div>
+        @foreach ($actions['detailedReports'] as $detailReport)
+            <details class="database-student-editor">
+                <summary>{{ $detailReport->nama_lengkap }} · {{ $detailReport->nama_kelas }} ({{ $detailReport->semester }} {{ $detailReport->tahun_ajaran }}) <small>{{ $detailReport->status }}</small></summary>
+                <div class="database-registration-details">
+                    <dl>
+                        <div><dt>Tanggal rapor</dt><dd>{{ $detailReport->tanggal_rapor ?: '—' }}</dd></div>
+                        <div><dt>Pertumbuhan fisik</dt><dd>Tinggi: {{ $detailReport->tinggi_badan ? $detailReport->tinggi_badan.' cm' : '—' }} · Berat: {{ $detailReport->berat_badan ? $detailReport->berat_badan.' kg' : '—' }}</dd></div>
+                        <div><dt>Ketidakhadiran</dt><dd>Sakit: {{ $detailReport->sakit ?? 0 }} · Izin: {{ $detailReport->izin ?? 0 }} · Tanpa keterangan: {{ $detailReport->tanpa_keterangan ?? $detailReport->alfa ?? 0 }}</dd></div>
+                        <div><dt>Wali kelas &amp; Guru Iqro</dt><dd>{{ $detailReport->guru_kelas ?? $detailReport->wali_kelas ?? '—' }}{{ !empty($detailReport->guru_iqro) ? ' / '.$detailReport->guru_iqro : '' }}</dd></div>
+                        <div class="database-registration-address"><dt>1. Nilai Agama dan Budi Pekerti</dt><dd>{{ $detailReport->narasi_agama_budi_pekerti ?: 'Belum diisi' }}</dd></div>
+                        <div class="database-registration-address"><dt>2. Jati Diri</dt><dd>{{ $detailReport->narasi_jati_diri ?: 'Belum diisi' }}</dd></div>
+                        <div class="database-registration-address"><dt>3. Dasar-Dasar Literasi, Matematika, Sains, Teknologi, Rekayasa, dan Seni (STEAM)</dt><dd>{{ $detailReport->narasi_literasi_steam ?: 'Belum diisi' }}</dd></div>
+                        <div class="database-registration-address"><dt>4. Projek Penguatan Profil Pelajar Pancasila (P5)</dt><dd>{{ $detailReport->narasi_p5 ?: 'Belum diisi' }}</dd></div>
+                        <div class="database-registration-address"><dt>Refleksi Orang Tua</dt><dd>{{ $detailReport->refleksi_orang_tua ?: 'Belum diisi oleh orang tua' }}</dd></div>
+                    </dl>
+                </div>
+            </details>
+        @endforeach
+    </section>
+@endif
+
 @if ($section === 'rapor' && $role === 'parent')
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Refleksi orang tua</h2><p>Tulis refleksi pada rapor anak yang terhubung ke akun ini.</p></div></div>
+        <div class="database-section-heading"><div><h2>Rapor perkembangan &amp; refleksi orang tua</h2><p>Lihat laporan capaian pembelajaran Kurikulum Merdeka anak Anda lalu tuliskan refleksi orang tua.</p></div></div>
         @forelse ($actions['parentReports'] ?? [] as $report)
-            <form method="POST" action="{{ route('database.report.reflection', ['report' => $report->id_rapor]) }}" class="database-action-form">
-                @csrf @method('PATCH')
-                <strong>{{ $report->nama_lengkap }} · {{ $report->semester }} · {{ $report->status }}</strong>
-                <textarea name="refleksi_orang_tua" rows="3" maxlength="5000" placeholder="Refleksi orang tua">{{ $report->refleksi_orang_tua }}</textarea>
-                <button class="database-button" type="submit">Simpan refleksi</button>
-            </form>
+            <div class="database-student-editor">
+                <div class="database-registration-details">
+                    <strong>{{ $report->nama_lengkap }} · {{ $report->nama_kelas ?? '' }} · Semester {{ $report->semester }} ({{ $report->tahun_ajaran ?? '' }}) · {{ $report->status }}</strong>
+                    <dl>
+                        <div><dt>Tanggal rapor</dt><dd>{{ $report->tanggal_rapor ?: '—' }}</dd></div>
+                        <div><dt>Tinggi &amp; berat badan</dt><dd>{{ $report->tinggi_badan ? $report->tinggi_badan.' cm' : '—' }} / {{ $report->berat_badan ? $report->berat_badan.' kg' : '—' }}</dd></div>
+                        <div><dt>Rekap kehadiran</dt><dd>Sakit: {{ $report->sakit ?? 0 }} hari · Izin: {{ $report->izin ?? 0 }} hari · Tanpa keterangan: {{ $report->tanpa_keterangan ?? $report->alfa ?? 0 }} hari</dd></div>
+                        <div><dt>Wali kelas &amp; Kepala sekolah</dt><dd>{{ $report->guru_kelas ?? $report->wali_kelas ?? '—' }}{{ !empty($report->kepala_sekolah) ? ' · Kepsek: '.$report->kepala_sekolah : '' }}</dd></div>
+                        <div class="database-registration-address"><dt>Nilai Agama dan Budi Pekerti</dt><dd>{{ $report->narasi_agama_budi_pekerti ?: '—' }}</dd></div>
+                        <div class="database-registration-address"><dt>Jati Diri</dt><dd>{{ $report->narasi_jati_diri ?: '—' }}</dd></div>
+                        <div class="database-registration-address"><dt>Dasar Literasi &amp; STEAM</dt><dd>{{ $report->narasi_literasi_steam ?: '—' }}</dd></div>
+                        <div class="database-registration-address"><dt>Projek Penguatan Profil Pelajar Pancasila (P5)</dt><dd>{{ $report->narasi_p5 ?: '—' }}</dd></div>
+                    </dl>
+                </div>
+                <form method="POST" action="{{ route('database.report.reflection', ['report' => $report->id_rapor]) }}" class="database-action-form">
+                    @csrf @method('PATCH')
+                    <strong>Refleksi orang tua untuk {{ $report->nama_lengkap }} ({{ $report->semester }})</strong>
+                    <textarea name="refleksi_orang_tua" rows="3" maxlength="5000" placeholder="Refleksi orang tua">{{ $report->refleksi_orang_tua }}</textarea>
+                    <button class="database-button" type="submit">Simpan refleksi</button>
+                </form>
+            </div>
         @empty
             <p class="database-empty-note">Rapor anak belum tersedia.</p>
         @endforelse
     </section>
 @endif
 
-@if ($section === 'kegiatan' && $role === 'teacher')
+@if ($section === 'kegiatan' && in_array($role, ['teacher', 'admin'], true))
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Unggah dokumentasi kegiatan</h2><p>Semua guru dapat memilih kelas, membuat kegiatan, lalu mengunggah foto. Orang tua yang terhubung dengan kelas tersebut dapat melihat dokumentasinya.</p></div></div>
+        <div class="database-section-heading"><div><h2>Unggah dokumentasi kegiatan</h2><p>Pilih kelas, buat kegiatan, lalu unggah foto dokumentasi. Orang tua yang terhubung dengan kelas tersebut dapat melihat dokumentasinya.</p></div></div>
         <form method="POST" action="{{ route('database.activity.store') }}" class="database-form-grid">
             @csrf
             <label>Kelas<select name="id_kelas" required>@foreach ($classOptions as $class)<option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>@endforeach</select></label>
@@ -479,7 +926,7 @@
 @if (in_array($section, ['tagihan', 'pembayaran'], true) && in_array($role, ['admin', 'parent'], true))
     <section class="database-action-panel">
         @if ($role === 'admin' && $section === 'tagihan')
-            <div class="database-section-heading"><div><h2>Buat tagihan SPP bulanan</h2><p>Tagihan dibuat untuk siswa aktif pada tahun ajaran aktif sesuai tarif database; tagihan yang sudah ada tidak digandakan.</p></div></div>
+            <div class="database-section-heading"><div><h2>Buat tagihan SPP bulanan</h2><p>Tagihan dibuat untuk siswa aktif pada tahun ajaran aktif sesuai tarif database dan potongan diskon siswa; tagihan yang sudah ada tidak digandakan.</p></div></div>
             <form method="POST" action="{{ route('database.bills.generate') }}" class="database-inline-form">
                 @csrf
                 <label>Periode<input type="month" name="periode" required></label>
@@ -487,7 +934,7 @@
                 <button class="database-button" type="submit">Buat tagihan</button>
             </form>
 
-            <div class="database-section-heading database-subsection-heading"><div><h2>Buat tagihan untuk satu siswa</h2><p>Nominal mengikuti tarif bulanan aktif dan hanya berlaku untuk siswa yang dipilih.</p></div></div>
+            <div class="database-section-heading database-subsection-heading"><div><h2>Buat tagihan untuk satu siswa</h2><p>Nominal mengikuti tarif bulanan aktif serta diskon siswa yang dipilih.</p></div></div>
             @if (! ($actions['activeSchoolYear'] ?? null))
                 <p class="database-empty-note">Tahun ajaran aktif belum tersedia.</p>
             @elseif (($actions['billRosters'] ?? collect())->isEmpty())
@@ -541,6 +988,18 @@
             @empty
                 <p class="database-empty-note">Tidak ada pembayaran yang menunggu verifikasi.</p>
             @endforelse
+
+            @if (($actions['cancellablePayments'] ?? collect())->isNotEmpty())
+                <div class="database-section-heading database-subsection-heading"><div><h2>Batalkan kuitansi pembayaran</h2><p>Pembatalan tidak menghapus baris transaksi (immutable ledger), melainkan mengubah status menjadi Dibatalkan dengan alasan wajib.</p></div></div>
+                @foreach ($actions['cancellablePayments'] as $cancellable)
+                    <form method="POST" action="{{ route('database.payment.cancel', ['payment' => $cancellable->id_pembayaran]) }}" class="database-action-row" onsubmit="return confirm('Batalkan kuitansi pembayaran ini?');">
+                        @csrf @method('PATCH')
+                        <div><strong>{{ $cancellable->no_kuitansi }}</strong><small>{{ $cancellable->tanggal_bayar }} · {{ $cancellable->metode }} · Rp {{ number_format($cancellable->total_bayar, 0, ',', '.') }}</small></div>
+                        <input name="catatan" maxlength="255" placeholder="Alasan pembatalan (wajib)" required>
+                        <button class="database-button database-button-danger" type="submit">Batalkan kuitansi</button>
+                    </form>
+                @endforeach
+            @endif
         @endif
 
         @if ($section === 'pembayaran')
@@ -593,6 +1052,23 @@
 @endif
 
 @if ($section === 'keluarga' && $role === 'admin')
+    <section class="database-action-panel">
+        <div class="database-section-heading"><div><h2>Tambah data keluarga baru</h2><p>Tambahkan kartu keluarga, nama orang tua/wali, serta nomor kontak utama.</p></div></div>
+        <details class="database-student-editor">
+            <summary>Buka formulir keluarga baru</summary>
+            <form method="POST" action="{{ route('database.family.store') }}" class="database-form-grid">
+                @csrf
+                <label>Nomor KK (16 digit)<input name="no_kk" maxlength="16" pattern="[0-9]{16}" placeholder="16 digit angka"></label>
+                <label>Nomor HP / WhatsApp utama<input name="nomor" maxlength="16" placeholder="0812..."></label>
+                <label>Nama Ayah<input name="nama_ayah" maxlength="100"></label>
+                <label>Nama Ibu<input name="nama_ibu" maxlength="100"></label>
+                <label>Nama Wali (opsional)<input name="nama_wali" maxlength="100"></label>
+                <label class="database-form-wide">Alamat keluarga<textarea name="alamat" rows="2" maxlength="2000"></textarea></label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Simpan keluarga baru</button></div>
+            </form>
+        </details>
+    </section>
+
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Buat akun orang tua untuk keluarga lama</h2><p>Buat akun memakai email yang diberikan orang tua lalu hubungkan langsung ke keluarga yang benar. Akun hanya mendapat akses ke siswa dalam keluarga tersebut.</p></div></div>
         @if (($actions['unlinkedFamilies'] ?? collect())->isEmpty())

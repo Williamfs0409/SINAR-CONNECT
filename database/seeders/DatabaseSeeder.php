@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Support\PasswordPolicy;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class DatabaseSeeder extends Seeder
@@ -23,24 +24,26 @@ class DatabaseSeeder extends Seeder
             }
 
             $this->command?->info('Administrator account already exists; no changes were made.');
+        } else {
+            $password = config('admin.bootstrap_password');
+            if (! PasswordPolicy::accepts($password)) {
+                throw new RuntimeException('Set ADMIN_BOOTSTRAP_PASSWORD to a password of at least 8 characters with uppercase and lowercase letters and a number; symbols are optional.');
+            }
 
-            return;
+            $user = User::create([
+                'name' => 'Administrator',
+                'email' => $email,
+                'password' => $password,
+                'role' => 'admin',
+            ]);
+            $user->is_active = true;
+            $user->save();
+
+            $this->command?->info("Administrator account created: {$email}");
         }
 
-        $password = config('admin.bootstrap_password');
-        if (! PasswordPolicy::accepts($password)) {
-            throw new RuntimeException('Set ADMIN_BOOTSTRAP_PASSWORD to a password of at least 8 characters with uppercase and lowercase letters and a number; symbols are optional.');
+        if (Schema::hasTable('siswa') && Schema::hasTable('tahun_ajaran')) {
+            $this->call(OperationalDataSeeder::class);
         }
-
-        $user = User::create([
-            'name' => 'Administrator',
-            'email' => $email,
-            'password' => $password,
-            'role' => 'admin',
-        ]);
-        $user->is_active = true;
-        $user->save();
-
-        $this->command?->info("Administrator account created: {$email}");
     }
 }

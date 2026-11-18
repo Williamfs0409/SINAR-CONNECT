@@ -301,7 +301,7 @@
                         <div class="database-table-wrap">
                             <table class="database-table">
                                 <thead>
-                                    <tr data-record-row>
+                                    <tr>
                                         @foreach ($module['columns'] as $label)
                                             <th scope="col">{{ $label }}</th>
                                         @endforeach
@@ -315,7 +315,7 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($records as $record)
-                                        <tr>
+                                        <tr data-record-row>
                                             @foreach ($module['columns'] as $field => $label)
                                                 <td>
                                                     @php($cellValue = data_get($record, $field))

@@ -17,20 +17,21 @@ class SchoolDataController extends Controller
             'siswa', 'pendaftaran', 'guru', 'kelas', 'absensi', 'pembelajaran',
             'tugas', 'nilai', 'perkembangan', 'rapor', 'kegiatan', 'tagihan', 'pembayaran',
             'tabungan', 'saldo-tabungan', 'tunggakan', 'rekap-pembayaran', 'rekap-pendaftar', 'tarif',
+            'diskon-siswa', 'kapasitas-kelas', 'keluarga-tanpa-akun',
             'keluarga', 'pengguna', 'kesiapan', 'kualitas', 'duplikat-siswa', 'audit',
         ],
         'principal' => [
             'siswa', 'pendaftaran', 'guru', 'kelas', 'absensi', 'pembelajaran',
             'tugas', 'nilai', 'perkembangan', 'rapor', 'kegiatan', 'tagihan', 'pembayaran',
             'tabungan', 'saldo-tabungan', 'tunggakan', 'rekap-pembayaran', 'rekap-pendaftar', 'tarif',
-            'kesiapan', 'kualitas',
+            'diskon-siswa', 'kapasitas-kelas', 'kesiapan', 'kualitas',
         ],
         'teacher' => [
             'siswa', 'kelas', 'absensi', 'pembelajaran', 'tugas', 'nilai',
             'perkembangan', 'rapor', 'kegiatan',
         ],
         'parent' => [
-            'siswa', 'pendaftaran', 'absensi', 'tugas', 'rapor', 'kegiatan', 'tagihan',
+            'siswa', 'pendaftaran', 'absensi', 'tugas', 'nilai', 'rapor', 'kegiatan', 'tagihan',
             'pembayaran', 'tabungan', 'saldo-tabungan', 'tunggakan', 'perkembangan',
         ],
     ];
@@ -39,7 +40,7 @@ class SchoolDataController extends Controller
         'data' => [
             'title' => 'Data Sekolah',
             'role_titles' => ['teacher' => 'Kelas & Siswa', 'parent' => 'Anak Saya'],
-            'modules' => ['siswa', 'guru', 'kelas', 'keluarga', 'pengguna'],
+            'modules' => ['siswa', 'guru', 'kelas', 'kapasitas-kelas', 'keluarga', 'keluarga-tanpa-akun', 'pengguna'],
         ],
         'admissions' => [
             'title' => 'Penerimaan Siswa',
@@ -59,7 +60,7 @@ class SchoolDataController extends Controller
             'role_titles' => ['parent' => 'Keuangan Anak'],
             'modules' => [
                 'tagihan', 'pembayaran', 'tabungan', 'saldo-tabungan', 'tunggakan',
-                'rekap-pembayaran', 'tarif',
+                'rekap-pembayaran', 'tarif', 'diskon-siswa',
             ],
         ],
         'reports' => [
@@ -344,6 +345,51 @@ class SchoolDataController extends Controller
             'scope' => 'all',
             'order' => 'entitas',
         ],
+        'diskon-siswa' => [
+            'title' => 'Diskon Siswa',
+            'description' => 'Daftar siswa aktif penerima potongan biaya SPP bulanan.',
+            'view' => 'v_diskon_siswa',
+            'columns' => [
+                'nama_lengkap' => 'Nama siswa',
+                'nama_kelas' => 'Kelas',
+                'diskon' => 'Kategori diskon',
+                'tipe' => 'Tipe',
+                'nilai' => 'Besaran potongan',
+            ],
+            'scope' => 'all',
+            'order' => 'nama_lengkap',
+        ],
+        'kapasitas-kelas' => [
+            'title' => 'Kapasitas Kelas',
+            'description' => 'Kapasitas ruang kelas, siswa aktif, dan sisa kursi per tahun ajaran.',
+            'view' => 'v_kapasitas_kelas',
+            'columns' => [
+                'tahun_ajaran' => 'Tahun ajaran',
+                'kelompok' => 'Kelompok',
+                'nama_kelas' => 'Kelas',
+                'kapasitas' => 'Kapasitas',
+                'siswa_aktif' => 'Siswa aktif',
+                'sisa_kursi' => 'Sisa kursi',
+                'status' => 'Status kapasitas',
+            ],
+            'scope' => 'all',
+            'order' => 'tahun_ajaran',
+            'direction' => 'desc',
+        ],
+        'keluarga-tanpa-akun' => [
+            'title' => 'Keluarga Tanpa Akun',
+            'description' => 'Keluarga siswa aktif yang belum dihubungkan ke akun orang tua.',
+            'view' => 'v_keluarga_tanpa_akun',
+            'columns' => [
+                'id_keluarga' => 'ID keluarga',
+                'nama_ayah' => 'Ayah',
+                'nama_ibu' => 'Ibu',
+                'no_hp_utama' => 'Nomor HP utama',
+                'anak_aktif' => 'Siswa aktif',
+            ],
+            'scope' => 'all',
+            'order' => 'id_keluarga',
+        ],
         'keluarga' => [
             'title' => 'Data Keluarga',
             'description' => 'Kontak keluarga dan wali siswa.',
@@ -426,7 +472,7 @@ class SchoolDataController extends Controller
         }
         $data['classes'] = $classes->get();
 
-        if (in_array($role, ['teacher', 'parent'], true)) {
+        if (in_array($role, ['teacher', 'parent', 'admin'], true) && Schema::hasTable('rombel_siswa')) {
             $students = DB::table('rombel_siswa as r')
                 ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
                 ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
@@ -440,21 +486,27 @@ class SchoolDataController extends Controller
                     'k.kelompok',
                 ])
                 ->orderBy('s.nama_lengkap');
-            $students->whereIn('r.id_siswa', $scope['studentIds']);
+            if ($role !== 'admin') {
+                $students->whereIn('r.id_siswa', $scope['studentIds']);
+            }
             $data['rosters'] = $students->get();
         }
 
-        if ($section === 'absensi' && $role === 'teacher') {
+        if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('rombel_siswa') && Schema::hasTable('absensi')) {
+            $attendanceClasses = $role === 'admin'
+                ? $data['classes']->where('nama_kelas', '<>', 'Belum Ditentukan')->values()
+                : $data['classes'];
             $selectedClass = request()->query('kelas');
             if ($selectedClass !== null) {
-                abort_unless($data['classes']->contains('id_kelas', (int) $selectedClass), 403);
+                abort_unless($attendanceClasses->contains('id_kelas', (int) $selectedClass), 403);
             } else {
-                $selectedClass = $data['classes']->first()->id_kelas ?? null;
+                $selectedClass = $attendanceClasses->first()->id_kelas ?? null;
             }
 
             $date = request()->query('tanggal', now('Asia/Jakarta')->toDateString());
             $data['attendanceDate'] = $date;
             $data['selectedClass'] = $selectedClass;
+            $data['attendanceClasses'] = $attendanceClasses;
             $data['attendanceRoster'] = $selectedClass
                 ? DB::table('rombel_siswa as r')
                     ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
@@ -471,6 +523,23 @@ class SchoolDataController extends Controller
                         'a.keterangan',
                     ])
                 : collect();
+        }
+
+        if ($section === 'absensi' && $role === 'parent' && Schema::hasTable('absensi') && Schema::hasTable('rombel_siswa')) {
+            $data['parentAttendanceHistory'] = DB::table('absensi as a')
+                ->join('rombel_siswa as r', 'r.id_rombel', '=', 'a.id_rombel')
+                ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                ->whereIn('r.id_siswa', $scope['studentIds'])
+                ->orderByDesc('a.tanggal')
+                ->limit(60)
+                ->get([
+                    's.nama_lengkap',
+                    'k.nama_kelas',
+                    'a.tanggal',
+                    'a.status',
+                    'a.keterangan',
+                ]);
         }
 
         if ($section === 'pendaftaran' && $role === 'admin') {
@@ -594,39 +663,216 @@ class SchoolDataController extends Controller
         }
 
         if ($section === 'siswa' && $role === 'admin') {
+            $studentColumns = [
+                'id_siswa',
+                'nama_lengkap',
+                'nama_panggilan',
+                'tempat_lahir',
+                'tanggal_lahir',
+                'jenis_kelamin',
+                'alamat_domisili',
+            ];
+            if (Schema::hasColumn('siswa', 'nik')) {
+                $studentColumns = array_merge($studentColumns, [
+                    'id_keluarga',
+                    'no_induk',
+                    'nik',
+                    'nisn',
+                    'agama',
+                    'anak_ke',
+                ]);
+            }
+
             $data['studentProfiles'] = DB::table('siswa')
                 ->orderBy('nama_lengkap')
-                ->paginate(30, [
-                    'id_siswa',
-                    'nama_lengkap',
-                    'nama_panggilan',
-                    'tempat_lahir',
-                    'tanggal_lahir',
-                    'jenis_kelamin',
-                    'alamat_domisili',
-                ], 'profile_page')
+                ->paginate(30, $studentColumns, 'profile_page')
                 ->withQueryString();
+
+            if (Schema::hasTable('keluarga')) {
+                $familyQuery = DB::table('keluarga as f')->orderBy('f.id_keluarga');
+                if (Schema::hasTable('v_keluarga_lengkap')) {
+                    $familyQuery->leftJoin('v_keluarga_lengkap as vf', 'vf.id_keluarga', '=', 'f.id_keluarga')
+                        ->select([
+                            'f.id_keluarga',
+                            'f.no_kk',
+                            'f.alamat',
+                            'vf.nama_ayah',
+                            'vf.nama_ibu',
+                            DB::raw("CONCAT_WS(' / ', vf.nama_ayah, vf.nama_ibu) as wali_names"),
+                        ]);
+                } else {
+                    $familyQuery->select([
+                        'f.id_keluarga',
+                        DB::raw("'' as no_kk"),
+                        DB::raw("'' as wali_names"),
+                    ]);
+                }
+                $data['allFamilies'] = $familyQuery->get();
+                $data['families'] = $data['allFamilies'];
+            }
+
+            if (Schema::hasTable('rombel_siswa') && Schema::hasTable('kelas')) {
+                $activeClassCols = ['k.id_kelas', 'k.nama_kelas', 'k.kelompok', 'ta.nama as tahun_ajaran'];
+                if (Schema::hasColumn('kelas', 'kapasitas')) {
+                    $activeClassCols[] = 'k.kapasitas';
+                }
+                $data['activeClasses'] = DB::table('kelas as k')
+                    ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+                    ->where('ta.is_aktif', true)
+                    ->where('k.nama_kelas', '<>', 'Belum Ditentukan')
+                    ->orderBy('k.kelompok')
+                    ->orderBy('k.nama_kelas')
+                    ->get($activeClassCols);
+
+                $data['discounts'] = Schema::hasTable('diskon')
+                    ? DB::table('diskon')->orderBy('id_diskon')->get()
+                    : collect();
+
+                $placementColumns = [
+                    'r.id_rombel',
+                    'r.id_siswa',
+                    'r.id_kelas',
+                    's.nama_lengkap',
+                    'k.nama_kelas',
+                    'k.kelompok',
+                    'ta.nama as tahun_ajaran',
+                ];
+                if (Schema::hasColumn('rombel_siswa', 'id_diskon')) {
+                    $placementColumns[] = 'r.id_diskon';
+                }
+
+                $data['studentPlacements'] = DB::table('rombel_siswa as r')
+                    ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                    ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                    ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+                    ->where('r.status', 'Aktif')
+                    ->orderByRaw("CASE WHEN k.nama_kelas = 'Belum Ditentukan' THEN 0 ELSE 1 END")
+                    ->orderBy('s.nama_lengkap')
+                    ->get($placementColumns);
+            }
+        }
+
+        if ($section === 'guru' && $role === 'admin' && Schema::hasTable('guru')) {
+            $data['teachers'] = DB::table('guru')->orderBy('nama_lengkap')->get();
+            $data['teacherUsers'] = Schema::hasTable('users')
+                ? DB::table('users')
+                    ->whereIn('role', ['guru', 'kepala_sekolah', 'teacher', 'principal'])
+                    ->orderBy('name')
+                    ->get(['id_user', 'name', 'email', 'role'])
+                : collect();
+            $data['activeClasses'] = Schema::hasTable('kelas') && Schema::hasTable('tahun_ajaran')
+                ? DB::table('kelas as k')
+                    ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+                    ->where('ta.is_aktif', true)
+                    ->where('k.nama_kelas', '<>', 'Belum Ditentukan')
+                    ->orderBy('k.kelompok')
+                    ->orderBy('k.nama_kelas')
+                    ->get(['k.id_kelas', 'k.nama_kelas', 'k.kelompok', 'ta.nama as tahun_ajaran'])
+                : collect();
+            $data['classAssignments'] = Schema::hasTable('guru_kelas') && Schema::hasTable('kelas')
+                ? DB::table('guru_kelas as gk')
+                    ->join('guru as g', 'g.id_guru', '=', 'gk.id_guru')
+                    ->join('kelas as k', 'k.id_kelas', '=', 'gk.id_kelas')
+                    ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+                    ->where('ta.is_aktif', true)
+                    ->orderBy('k.nama_kelas')
+                    ->orderBy('gk.peran')
+                    ->get(['gk.id_kelas', 'gk.id_guru', 'gk.peran', 'g.nama_lengkap', 'k.nama_kelas', 'k.kelompok'])
+                : collect();
+        }
+
+        if ($section === 'kelas' && $role === 'admin' && Schema::hasTable('kelas')) {
+            $data['schoolYears'] = Schema::hasTable('tahun_ajaran')
+                ? DB::table('tahun_ajaran')->orderByDesc('tahun_mulai')->get()
+                : collect();
+            $teacherCols = ['id_guru', 'nama_lengkap'];
+            if (Schema::hasColumn('guru', 'gelar_belakang')) {
+                $teacherCols[] = 'gelar_belakang';
+            }
+            if (Schema::hasColumn('guru', 'jabatan')) {
+                $teacherCols[] = 'jabatan';
+            }
+            $data['teachers'] = Schema::hasTable('guru')
+                ? DB::table('guru')
+                    ->when(Schema::hasColumn('guru', 'status'), fn ($q) => $q->where('status', 'Aktif'))
+                    ->orderBy('nama_lengkap')
+                    ->get($teacherCols)
+                : collect();
+            $classCols = ['k.id_kelas', 'k.id_tahun_ajaran', 'k.kelompok', 'k.nama_kelas', 'ta.nama as tahun_ajaran'];
+            if (Schema::hasColumn('kelas', 'kapasitas')) {
+                $classCols[] = 'k.kapasitas';
+            }
+            $managedClassesQuery = DB::table('kelas as k')
+                ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+                ->select($classCols)
+                ->orderByDesc('ta.tahun_mulai')
+                ->orderBy('k.kelompok')
+                ->orderBy('k.nama_kelas');
+            if (Schema::hasTable('guru_kelas')) {
+                $managedClassesQuery->selectSub(
+                    DB::table('guru_kelas as gk')
+                        ->whereColumn('gk.id_kelas', 'k.id_kelas')
+                        ->where('gk.peran', 'Wali Kelas')
+                        ->limit(1)
+                        ->select('gk.id_guru'),
+                    'id_wali_kelas'
+                );
+            }
+            $data['managedClasses'] = $managedClassesQuery->get();
+        }
+
+        if ($section === 'duplikat-siswa' && $role === 'admin') {
+            $data['allStudents'] = Schema::hasTable('siswa')
+                ? DB::table('siswa')->orderBy('nama_lengkap')->get(['id_siswa', 'nama_lengkap', 'tanggal_lahir', 'id_keluarga'])
+                : collect();
+            $data['students'] = $data['allStudents'];
+
+            if (Schema::hasTable('keluarga')) {
+                $dupFamilyQuery = DB::table('keluarga as f')->orderBy('f.id_keluarga');
+                if (Schema::hasTable('v_keluarga_lengkap')) {
+                    $dupFamilyQuery->leftJoin('v_keluarga_lengkap as vf', 'vf.id_keluarga', '=', 'f.id_keluarga')
+                        ->select([
+                            'f.id_keluarga',
+                            'f.no_kk',
+                            'f.alamat',
+                            DB::raw("CONCAT_WS(' / ', vf.nama_ayah, vf.nama_ibu) as wali_names"),
+                            DB::raw('COALESCE(vf.jumlah_anak, 0) as jumlah_siswa'),
+                        ]);
+                } else {
+                    $dupFamilyQuery->select([
+                        'f.id_keluarga',
+                        DB::raw("'' as no_kk"),
+                        DB::raw("'' as alamat"),
+                        DB::raw("'' as wali_names"),
+                        DB::raw('0 as jumlah_siswa'),
+                    ]);
+                }
+                $data['allFamilies'] = $dupFamilyQuery->get();
+                $data['families'] = $data['allFamilies'];
+            }
         }
 
         if ($section === 'tugas') {
-            if ($role === 'teacher') {
-                $data['submissions'] = DB::table('pengumpulan_tugas as pt')
+            if (in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('pengumpulan_tugas')) {
+                $submissionsQuery = DB::table('pengumpulan_tugas as pt')
                     ->join('tugas as t', 't.id_tugas', '=', 'pt.id_tugas')
                     ->join('rombel_siswa as r', 'r.id_rombel', '=', 'pt.id_rombel')
                     ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
-                    ->whereIn('t.id_kelas', $scope['classIds'])
-                    ->orderByDesc('pt.dikumpulkan_pada')
-                    ->get([
-                        'pt.id_pengumpulan',
-                        't.id_kelas',
-                        't.judul',
-                        's.nama_lengkap',
-                        'pt.dikumpulkan_pada',
-                        DB::raw("CASE WHEN pt.nilai IS NULL THEN 'Menunggu Penilaian' ELSE 'Dinilai' END as status"),
-                        'pt.nilai',
-                        'pt.umpan_balik',
-                        'pt.file_path',
-                    ]);
+                    ->orderByDesc('pt.dikumpulkan_pada');
+                if ($role === 'teacher') {
+                    $submissionsQuery->whereIn('t.id_kelas', $scope['classIds']);
+                }
+                $data['submissions'] = $submissionsQuery->get([
+                    'pt.id_pengumpulan',
+                    't.id_kelas',
+                    't.judul',
+                    's.nama_lengkap',
+                    'pt.dikumpulkan_pada',
+                    DB::raw("CASE WHEN pt.nilai IS NULL THEN 'Menunggu Penilaian' ELSE 'Dinilai' END as status"),
+                    'pt.nilai',
+                    'pt.umpan_balik',
+                    'pt.file_path',
+                ]);
             } elseif ($role === 'parent') {
                 $data['parentTasks'] = DB::table('tugas as t')
                     ->join('rombel_siswa as r', 'r.id_kelas', '=', 't.id_kelas')
@@ -652,22 +898,57 @@ class SchoolDataController extends Controller
             }
         }
 
-        if ($section === 'nilai' && $role === 'teacher') {
-            $data['indicators'] = DB::table('indikator_iqro')->orderBy('kelompok')->orderBy('urutan')->get([
-                'id_indikator', 'kelompok', 'kategori', 'nama',
+        if ($section === 'nilai' && in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('indikator_iqro')) {
+            $indicatorsQuery = DB::table('indikator_iqro')->orderBy('kelompok')->orderBy('urutan');
+            if ($role === 'teacher') {
+                $teacherGroups = $data['classes']->pluck('kelompok')->unique()->values()->all();
+                if ($teacherGroups !== []) {
+                    $indicatorsQuery->whereIn('kelompok', $teacherGroups);
+                }
+            }
+            $data['indicators'] = $indicatorsQuery->get([
+                'id_indikator', 'kelompok', 'kategori', 'nama', 'urutan',
             ]);
         }
 
-        if ($section === 'rapor' && $role === 'parent') {
-            $data['parentReports'] = DB::table('v_rapor_lengkap')
-                ->whereIn('id_siswa', $scope['studentIds'])
-                ->whereNotNull('id_rapor')
-                ->orderByDesc('tanggal_rapor')
-                ->get([
-                    'id_rapor', 'id_siswa', 'nama_lengkap', 'semester', 'status',
-                    'narasi_agama_budi_pekerti', 'narasi_jati_diri',
-                    'narasi_literasi_steam', 'narasi_p5', 'refleksi_orang_tua',
-                ]);
+        if ($section === 'rapor') {
+            $reportColumns = [
+                'id_rapor', 'id_rombel', 'id_siswa', 'nama_lengkap', 'nama_kelas', 'kelompok', 'tahun_ajaran',
+                'semester', 'status', 'tanggal_rapor', 'tinggi_badan', 'berat_badan',
+                'sakit', 'izin', 'tanpa_keterangan',
+                'narasi_agama_budi_pekerti', 'narasi_jati_diri',
+                'narasi_literasi_steam', 'narasi_p5', 'refleksi_orang_tua',
+                'guru_kelas', 'guru_iqro', 'kepala_sekolah',
+            ];
+            if ($role === 'parent') {
+                $data['parentReports'] = DB::table('v_rapor_lengkap')
+                    ->whereIn('id_siswa', $scope['studentIds'])
+                    ->whereNotNull('id_rapor')
+                    ->orderByDesc('tanggal_rapor')
+                    ->get($reportColumns);
+            } elseif (in_array($role, ['teacher', 'principal', 'admin'], true)) {
+                $detailedReportsQuery = DB::table('v_rapor_lengkap')
+                    ->whereNotNull('id_rapor')
+                    ->orderByDesc('tanggal_rapor');
+                if ($role === 'teacher') {
+                    $detailedReportsQuery->whereIn('id_siswa', $scope['studentIds']);
+                }
+                $data['detailedReports'] = $detailedReportsQuery->get($reportColumns);
+                if (in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('guru')) {
+                    $iqroCols = ['id_guru', 'nama_lengkap'];
+                    if (Schema::hasColumn('guru', 'gelar_belakang')) {
+                        $iqroCols[] = 'gelar_belakang';
+                    }
+                    if (Schema::hasColumn('guru', 'jabatan')) {
+                        $iqroCols[] = 'jabatan';
+                    }
+                    $data['teachers'] = DB::table('guru')
+                        ->when(Schema::hasColumn('guru', 'status'), fn ($q) => $q->where('status', 'Aktif'))
+                        ->orderBy('nama_lengkap')
+                        ->get($iqroCols);
+                    $data['iqroTeachers'] = $data['teachers'];
+                }
+            }
         }
 
         if ($section === 'kegiatan') {
@@ -759,6 +1040,14 @@ class SchoolDataController extends Controller
                     'id_pembayaran', 'no_kuitansi', 'tanggal_bayar',
                     'metode', 'total_bayar',
                 ]);
+            $data['cancellablePayments'] = DB::table('v_pembayaran_detail')
+                ->whereIn('status', ['Terverifikasi', 'Menunggu Verifikasi'])
+                ->orderByDesc('tanggal_bayar')
+                ->limit(30)
+                ->get([
+                    'id_pembayaran', 'no_kuitansi', 'tanggal_bayar',
+                    'metode', 'status', 'total_bayar',
+                ]);
         }
 
         if ($section === 'kegiatan' && $role === 'admin') {
@@ -782,7 +1071,9 @@ class SchoolDataController extends Controller
         }
 
         if ($section === 'pembayaran') {
-            $data['paymentSettings'] = DB::table('payment_settings')->where('id', 1)->first();
+            $data['paymentSettings'] = Schema::hasTable('payment_settings')
+                ? DB::table('payment_settings')->where('id', 1)->first()
+                : null;
             $data['payableBills'] = collect($data['bills'] ?? [])
                 ->filter(fn (object $bill): bool => (float) $bill->sisa > 0)
                 ->values();
@@ -961,14 +1252,24 @@ class SchoolDataController extends Controller
     private function customModuleDefinition(string $section): ?array
     {
         return match ($section) {
-            'kelas' => ['title' => 'Data Kelas', 'description' => 'Kelas, tahun ajaran, dan siswa aktif.', 'columns' => [
-                'nama_kelas' => 'Nama kelas', 'kelompok' => 'Kelompok', 'tahun_ajaran' => 'Tahun ajaran',
-                'wali_kelas' => 'Wali kelas', 'jumlah_siswa' => 'Siswa aktif',
-            ]],
-            'pembelajaran' => ['title' => 'Rencana Pembelajaran', 'description' => 'Rencana pembelajaran berdasarkan kelas dan guru.', 'columns' => [
-                'tanggal' => 'Tanggal', 'nama_kelas' => 'Kelas', 'tema' => 'Tema', 'subtema' => 'Subtema',
-                'nama_guru' => 'Guru', 'status' => 'Status',
-            ]],
+            'kelas' => ['title' => 'Data Kelas', 'description' => 'Kelas, kapasitas, tahun ajaran, dan siswa aktif.', 'columns' => array_filter([
+                'nama_kelas' => 'Nama kelas',
+                'kelompok' => 'Kelompok',
+                'tahun_ajaran' => 'Tahun ajaran',
+                'wali_kelas' => 'Wali kelas',
+                'kapasitas' => Schema::hasColumn('kelas', 'kapasitas') ? 'Kapasitas' : null,
+                'jumlah_siswa' => 'Siswa aktif',
+            ])],
+            'pembelajaran' => ['title' => 'Rencana Pembelajaran', 'description' => 'Rencana pembelajaran berdasarkan kelas dan guru.', 'columns' => array_filter([
+                'tanggal' => 'Tanggal',
+                'jenis' => Schema::hasColumn('rencana_pembelajaran', 'jenis') ? 'Jenis' : null,
+                'nama_kelas' => 'Kelas',
+                'tema' => 'Tema',
+                'subtema' => 'Subtema',
+                'tujuan' => Schema::hasColumn('rencana_pembelajaran', 'tujuan') ? 'Tujuan & kegiatan' : null,
+                'nama_guru' => 'Guru',
+                'status' => 'Status',
+            ])],
             'nilai' => ['title' => 'Nilai Iqro', 'description' => 'Capaian indikator Iqro tiap siswa dan semester.', 'columns' => [
                 'nama_lengkap' => 'Nama siswa', 'kategori' => 'Kategori', 'indikator' => 'Indikator',
                 'semester_1' => 'Ganjil', 'semester_2' => 'Genap',
@@ -1121,18 +1422,23 @@ class SchoolDataController extends Controller
 
     private function classQuery(array $scope, string $role): Builder
     {
+        $select = [
+            'k.nama_kelas',
+            'k.kelompok',
+            'ta.nama as tahun_ajaran',
+            'g.nama_lengkap as wali_kelas',
+        ];
+        if (Schema::hasColumn('kelas', 'kapasitas')) {
+            $select[] = 'k.kapasitas';
+        }
+
         $query = DB::table('kelas as k')
             ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
             ->leftJoin('guru_kelas as gk', function ($join): void {
                 $join->on('gk.id_kelas', '=', 'k.id_kelas')->where('gk.peran', '=', 'Wali Kelas');
             })
             ->leftJoin('guru as g', 'g.id_guru', '=', 'gk.id_guru')
-            ->select([
-                'k.nama_kelas',
-                'k.kelompok',
-                'ta.nama as tahun_ajaran',
-                'g.nama_lengkap as wali_kelas',
-            ])
+            ->select($select)
             ->selectSub(
                 DB::table('rombel_siswa as r')
                     ->selectRaw('COUNT(*)')
@@ -1150,17 +1456,25 @@ class SchoolDataController extends Controller
 
     private function lessonQuery(array $scope, string $role): Builder
     {
+        $select = [
+            'rp.tanggal',
+            'k.nama_kelas',
+            'rp.tema',
+            'rp.subtema',
+            'g.nama_lengkap as nama_guru',
+            'rp.status',
+        ];
+        if (Schema::hasColumn('rencana_pembelajaran', 'jenis')) {
+            $select[] = 'rp.jenis';
+        }
+        if (Schema::hasColumn('rencana_pembelajaran', 'tujuan')) {
+            $select[] = 'rp.tujuan';
+        }
+
         $query = DB::table('rencana_pembelajaran as rp')
             ->join('kelas as k', 'k.id_kelas', '=', 'rp.id_kelas')
             ->join('guru as g', 'g.id_guru', '=', 'rp.id_guru')
-            ->select([
-                'rp.tanggal',
-                'k.nama_kelas',
-                'rp.tema',
-                'rp.subtema',
-                'g.nama_lengkap as nama_guru',
-                'rp.status',
-            ]);
+            ->select($select);
 
         if ($role === 'teacher') {
             $query->whereIn('rp.id_kelas', $scope['classIds'])
@@ -1245,13 +1559,17 @@ class SchoolDataController extends Controller
 
     private function parentPaymentsQuery(array $scope): Builder
     {
+        $receiptExpr = DB::connection()->getDriverName() === 'mysql'
+            ? 'fn_no_kuitansi(p.id_pembayaran, p.tanggal_bayar)'
+            : "'KWT-' || COALESCE(strftime('%Y', p.tanggal_bayar), '2026') || '-' || printf('%05d', p.id_pembayaran)";
+
         return DB::table('pembayaran as p')
             ->join('alokasi_pembayaran as a', 'a.id_pembayaran', '=', 'p.id_pembayaran')
             ->join('tagihan as t', 't.id_tagihan', '=', 'a.id_tagihan')
             ->join('rombel_siswa as r', 'r.id_rombel', '=', 't.id_rombel')
             ->whereIn('r.id_siswa', $scope['studentIds'])
             ->select([
-                'p.id_pembayaran as no_kuitansi',
+                DB::raw("{$receiptExpr} as no_kuitansi"),
                 'p.tanggal_bayar',
                 'p.metode',
                 'p.status',
