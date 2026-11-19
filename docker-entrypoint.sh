@@ -99,7 +99,10 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan migrate --force || echo "[entrypoint] Migration skipped or already satisfied."
 fi
 
+# Re-apply ownership after root artisan commands so www-data can write cache/sessions/logs
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
 php-fpm -t
-php-fpm -D
+php-fpm -F &
 nginx -t
 exec nginx -g "daemon off;"
