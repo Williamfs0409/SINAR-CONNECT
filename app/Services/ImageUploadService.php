@@ -12,6 +12,35 @@ class ImageUploadService
 {
     private const MAX_DIMENSION = 1920;
 
+    private const MAX_PIXELS = 50_000_000;
+
+    private function ensureMemoryFor(int $pixels): void
+    {
+        $required = (int) ($pixels * 6) + 64 * 1024 * 1024;
+        $current = $this->memoryLimitBytes();
+
+        if ($current !== -1 && $current < $required) {
+            ini_set('memory_limit', (string) $required);
+        }
+    }
+
+    private function memoryLimitBytes(): int
+    {
+        $limit = trim((string) ini_get('memory_limit'));
+        if ($limit === '' || $limit === '-1') {
+            return -1;
+        }
+
+        $value = (int) $limit;
+
+        return match (strtolower(substr($limit, -1))) {
+            'g' => $value * 1024 * 1024 * 1024,
+            'm' => $value * 1024 * 1024,
+            'k' => $value * 1024,
+            default => $value,
+        };
+    }
+
     public function store(UploadedFile $file, string $directory, string $inputName = 'file'): string
     {
         $imageInfo = @getimagesize($file->getPathname());
@@ -21,10 +50,23 @@ class ImageUploadService
             return $this->storeOriginal($file, $directory);
         }
 
-        if ($imageInfo[0] * $imageInfo[1] > 20_000_000) {
+        $pixels = $imageInfo[0] * $imageInfo[1];
+        if ($pixels > self::MAX_PIXELS) {
             throw ValidationException::withMessages([
-                $inputName => 'Resolusi gambar terlalu tinggi. Kecilkan ukuran gambar lalu unggah kembali.',
+                $inputName => sprintf(
+                    'Resolusi gambar %d×%d (%s MP) melebihi batas %d MP. Pilih foto lain atau kecilkan ukurannya.',
+                    $imageInfo[0],
+                    $imageInfo[1],
+                    number_format($pixels / 1_000_000, 1, ',', '.'),
+                    self::MAX_PIXELS / 1_000_000,
+                ),
             ]);
+        }
+
+        // Foto kamera HP modern (12–50 MP) diperkecil otomatis menjadi maks. 1920 px,
+        // sehingga butuh memori ekstra sementara saat proses resize.
+        if ($pixels > 12_000_000) {
+            $this->ensureMemoryFor($pixels);
         }
 
         if (! function_exists('imagecreatefromstring')

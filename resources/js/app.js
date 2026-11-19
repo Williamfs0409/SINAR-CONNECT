@@ -675,3 +675,412 @@ document.querySelectorAll('[data-iqro-roster-select]').forEach((rosterSelect) =>
     rosterSelect.addEventListener('change', syncIndicators);
     syncIndicators();
 });
+
+document.querySelectorAll('[data-attendance-date-input]').forEach((dateInput) => {
+    dateInput.addEventListener('change', () => {
+        dateInput.closest('form')?.requestSubmit();
+    });
+});
+
+document.querySelectorAll('[data-attendance-select-all]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const targetStatus = button.dataset.attendanceSelectAll;
+        const panel = button.closest('.database-action-panel') ?? document;
+        panel.querySelectorAll(`input[type="radio"][value="${targetStatus}"]`).forEach((radio) => {
+            radio.checked = true;
+        });
+    });
+});
+
+/* --------------------------------------------------------------------------
+ * Validasi unggahan instan: begitu file dipilih, langsung tampil
+ * "melebihi batas" bila ukuran/resolusi terlalu besar, dan form tidak dikirim.
+ * ------------------------------------------------------------------------ */
+const MAX_IMAGE_MEGAPIXELS = 50;
+
+const formatBytes = (bytes) => {
+    const megabytes = bytes / (1024 * 1024);
+    const number = new Intl.NumberFormat('id-ID', { maximumFractionDigits: megabytes >= 1 ? 1 : 0 });
+
+    return megabytes >= 1 ? `${number.format(megabytes)} MB` : `${number.format(bytes / 1024)} KB`;
+};
+
+const readImageSize = (file) => new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+        resolve(null);
+        return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+        resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        URL.revokeObjectURL(url);
+    };
+    image.onerror = () => {
+        resolve(null);
+        URL.revokeObjectURL(url);
+    };
+    image.src = url;
+});
+
+const acceptedExtensions = (input) => (input.getAttribute('accept') ?? '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .flatMap((item) => {
+        if (item.startsWith('.')) return [item.slice(1)];
+        if (item === 'image/jpeg') return ['jpg', 'jpeg'];
+        if (item === 'image/png') return ['png'];
+        if (item === 'image/webp') return ['webp'];
+        if (item === 'application/pdf') return ['pdf'];
+        if (item === 'image/*') return ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        return [];
+    });
+
+document.querySelectorAll('input[type="file"][data-max-mb], input[type="file"][data-max-bytes]:not([aria-describedby])')
+    .forEach((input) => {
+        const maxBytes = input.dataset.maxMb
+            ? Number(input.dataset.maxMb) * 1024 * 1024
+            : Number(input.dataset.maxBytes);
+        const maxLabel = formatBytes(maxBytes);
+        const extensions = acceptedExtensions(input);
+
+        let feedback = input.parentElement.querySelector(':scope > .upload-feedback');
+        if (!feedback) {
+            feedback = document.createElement('small');
+            feedback.className = 'upload-feedback';
+            feedback.setAttribute('aria-live', 'polite');
+            input.insertAdjacentElement('afterend', feedback);
+        }
+        feedback.textContent = `Maksimal ${maxLabel} per file.`;
+
+        const setState = (message, state) => {
+            feedback.textContent = message;
+            feedback.classList.toggle('is-error', state === 'error');
+            feedback.classList.toggle('is-success', state === 'success');
+            input.classList.toggle('is-invalid', state === 'error');
+            input.setAttribute('aria-invalid', String(state === 'error'));
+            input.setCustomValidity(state === 'error' ? message : '');
+        };
+
+        const validate = async () => {
+            const files = Array.from(input.files ?? []);
+            if (files.length === 0) {
+                setState(`Maksimal ${maxLabel} per file.`, '');
+                return true;
+            }
+
+            const problems = [];
+            for (const file of files) {
+                const extension = file.name.split('.').pop().toLowerCase();
+                if (extensions.length > 0 && !extensions.includes(extension)) {
+                    problems.push(`${file.name}: format .${extension} tidak didukung (gunakan ${extensions.join(', ').toUpperCase()}).`);
+                    continue;
+                }
+                if (file.size > maxBytes) {
+                    problems.push(`${file.name} berukuran ${formatBytes(file.size)} — melebihi batas maksimal ${maxLabel}.`);
+                    continue;
+                }
+                const size = await readImageSize(file);
+                if (size && (size.width * size.height) / 1_000_000 > MAX_IMAGE_MEGAPIXELS) {
+                    const megapixels = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 })
+                        .format((size.width * size.height) / 1_000_000);
+                    problems.push(`${file.name} beresolusi ${size.width}×${size.height} (${megapixels} MP) — melebihi batas ${MAX_IMAGE_MEGAPIXELS} MP.`);
+                }
+            }
+
+            if (problems.length > 0) {
+                setState(`✕ ${problems.join(' ')}`, 'error');
+                return false;
+            }
+
+            const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+            setState(
+                files.length === 1
+                    ? `✓ ${files[0].name} (${formatBytes(totalSize)}) siap diunggah.`
+                    : `✓ ${files.length} file (${formatBytes(totalSize)}) siap diunggah.`,
+                'success',
+            );
+            return true;
+        };
+
+        input.addEventListener('change', () => {
+            validate();
+        });
+
+        input.form?.addEventListener('submit', (event) => {
+            if (input.classList.contains('is-invalid')) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                input.closest('details')?.setAttribute('open', '');
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                input.reportValidity();
+            }
+        }, true);
+    });
+
+/* --------------------------------------------------------------------------
+ * Isian form tidak hilang saat server menolak (validasi gagal):
+ * nilai disimpan sementara saat submit, lalu dikembalikan bila ada error.
+ * ------------------------------------------------------------------------ */
+const FORM_DRAFT_KEY = 'sinar:last-submitted-form';
+
+const formSignature = (form) => {
+    const method = (form.getAttribute('method') ?? 'get').toLowerCase();
+    const sameForms = Array.from(document.querySelectorAll('form'))
+        .filter((candidate) => candidate.action === form.action
+            && (candidate.getAttribute('method') ?? 'get').toLowerCase() === method);
+
+    return `${window.location.pathname}|${form.action}|${sameForms.indexOf(form)}`;
+};
+
+const isDraftableField = (field) => field.name
+    && !['_token', '_method'].includes(field.name)
+    && !['file', 'password', 'hidden', 'submit', 'button', 'reset'].includes(field.type);
+
+document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || (form.getAttribute('method') ?? 'get').toLowerCase() !== 'post') {
+        return;
+    }
+
+    const nameCounters = {};
+    const fields = [];
+    Array.from(form.elements).filter(isDraftableField).forEach((field) => {
+        const position = nameCounters[field.name] ?? 0;
+        nameCounters[field.name] = position + 1;
+        fields.push({
+            name: field.name,
+            position,
+            value: field.value,
+            checked: field.type === 'checkbox' || field.type === 'radio' ? field.checked : null,
+        });
+    });
+
+    try {
+        sessionStorage.setItem(FORM_DRAFT_KEY, JSON.stringify({ signature: formSignature(form), fields }));
+    } catch (error) {
+        console.error('Isian form tidak dapat disimpan sementara.', error);
+    }
+});
+
+(() => {
+    let draft = null;
+    try {
+        draft = JSON.parse(sessionStorage.getItem(FORM_DRAFT_KEY) ?? 'null');
+        sessionStorage.removeItem(FORM_DRAFT_KEY);
+    } catch (error) {
+        console.error('Isian form sementara tidak dapat dibaca.', error);
+    }
+
+    const errorBox = document.querySelector('.database-form-errors, .registration-errors');
+    if (!draft || !errorBox) {
+        return;
+    }
+
+    const form = Array.from(document.querySelectorAll('form'))
+        .find((candidate) => formSignature(candidate) === draft.signature);
+    if (!form) {
+        return;
+    }
+
+    const groups = {};
+    Array.from(form.elements).filter(isDraftableField).forEach((field) => {
+        (groups[field.name] ??= []).push(field);
+    });
+
+    draft.fields.forEach(({ name, position, value, checked }) => {
+        const field = groups[name]?.[position];
+        if (!field) return;
+
+        if (checked !== null) {
+            field.checked = checked;
+        } else {
+            field.value = value;
+        }
+        field.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    form.closest('details')?.setAttribute('open', '');
+    form.querySelectorAll('details').forEach((details) => details.setAttribute('open', ''));
+
+    const inlineErrors = errorBox.cloneNode(true);
+    inlineErrors.classList.add('is-inline');
+    form.prepend(inlineErrors);
+    form.querySelectorAll('input[type="file"]').forEach((fileInput) => {
+        const feedback = fileInput.parentElement.querySelector(':scope > .upload-feedback');
+        if (feedback) {
+            feedback.textContent = 'Isian lain sudah dikembalikan. Silakan pilih ulang file-nya (browser tidak mengizinkan file disimpan otomatis).';
+            feedback.classList.remove('is-success', 'is-error');
+            feedback.classList.add('is-warning');
+        }
+    });
+    inlineErrors.scrollIntoView({ behavior: 'smooth', block: 'center' });
+})();
+
+/* Pencarian & filter peran kontak pada halaman Pesan (ala WhatsApp) */
+document.querySelectorAll('.message-contact-panel').forEach((panel) => {
+    const searchInput = panel.querySelector('[data-contact-search]');
+    const roleButtons = Array.from(panel.querySelectorAll('[data-contact-role]'));
+    const items = Array.from(panel.querySelectorAll('[data-contact-item]'));
+    const emptyState = panel.querySelector('[data-contact-search-empty]');
+    let activeRole = 'all';
+
+    const applyFilter = () => {
+        const query = (searchInput?.value ?? '').trim().toLocaleLowerCase();
+        let visibleCount = 0;
+
+        items.forEach((item) => {
+            const matchesQuery = query === '' || item.textContent.toLocaleLowerCase().includes(query);
+            const matchesRole = activeRole === 'all' || item.dataset.roleGroup === activeRole;
+            const visible = matchesQuery && matchesRole;
+            item.hidden = !visible;
+            visibleCount += Number(visible);
+        });
+
+        if (emptyState) {
+            emptyState.hidden = visibleCount !== 0 || items.length === 0;
+        }
+    };
+
+    searchInput?.addEventListener('input', applyFilter);
+    roleButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            activeRole = button.dataset.contactRole ?? 'all';
+            roleButtons.forEach((btn) => btn.classList.toggle('is-active', btn === button));
+            applyFilter();
+        });
+    });
+});
+
+/* Auto-scroll ke pesan terbaru, Enter untuk kirim, dan sinkronisasi pesan otomatis */
+const messageThread = document.querySelector('[data-message-thread]');
+if (messageThread) {
+    messageThread.scrollTop = messageThread.scrollHeight;
+
+    let lastSnapshot = '';
+    const formatDateDivider = (dateStr) => {
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+        const yesterdayDate = new Date(Date.now() - 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+        if (dateStr === today) return 'Hari ini';
+        if (dateStr === yesterdayDate) return 'Kemarin';
+        const [y, m, d] = dateStr.split('-');
+        return `${d}/${m}/${y}`;
+    };
+
+    const pollThread = async () => {
+        try {
+            const response = await fetch(messageThread.dataset.threadUrl, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            if (!response.ok) return;
+            const { messages } = await response.json();
+            const snapshot = JSON.stringify(messages);
+            if (lastSnapshot === '') {
+                lastSnapshot = snapshot;
+                return;
+            }
+            if (snapshot === lastSnapshot) return;
+            lastSnapshot = snapshot;
+
+            const wasAtBottom = messageThread.scrollHeight - messageThread.scrollTop - messageThread.clientHeight < 60;
+            const csrfToken = messageThread.dataset.csrfToken ?? '';
+            messageThread.replaceChildren();
+
+            if (messages.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'message-thread-empty';
+                empty.textContent = 'Belum ada percakapan. Kirim pesan pertama.';
+                messageThread.append(empty);
+                return;
+            }
+
+            let lastDate = null;
+            messages.forEach((msg) => {
+                if (lastDate !== msg.date) {
+                    const divider = document.createElement('div');
+                    divider.className = 'message-date-divider';
+                    const span = document.createElement('span');
+                    span.textContent = formatDateDivider(msg.date);
+                    divider.append(span);
+                    messageThread.append(divider);
+                    lastDate = msg.date;
+                }
+
+                const article = document.createElement('article');
+                article.className = `message-bubble ${msg.is_own ? 'is-own' : 'is-incoming'}`;
+
+                const p = document.createElement('p');
+                p.textContent = msg.body;
+
+                const meta = document.createElement('div');
+                meta.className = 'message-bubble-meta';
+
+                const time = document.createElement('time');
+                time.textContent = msg.time;
+                meta.append(time);
+
+                if (msg.is_own) {
+                    const tick = document.createElement('span');
+                    tick.className = `message-read-tick ${msg.read ? 'is-read' : ''}`;
+                    tick.title = msg.read ? 'Sudah dibaca' : 'Terkirim';
+                    tick.textContent = msg.read ? '✓✓' : '✓';
+                    meta.append(tick);
+
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = msg.delete_url;
+                    form.className = 'message-delete-form';
+                    form.addEventListener('submit', (e) => {
+                        if (!window.confirm('Hapus pesan ini?')) e.preventDefault();
+                    });
+
+                    const tokenInput = document.createElement('input');
+                    tokenInput.type = 'hidden';
+                    tokenInput.name = '_token';
+                    tokenInput.value = csrfToken;
+
+                    const methodInput = document.createElement('input');
+                    methodInput.type = 'hidden';
+                    methodInput.name = '_method';
+                    methodInput.value = 'DELETE';
+
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'submit';
+                    delBtn.className = 'message-delete-button';
+                    delBtn.title = 'Hapus pesan';
+                    delBtn.setAttribute('aria-label', 'Hapus pesan');
+                    delBtn.textContent = '×';
+
+                    form.append(tokenInput, methodInput, delBtn);
+                    meta.append(form);
+                }
+
+                article.append(p, meta);
+                messageThread.append(article);
+            });
+
+            if (wasAtBottom) {
+                messageThread.scrollTop = messageThread.scrollHeight;
+            }
+        } catch (error) {
+            console.error('Gagal menyinkronkan percakapan.', error);
+        }
+    };
+
+    pollThread();
+    window.setInterval(pollThread, 5000);
+}
+
+const composeForm = document.querySelector('[data-message-compose]');
+const composeTextarea = composeForm?.querySelector('textarea');
+composeTextarea?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        if (composeTextarea.value.trim() !== '') {
+            composeForm.requestSubmit();
+        }
+    }
+});

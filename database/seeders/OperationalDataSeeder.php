@@ -194,12 +194,13 @@ class OperationalDataSeeder extends Seeder
 
     private function seedAttendance(): void
     {
-        if (! Schema::hasTable('absensi') || DB::table('absensi')->count() > 0) {
+        if (! Schema::hasTable('absensi')) {
             return;
         }
 
+        $today = now('Asia/Jakarta')->toDateString();
         $adminUserId = DB::table('users')->where('role', 'admin')->value('id_user') ?? 1;
-        $dates = ['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-16', '2026-11-17'];
+        $dates = array_values(array_unique(['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-16', '2026-11-17', $today]));
         $activeRombels = DB::table('rombel_siswa as r')
             ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
             ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
@@ -211,6 +212,9 @@ class OperationalDataSeeder extends Seeder
 
         $rows = [];
         foreach ($dates as $dIdx => $date) {
+            if (DB::table('absensi')->whereDate('tanggal', $date)->exists()) {
+                continue;
+            }
             foreach ($activeRombels as $rIdx => $rombel) {
                 $mod = ($dIdx + $rIdx) % 19;
                 $status = match (true) {

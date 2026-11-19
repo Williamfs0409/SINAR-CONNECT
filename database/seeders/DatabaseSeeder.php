@@ -41,9 +41,5 @@ class DatabaseSeeder extends Seeder
 
             $this->command?->info("Administrator account created: {$email}");
         }
-
-        if (Schema::hasTable('siswa') && Schema::hasTable('tahun_ajaran')) {
-            $this->call(OperationalDataSeeder::class);
-        }
     }
 }

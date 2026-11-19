@@ -93,7 +93,7 @@
             @else
                 @include('dashboard.admin-feature')
             @endif
-            <footer class="dashboard-footer">© {{ now()->format('Y') }} TK Cerdas Ceria <span>Belajar · Bermain · Tumbuh</span></footer>
+            <footer class="dashboard-footer">© {{ now()->format('Y') }} TK Swasta Najmah Rugayah Darus Medan <span>Belajar · Bermain · Tumbuh</span></footer>
         </div>
     </main>
 </div>

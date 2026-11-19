@@ -845,7 +845,11 @@ class SchoolFeatureController extends Controller
             'deskripsi' => ['nullable', 'string', 'max:5000'],
             'tanggal_diberikan' => ['required', 'date', 'before_or_equal:today'],
             'tenggat' => ['required', 'date', 'after_or_equal:tanggal_diberikan'],
-            'lampiran' => ['nullable', 'file', 'max:10240'],
+            'lampiran' => ['nullable', 'file', 'max:5120'],
+        ], [
+            'lampiran.max' => 'Ukuran lampiran tugas melebihi batas maksimal 5 MB.',
+            'lampiran.uploaded' => 'Lampiran gagal diunggah. Pastikan ukurannya tidak melebihi 5 MB.',
+            'tenggat.after_or_equal' => 'Tenggat harus sama atau setelah tanggal diberikan.',
         ]);
 
         $schoolClass = DB::table('kelas')->where('id_kelas', $data['id_kelas'])->first();
@@ -890,7 +894,10 @@ class SchoolFeatureController extends Controller
         $data = $request->validate([
             'id_siswa' => ['required', 'integer'],
             'catatan_ortu' => ['nullable', 'string', 'max:255'],
-            'file' => ['nullable', 'file', 'max:10240'],
+            'file' => ['nullable', 'file', 'max:5120'],
+        ], [
+            'file.max' => 'Ukuran file tugas melebihi batas maksimal 5 MB.',
+            'file.uploaded' => 'File gagal diunggah. Pastikan ukurannya tidak melebihi 5 MB.',
         ]);
 
         $familyId = $this->familyId($user);
@@ -1100,6 +1107,10 @@ class SchoolFeatureController extends Controller
             'tanggal' => ['required', 'date', 'before_or_equal:today'],
             'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'narasi' => ['required', 'string', 'max:5000'],
+        ], [
+            'foto.max' => 'Ukuran foto melebihi batas maksimal 5 MB.',
+            'foto.image' => 'File yang dipilih harus berupa gambar (JPG, PNG, atau WEBP).',
+            'foto.mimes' => 'Format foto harus JPG, PNG, atau WEBP.',
         ]);
         $teacherId = $this->resolveTeacherIdForRoster($user, (int) $data['id_rombel']);
         $path = $this->imageUploads->store($request->file('foto'), 'portofolio', 'foto');
@@ -1234,6 +1245,11 @@ class SchoolFeatureController extends Controller
             'keterangan' => ['nullable', 'string', 'max:255'],
             'foto' => ['required', 'array', 'min:1', 'max:10'],
             'foto.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'foto.max' => 'Maksimal 10 foto per unggahan.',
+            'foto.*.max' => 'Salah satu foto melebihi batas maksimal 5 MB per foto.',
+            'foto.*.image' => 'Semua file harus berupa gambar (JPG, PNG, atau WEBP).',
+            'foto.*.mimes' => 'Format foto harus JPG, PNG, atau WEBP.',
         ]);
         if ($user->role === 'teacher') {
             $teacherId = $this->teacherId($user);
@@ -1428,6 +1444,10 @@ class SchoolFeatureController extends Controller
                 'max:5120',
             ],
             'catatan' => ['nullable', 'string', 'max:255'],
+        ], [
+            'bukti_transfer.max' => 'Ukuran bukti transfer melebihi batas maksimal 5 MB.',
+            'bukti_transfer.mimes' => 'Bukti transfer harus berformat JPG, PNG, atau PDF.',
+            'bukti_transfer.required' => 'Bukti transfer wajib diunggah untuk pembayaran transfer.',
         ]);
 
         $familyId = $user->role === 'parent' ? $this->familyId($user) : null;
@@ -2285,6 +2305,358 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Data keluarga ganda berhasil digabungkan.');
     }
 
+    public function destroyTeacher(int $teacherId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $teacher = DB::table('guru')->where('id_guru', $teacherId)->first();
+        abort_unless($teacher !== null, 404);
+
+        $this->assertNoDeleteDependencies($teacherId, [
+            ['guru_kelas', 'id_guru', 'penugasan kelas'],
+            ['rencana_pembelajaran', 'id_guru', 'rencana pembelajaran'],
+            ['tugas', 'id_guru', 'data tugas'],
+            ['portofolio', 'id_guru', 'portofolio siswa'],
+            ['rapor', 'id_guru_kelas', 'rapor siswa'],
+        ], 'data guru');
+
+        DB::table('guru')->where('id_guru', $teacherId)->delete();
+
+        return back()->with('status', 'Data guru berhasil dihapus.');
+    }
+
+    public function destroyClass(int $classId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $schoolClass = DB::table('kelas')->where('id_kelas', $classId)->first();
+        abort_unless($schoolClass !== null, 404);
+
+        $this->assertNoDeleteDependencies($classId, [
+            ['rombel_siswa', 'id_kelas', 'data rombel siswa'],
+            ['guru_kelas', 'id_kelas', 'penugasan wali kelas'],
+            ['rencana_pembelajaran', 'id_kelas', 'rencana pembelajaran'],
+            ['tugas', 'id_kelas', 'data tugas'],
+            ['kegiatan_kelas', 'id_kelas', 'kegiatan kelas'],
+        ], 'data kelas');
+
+        DB::table('kelas')->where('id_kelas', $classId)->delete();
+
+        return back()->with('status', 'Data kelas berhasil dihapus.');
+    }
+
+    public function destroyTariff(int $tariffId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $tariff = DB::table('tarif')->where('id_tarif', $tariffId)->first();
+        abort_unless($tariff !== null, 404);
+
+        DB::table('tarif')->where('id_tarif', $tariffId)->delete();
+
+        return back()->with('status', 'Tarif biaya berhasil dihapus.');
+    }
+
+    public function updateLessonPlan(Request $request, int $lessonPlanId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $plan = DB::table('rencana_pembelajaran')->where('id_rencana', $lessonPlanId)->first();
+        abort_unless($plan !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $this->assertTeacherClass($this->teacherId($user), (int) $plan->id_kelas);
+        }
+
+        $data = $request->validate([
+            'tanggal' => ['required', 'date'],
+            'jenis' => ['nullable', Rule::in(['RPPH', 'RPPM', 'Modul Ajar'])],
+            'tema' => ['required', 'string', 'max:150'],
+            'subtema' => ['nullable', 'string', 'max:150'],
+            'tujuan' => ['nullable', 'string', 'max:5000'],
+            'kegiatan' => ['nullable', 'string', 'max:5000'],
+            'alat_bahan' => ['nullable', 'string', 'max:5000'],
+            'status' => ['required', Rule::in(['Draft', 'Final'])],
+        ]);
+
+        $payload = [
+            'tanggal' => $data['tanggal'],
+            'tema' => $data['tema'],
+            'subtema' => $data['subtema'] ?? null,
+            'tujuan' => $data['tujuan'] ?? null,
+            'kegiatan' => $data['kegiatan'] ?? null,
+            'alat_bahan' => $data['alat_bahan'] ?? null,
+            'status' => $data['status'],
+            'updated_at' => now(),
+        ];
+        if (Schema::hasColumn('rencana_pembelajaran', 'jenis') && filled($data['jenis'] ?? null)) {
+            $payload['jenis'] = $data['jenis'];
+        }
+
+        DB::table('rencana_pembelajaran')->where('id_rencana', $lessonPlanId)->update($payload);
+
+        return back()->with('status', 'Rencana pembelajaran berhasil diperbarui.');
+    }
+
+    public function destroyLessonPlan(int $lessonPlanId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $plan = DB::table('rencana_pembelajaran')->where('id_rencana', $lessonPlanId)->first();
+        abort_unless($plan !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $this->assertTeacherClass($this->teacherId($user), (int) $plan->id_kelas);
+        }
+
+        DB::table('rencana_pembelajaran')->where('id_rencana', $lessonPlanId)->delete();
+
+        return back()->with('status', 'Rencana pembelajaran berhasil dihapus.');
+    }
+
+    public function updateTask(Request $request, int $taskId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $task = DB::table('tugas')->where('id_tugas', $taskId)->first();
+        abort_unless($task !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $this->assertTeacherClass($this->teacherId($user), (int) $task->id_kelas);
+        }
+
+        $data = $request->validate([
+            'judul' => ['required', 'string', 'max:150'],
+            'tenggat' => ['required', 'date'],
+            'deskripsi' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        if ($data['tenggat'] < $task->tanggal_diberikan) {
+            throw ValidationException::withMessages([
+                'tenggat' => 'Tenggat tidak boleh lebih awal dari tanggal diberikan.',
+            ]);
+        }
+
+        DB::table('tugas')->where('id_tugas', $taskId)->update([
+            'judul' => $data['judul'],
+            'tenggat' => $data['tenggat'],
+            'deskripsi' => $data['deskripsi'] ?? null,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Tugas berhasil diperbarui.');
+    }
+
+    public function destroyTask(int $taskId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $task = DB::table('tugas')->where('id_tugas', $taskId)->first();
+        abort_unless($task !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $this->assertTeacherClass($this->teacherId($user), (int) $task->id_kelas);
+        }
+
+        $this->assertNoDeleteDependencies($taskId, [
+            ['pengumpulan_tugas', 'id_tugas', 'pengumpulan tugas siswa'],
+        ], 'tugas');
+
+        if ($task->lampiran) {
+            Storage::disk('local')->delete($task->lampiran);
+        }
+
+        DB::table('tugas')->where('id_tugas', $taskId)->delete();
+
+        return back()->with('status', 'Tugas berhasil dihapus.');
+    }
+
+    public function updatePortfolio(Request $request, int $portfolioId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $portfolio = DB::table('portofolio as p')
+            ->join('rombel_siswa as r', 'r.id_rombel', '=', 'p.id_rombel')
+            ->where('p.id_portofolio', $portfolioId)
+            ->first(['p.*', 'r.id_kelas']);
+        abort_unless($portfolio !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $this->assertTeacherClass($this->teacherId($user), (int) $portfolio->id_kelas);
+        }
+
+        $data = $request->validate([
+            'tanggal' => ['required', 'date', 'before_or_equal:today'],
+            'narasi' => ['required', 'string', 'max:5000'],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'foto.max' => 'Ukuran foto melebihi batas maksimal 5 MB.',
+        ]);
+
+        $photoPath = $portfolio->foto;
+        if ($request->hasFile('foto')) {
+            $newPath = $this->imageUploads->store($request->file('foto'), 'portofolio', 'foto');
+            if ($photoPath) {
+                Storage::disk('local')->delete($photoPath);
+            }
+            $photoPath = $newPath;
+        }
+
+        DB::table('portofolio')->where('id_portofolio', $portfolioId)->update([
+            'tanggal' => $data['tanggal'],
+            'narasi' => $data['narasi'],
+            'foto' => $photoPath,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Portofolio perkembangan siswa berhasil diperbarui.');
+    }
+
+    public function destroyPortfolio(int $portfolioId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $portfolio = DB::table('portofolio as p')
+            ->join('rombel_siswa as r', 'r.id_rombel', '=', 'p.id_rombel')
+            ->where('p.id_portofolio', $portfolioId)
+            ->first(['p.id_portofolio', 'p.foto', 'r.id_kelas']);
+        abort_unless($portfolio !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $this->assertTeacherClass($this->teacherId($user), (int) $portfolio->id_kelas);
+        }
+
+        if ($portfolio->foto) {
+            Storage::disk('local')->delete($portfolio->foto);
+        }
+
+        DB::table('portofolio')->where('id_portofolio', $portfolioId)->delete();
+
+        return back()->with('status', 'Portofolio perkembangan siswa berhasil dihapus.');
+    }
+
+    public function updateActivity(Request $request, int $activityId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $activity = DB::table('kegiatan')->where('id_kegiatan', $activityId)->first();
+        abort_unless($activity !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $authorized = (int) $activity->id_user_pembuat === $user->getKey()
+                || DB::table('kegiatan_kelas as kk')
+                    ->join('guru_kelas as gk', 'gk.id_kelas', '=', 'kk.id_kelas')
+                    ->where('kk.id_kegiatan', $activityId)
+                    ->where('gk.id_guru', $teacherId)
+                    ->exists();
+            abort_unless($authorized, 403);
+        }
+
+        $data = $request->validate([
+            'nama_kegiatan' => ['required', 'string', 'max:150'],
+            'jenis' => ['required', Rule::in(['Dalam Kelas', 'Luar Kelas', 'Field Trip'])],
+            'tanggal' => ['required', 'date'],
+            'lokasi' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        DB::table('kegiatan')->where('id_kegiatan', $activityId)->update([
+            'nama_kegiatan' => $data['nama_kegiatan'],
+            'jenis' => $data['jenis'],
+            'tanggal' => $data['tanggal'],
+            'lokasi' => $data['lokasi'] ?? null,
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Data kegiatan berhasil diperbarui.');
+    }
+
+    public function destroyActivity(int $activityId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $activity = DB::table('kegiatan')->where('id_kegiatan', $activityId)->first();
+        abort_unless($activity !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $authorized = (int) $activity->id_user_pembuat === $user->getKey()
+                || DB::table('kegiatan_kelas as kk')
+                    ->join('guru_kelas as gk', 'gk.id_kelas', '=', 'kk.id_kelas')
+                    ->where('kk.id_kegiatan', $activityId)
+                    ->where('gk.id_guru', $teacherId)
+                    ->exists();
+            abort_unless($authorized, 403);
+        }
+
+        $this->assertNoDeleteDependencies($activityId, [
+            ['tagihan', 'id_kegiatan', 'tagihan kegiatan siswa'],
+        ], 'kegiatan');
+
+        $photoPaths = DB::table('dokumentasi_kegiatan')
+            ->where('id_kegiatan', $activityId)
+            ->pluck('file_path')
+            ->filter()
+            ->all();
+
+        DB::transaction(function () use ($activityId): void {
+            DB::table('dokumentasi_kegiatan')->where('id_kegiatan', $activityId)->delete();
+            DB::table('kegiatan_kelas')->where('id_kegiatan', $activityId)->delete();
+            DB::table('kegiatan')->where('id_kegiatan', $activityId)->delete();
+        });
+
+        if ($photoPaths !== []) {
+            Storage::disk('local')->delete($photoPaths);
+        }
+
+        return back()->with('status', 'Kegiatan beserta dokumentasinya berhasil dihapus.');
+    }
+
+    public function updateStudentBill(Request $request, int $billId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $bill = DB::table('tagihan')->where('id_tagihan', $billId)->first();
+        abort_unless($bill !== null, 404);
+
+        $data = $request->validate([
+            'nominal' => ['required', 'numeric', 'min:0', 'max:999999999'],
+            'diskon' => ['required', 'numeric', 'min:0', 'max:999999999'],
+            'jatuh_tempo' => ['required', 'date'],
+        ]);
+
+        if ((float) $data['diskon'] > (float) $data['nominal']) {
+            throw ValidationException::withMessages([
+                'diskon' => 'Diskon tidak boleh lebih besar dari nominal tagihan.',
+            ]);
+        }
+
+        $paidAmount = (float) DB::table('alokasi_pembayaran as ap')
+            ->join('pembayaran as p', 'p.id_pembayaran', '=', 'ap.id_pembayaran')
+            ->where('ap.id_tagihan', $billId)
+            ->where('p.status', 'Terverifikasi')
+            ->sum('ap.jumlah');
+
+        $newTotal = (float) $data['nominal'] - (float) $data['diskon'];
+        if ($newTotal < $paidAmount) {
+            throw ValidationException::withMessages([
+                'nominal' => 'Total tagihan baru tidak boleh lebih kecil dari jumlah yang sudah dibayar (Rp '.number_format($paidAmount, 0, ',', '.').').',
+            ]);
+        }
+
+        DB::table('tagihan')->where('id_tagihan', $billId)->update([
+            'nominal' => $data['nominal'],
+            'diskon' => $data['diskon'],
+            'jatuh_tempo' => $data['jatuh_tempo'],
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Tagihan siswa berhasil diperbarui.');
+    }
+
+    public function destroyStudentBill(int $billId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $bill = DB::table('tagihan')->where('id_tagihan', $billId)->first();
+        abort_unless($bill !== null, 404);
+
+        $this->assertNoDeleteDependencies($billId, [
+            ['alokasi_pembayaran', 'id_tagihan', 'riwayat alokasi pembayaran'],
+        ], 'tagihan');
+
+        DB::table('tagihan')->where('id_tagihan', $billId)->delete();
+
+        return back()->with('status', 'Tagihan siswa berhasil dihapus.');
+    }
+
     private function calculateRosterDiscount(?int $discountId, float $nominal): float
     {
         if (! $discountId || ! Schema::hasTable('diskon')) {
@@ -2341,7 +2713,7 @@ class SchoolFeatureController extends Controller
             if ($waliId) {
                 return (int) $waliId;
             }
-        }
+         }
         if (Schema::hasTable('guru_kelas')) {
             $assignedId = DB::table('guru_kelas')->where('id_kelas', $classId)->value('id_guru');
             if ($assignedId) {

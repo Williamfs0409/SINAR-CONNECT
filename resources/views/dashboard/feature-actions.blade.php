@@ -76,59 +76,12 @@
 @if ($section === 'siswa' && $role === 'admin')
     <section class="database-action-panel">
         <div class="database-section-heading">
-            <div><h2>Tambah siswa baru</h2><p>Daftarkan siswa baru ke keluarga yang sudah ada atau buat keluarga baru sekaligus menempatkan kelas aktif.</p></div>
+            <div>
+                <h2>Pendaftaran siswa baru</h2>
+                <p>Calon siswa baru didaftarkan langsung oleh orang tua melalui formulir PPDB daring, lalu diverifikasi dan diterima oleh admin pada menu Pendaftaran.</p>
+            </div>
+            <a class="database-button database-button-secondary" href="{{ route('dashboard.feature', ['section' => 'pendaftaran']) }}">Buka Pendaftaran →</a>
         </div>
-        <details class="database-student-editor">
-            <summary>Buka formulir tambah siswa baru</summary>
-            <form method="POST" action="{{ route('database.student.store') }}" class="database-form-grid">
-                @csrf
-                <label>Nama lengkap siswa<input name="nama_lengkap" maxlength="100" required></label>
-                <label>Nama panggilan<input name="nama_panggilan" maxlength="100"></label>
-                <label>NIK (16 digit)<input name="nik" maxlength="16" pattern="[0-9]{16}" placeholder="16 digit angka"></label>
-                <label>NISN (10 digit)<input name="nisn" maxlength="10" pattern="[0-9]{10}" placeholder="10 digit angka"></label>
-                <label>Nomor induk<input name="no_induk" maxlength="30"></label>
-                <label>Tempat lahir<input name="tempat_lahir" maxlength="100"></label>
-                <label>Tanggal lahir<input type="date" name="tanggal_lahir" max="{{ now()->toDateString() }}" required></label>
-                <label>Jenis kelamin
-                    <select name="jenis_kelamin" required>
-                        <option value="Laki-Laki">Laki-laki</option>
-                        <option value="Perempuan">Perempuan</option>
-                    </select>
-                </label>
-                <label>Agama<input name="agama" value="Islam" maxlength="30"></label>
-                <label>Anak ke-<input type="number" name="anak_ke" min="1" max="20"></label>
-                <label>Keluarga terdaftar (opsional)
-                    <select name="id_keluarga">
-                        <option value="">— Buat keluarga baru di bawah —</option>
-                        @foreach ($actions['families'] ?? [] as $family)
-                            <option value="{{ $family->id_keluarga }}">Keluarga #{{ $family->id_keluarga }}{{ $family->wali_names ? ' · '.$family->wali_names : '' }}{{ $family->no_kk ? ' (KK '.$family->no_kk.')' : '' }}</option>
-                        @endforeach
-                    </select>
-                </label>
-                <label>Nomor KK baru (jika keluarga baru)<input name="no_kk" maxlength="16" pattern="[0-9]{16}"></label>
-                <label>Nama Ayah (jika keluarga baru)<input name="nama_ayah" maxlength="100"></label>
-                <label>Nama Ibu (jika keluarga baru)<input name="nama_ibu" maxlength="100"></label>
-                <label>No. HP keluarga baru<input name="nomor_telepon" maxlength="16"></label>
-                <label>Penempatan kelas aktif
-                    <select name="id_kelas">
-                        <option value="">— Pilih kelas —</option>
-                        @foreach ($actions['activeClasses'] ?? [] as $activeClass)
-                            <option value="{{ $activeClass->id_kelas }}">{{ $activeClass->nama_kelas }} · {{ $activeClass->kelompok }} (kapasitas {{ $activeClass->kapasitas }})</option>
-                        @endforeach
-                    </select>
-                </label>
-                <label>Kategori diskon SPP
-                    <select name="id_diskon">
-                        <option value="">Tanpa diskon</option>
-                        @foreach ($actions['discounts'] ?? [] as $discount)
-                            <option value="{{ $discount->id_diskon }}">{{ $discount->nama }} ({{ ($discount->tipe ?? $discount->jenis ?? '') === 'Persen' ? $discount->nilai.'%' : 'Rp'.number_format($discount->nilai, 0, ',', '.') }})</option>
-                        @endforeach
-                    </select>
-                </label>
-                <label class="database-form-wide">Alamat domisili<textarea name="alamat_domisili" rows="2" maxlength="2000"></textarea></label>
-                <div class="database-form-wide"><button class="database-button" type="submit">Tambah siswa</button></div>
-            </form>
-        </details>
     </section>
 
     @if (($actions['studentPlacements'] ?? collect())->isNotEmpty() && ($actions['activeClasses'] ?? collect())->isNotEmpty())
@@ -567,49 +520,133 @@
 @endif
 
 @if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true))
+    @php
+        $selectableClasses = ($actions['attendanceClasses'] ?? $classOptions)->values();
+        $currentAttendanceDate = $actions['attendanceDate'] ?? now()->toDateString();
+        $selectedClassId = (int) ($actions['selectedClass'] ?? 0);
+    @endphp
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Catat kehadiran</h2><p>Perubahan dicatat per siswa dan tanggal sesuai kelas definitif.</p></div></div>
-        <div class="database-action-buttons">
-            <form method="GET" action="{{ route('dashboard.feature', ['section' => 'absensi']) }}" class="database-inline-form database-filter-form">
-                <select name="kelas" required aria-label="Pilih kelas">
-                    @foreach ($classOptions as $class)
-                        <option value="{{ $class->id_kelas }}" @selected((int) ($actions['selectedClass'] ?? 0) === (int) $class->id_kelas)>{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>
-                    @endforeach
-                </select>
-                <input type="date" name="tanggal" value="{{ $actions['attendanceDate'] ?? now()->toDateString() }}" max="{{ now()->toDateString() }}" required>
-                <button class="database-button database-button-secondary" type="submit">Tampilkan daftar</button>
-            </form>
-            @if ($actions['selectedClass'] ?? null)
-                <form method="POST" action="{{ route('database.attendance.init') }}" class="database-inline-form">
-                    @csrf
-                    <input type="hidden" name="id_kelas" value="{{ $actions['selectedClass'] }}">
-                    <input type="hidden" name="tanggal" value="{{ $actions['attendanceDate'] ?? now()->toDateString() }}">
-                    <button class="database-button database-button-secondary" type="submit">Inisialisasi hadir sekelas</button>
-                </form>
-            @endif
+        <div class="database-section-heading">
+            <div>
+                <h2>Catat kehadiran</h2>
+                <p>Klik kotak kelas di atas untuk memilih kelas, lalu klik tombol bulat status kehadiran pada masing-masing siswa.</p>
+            </div>
         </div>
+
+        @if ($selectableClasses->isNotEmpty())
+            <div class="attendance-class-picker">
+                <span class="attendance-picker-label">Pilih Kelas</span>
+                <div class="attendance-class-grid" role="list" aria-label="Daftar kelas absensi">
+                    @foreach ($selectableClasses as $class)
+                        @php
+                            $isSelectedClass = $selectedClassId === (int) $class->id_kelas;
+                        @endphp
+                        <a
+                            href="{{ route('dashboard.feature', ['section' => 'absensi', 'kelas' => $class->id_kelas, 'tanggal' => $currentAttendanceDate]) }}"
+                            class="attendance-class-card{{ $isSelectedClass ? ' is-selected' : '' }}"
+                            @if ($isSelectedClass) aria-current="page" @endif
+                        >
+                            <span class="attendance-class-badge">{{ $class->kelompok }}</span>
+                            <strong>{{ $class->nama_kelas }}</strong>
+                            <small>{{ $isSelectedClass ? 'Kelas aktif dipilih' : 'Klik untuk buka absensi' }}</small>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+
+            <div class="attendance-toolbar">
+                <form method="GET" action="{{ route('dashboard.feature', ['section' => 'absensi']) }}" class="attendance-date-form" data-attendance-date-form>
+                    <input type="hidden" name="kelas" value="{{ $selectedClassId }}">
+                    <label class="attendance-date-label">
+                        <span>Tanggal Absensi</span>
+                        <input
+                            type="date"
+                            name="tanggal"
+                            value="{{ $currentAttendanceDate }}"
+                            max="{{ now()->toDateString() }}"
+                            required
+                            data-attendance-date-input
+                        >
+                    </label>
+                    <button class="database-button database-button-secondary" type="submit">Tampilkan tanggal</button>
+                </form>
+
+                <div class="attendance-quick-actions">
+                    <span class="attendance-picker-label">Tandai Semua</span>
+                    <div class="attendance-quick-buttons">
+                        @foreach (['Hadir' => 'hadir', 'Izin' => 'izin', 'Sakit' => 'sakit', 'Alfa' => 'alfa'] as $statusLabel => $statusSlug)
+                            <button
+                                type="button"
+                                class="attendance-quick-chip is-{{ $statusSlug }}"
+                                data-attendance-select-all="{{ $statusLabel }}"
+                            >
+                                <span class="attendance-radio-dot"></span>
+                                Semua {{ $statusLabel }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @if (($actions['attendanceRoster'] ?? collect())->isNotEmpty())
-            <form method="POST" action="{{ route('database.attendance.store') }}">
+            <form method="POST" action="{{ route('database.attendance.store') }}" data-attendance-form>
                 @csrf
                 <input type="hidden" name="id_kelas" value="{{ $actions['selectedClass'] }}">
-                <input type="hidden" name="tanggal" value="{{ $actions['attendanceDate'] }}">
+                <input type="hidden" name="tanggal" value="{{ $currentAttendanceDate }}">
+
+                <div class="database-attendance-header">
+                    <span>Nama Siswa</span>
+                    <span>Pilih Status Kehadiran</span>
+                    <span>Keterangan</span>
+                </div>
+
                 <div class="database-attendance-list">
-                    @foreach ($actions['attendanceRoster'] as $student)
+                    @foreach ($actions['attendanceRoster'] as $index => $student)
+                        @php
+                            $currentStatus = $student->status_absensi ?? 'Hadir';
+                        @endphp
                         <div class="database-attendance-row">
-                            <strong>{{ $student->nama_lengkap }}</strong>
-                            <select name="attendance[{{ $student->id_rombel }}][status]" required aria-label="Status {{ $student->nama_lengkap }}">
-                                @foreach (['Hadir', 'Izin', 'Sakit', 'Alfa'] as $status)
-                                    <option value="{{ $status }}" @selected(($student->status_absensi ?? 'Hadir') === $status)>{{ $status }}</option>
+                            <div class="attendance-student-name">
+                                <span class="attendance-student-number">{{ $index + 1 }}</span>
+                                <strong>{{ $student->nama_lengkap }}</strong>
+                            </div>
+
+                            <div class="attendance-status-group" role="radiogroup" aria-label="Status {{ $student->nama_lengkap }}">
+                                @foreach (['Hadir' => 'hadir', 'Izin' => 'izin', 'Sakit' => 'sakit', 'Alfa' => 'alfa'] as $status => $slug)
+                                    <label class="attendance-status-option is-{{ $slug }}">
+                                        <input
+                                            type="radio"
+                                            name="attendance[{{ $student->id_rombel }}][status]"
+                                            value="{{ $status }}"
+                                            @checked($currentStatus === $status)
+                                            required
+                                        >
+                                        <span class="attendance-radio-circle" aria-hidden="true"></span>
+                                        <span class="attendance-status-text">{{ $status }}</span>
+                                    </label>
                                 @endforeach
-                            </select>
-                            <input name="attendance[{{ $student->id_rombel }}][keterangan]" value="{{ $student->keterangan }}" maxlength="255" placeholder="Keterangan">
+                            </div>
+
+                            <input
+                                class="attendance-note-input"
+                                name="attendance[{{ $student->id_rombel }}][keterangan]"
+                                value="{{ $student->keterangan }}"
+                                maxlength="255"
+                                placeholder="Keterangan (opsional)"
+                            >
                         </div>
                     @endforeach
                 </div>
-                <button class="database-button" type="submit">Simpan absensi</button>
+
+                <div class="attendance-submit-bar">
+                    <button class="database-button" type="submit">Simpan absensi</button>
+                </div>
             </form>
-        @elseif ($classOptions->isEmpty())
+        @elseif ($selectableClasses->isEmpty())
             <p class="database-empty-note">Belum ada kelas aktif yang ditugaskan.</p>
+        @else
+            <p class="database-empty-note">Belum ada siswa aktif pada kelas yang dipilih.</p>
         @endif
     </section>
 @endif
@@ -667,56 +704,89 @@
             <label>Tanggal diberikan<input type="date" name="tanggal_diberikan" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required></label>
             <label>Tenggat<input type="date" name="tenggat" required></label>
             <label class="database-form-wide">Deskripsi<textarea name="deskripsi" rows="3"></textarea></label>
-            <label class="database-form-wide">Lampiran tugas<input type="file" name="lampiran"></label>
+            <label class="database-form-wide">Lampiran tugas (opsional, maks. 5 MB)<input type="file" name="lampiran" data-max-mb="5"></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Buat tugas</button></div>
         </form>
 
         <h3 class="database-subheading">Pengumpulan untuk dinilai</h3>
-        @forelse ($actions['submissions'] ?? [] as $submission)
-            <form method="POST" action="{{ route('database.task.grade', ['submission' => $submission->id_pengumpulan]) }}" class="database-action-row">
-                @csrf @method('PATCH')
-                <div>
-                    <strong>{{ $submission->nama_lengkap }} · {{ $submission->judul }}</strong>
-                    <small>{{ $submission->dikumpulkan_pada }} · {{ $submission->status }}</small>
-                </div>
-                @if ($submission->file_path)
-                    <a class="database-button database-button-secondary" href="{{ route('database.task.submission.file', ['submission' => $submission->id_pengumpulan]) }}" target="_blank" rel="noopener">Lihat file</a>
-                @endif
-                <select name="nilai" required aria-label="Nilai tugas">
-                    @foreach (['BB', 'MB', 'BSH', 'BSB'] as $grade)
-                        <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }}</option>
-                    @endforeach
-                </select>
-                <input name="umpan_balik" value="{{ $submission->umpan_balik }}" placeholder="Umpan balik">
-                <button class="database-button" type="submit">Simpan nilai</button>
-            </form>
-        @empty
-            <p class="database-empty-note">Belum ada tugas yang dikumpulkan untuk kelas ini.</p>
-        @endforelse
+        <div class="submission-card-list">
+            @forelse ($actions['submissions'] ?? [] as $submission)
+                <form method="POST" action="{{ route('database.task.grade', ['submission' => $submission->id_pengumpulan]) }}" class="submission-card">
+                    @csrf @method('PATCH')
+                    <div class="submission-card-header">
+                        <div class="submission-card-meta">
+                            <strong>{{ $submission->nama_lengkap }}</strong>
+                            <span>{{ $submission->judul }} · <time>{{ $submission->dikumpulkan_pada }}</time></span>
+                        </div>
+                        <div class="submission-card-badges">
+                            <span class="database-badge {{ $submission->status === 'Dinilai' ? 'is-success' : 'is-warning' }}">{{ $submission->status }}</span>
+                            @if ($submission->file_path)
+                                <a class="database-button database-button-secondary" href="{{ route('database.task.submission.file', ['submission' => $submission->id_pengumpulan]) }}" target="_blank" rel="noopener">Lihat file</a>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="submission-card-controls">
+                        <label class="submission-grade-field">
+                            <span>Nilai</span>
+                            <select name="nilai" required aria-label="Nilai tugas">
+                                @foreach (['BB', 'MB', 'BSH', 'BSB'] as $grade)
+                                    <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label class="submission-feedback-field">
+                            <span>Umpan balik guru</span>
+                            <input name="umpan_balik" value="{{ $submission->umpan_balik }}" placeholder="Tulis umpan balik untuk siswa...">
+                        </label>
+                        <button class="database-button" type="submit">Simpan nilai</button>
+                    </div>
+                </form>
+            @empty
+                <p class="database-empty-note">Belum ada tugas yang dikumpulkan untuk kelas ini.</p>
+            @endforelse
+        </div>
     </section>
 @endif
 
 @if ($section === 'tugas' && $role === 'parent')
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Kumpulkan tugas anak</h2><p>Pengumpulan hanya dapat dilakukan untuk anak dan kelas yang terhubung ke akun ini.</p></div></div>
-        @forelse ($actions['parentTasks'] ?? [] as $task)
-            <form method="POST" action="{{ route('database.task.submit', ['task' => $task->id_tugas]) }}" enctype="multipart/form-data" class="database-action-row">
-                @csrf
-                <div><strong>{{ $task->nama_lengkap }} · {{ $task->judul }}</strong><small>Tenggat {{ $task->tenggat }} · {{ $task->dikumpulkan_pada ? 'Sudah dikumpulkan' : 'Belum dikumpulkan' }}</small></div>
-                @if ($task->has_attachment)
-                    <a class="database-button database-button-secondary" href="{{ route('database.task.attachment', ['task' => $task->id_tugas]) }}" target="_blank" rel="noopener">Lihat lampiran</a>
-                @endif
-                @if ($task->submission_file)
-                    <a class="database-button database-button-secondary" href="{{ route('database.task.submission.file', ['submission' => $task->id_pengumpulan]) }}" target="_blank" rel="noopener">Lihat pengumpulan</a>
-                @endif
-                <input type="hidden" name="id_siswa" value="{{ $task->id_siswa }}">
-                <input type="file" name="file" aria-label="File tugas">
-                <input name="catatan_ortu" maxlength="255" placeholder="Catatan untuk guru">
-                <button class="database-button" type="submit">Kirim</button>
-            </form>
-        @empty
-            <p class="database-empty-note">Belum ada tugas pada kelas anak yang terhubung.</p>
-        @endforelse
+        <div class="submission-card-list">
+            @forelse ($actions['parentTasks'] ?? [] as $task)
+                <form method="POST" action="{{ route('database.task.submit', ['task' => $task->id_tugas]) }}" enctype="multipart/form-data" class="submission-card">
+                    @csrf
+                    <input type="hidden" name="id_siswa" value="{{ $task->id_siswa }}">
+                    <div class="submission-card-header">
+                        <div class="submission-card-meta">
+                            <strong>{{ $task->nama_lengkap }} · {{ $task->judul }}</strong>
+                            <span>Tenggat: {{ $task->tenggat }}</span>
+                        </div>
+                        <div class="submission-card-badges">
+                            <span class="database-badge {{ $task->dikumpulkan_pada ? 'is-success' : 'is-warning' }}">{{ $task->dikumpulkan_pada ? 'Sudah dikumpulkan' : 'Belum dikumpulkan' }}</span>
+                            @if ($task->has_attachment)
+                                <a class="database-button database-button-secondary" href="{{ route('database.task.attachment', ['task' => $task->id_tugas]) }}" target="_blank" rel="noopener">Lihat lampiran</a>
+                            @endif
+                            @if ($task->submission_file)
+                                <a class="database-button database-button-secondary" href="{{ route('database.task.submission.file', ['submission' => $task->id_pengumpulan]) }}" target="_blank" rel="noopener">Lihat pengumpulan</a>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="submission-card-controls is-parent-submit">
+                        <label class="submission-file-field">
+                            <span>File tugas (maks. 5 MB)</span>
+                            <input type="file" name="file" aria-label="File tugas" data-max-mb="5">
+                        </label>
+                        <label class="submission-feedback-field">
+                            <span>Catatan untuk guru</span>
+                            <input name="catatan_ortu" maxlength="255" placeholder="Catatan opsional...">
+                        </label>
+                        <button class="database-button" type="submit">Kirim</button>
+                    </div>
+                </form>
+            @empty
+                <p class="database-empty-note">Belum ada tugas pada kelas anak yang terhubung.</p>
+            @endforelse
+        </div>
     </section>
 @endif
 
@@ -753,7 +823,7 @@
             @csrf
             <label>Siswa / kelas<select name="id_rombel" required>@foreach ($rosterOptions as $roster)<option value="{{ $roster->id_rombel }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }}</option>@endforeach</select></label>
             <label>Tanggal<input type="date" name="tanggal" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" required></label>
-            <label>Foto<input type="file" name="foto" accept="image/jpeg,image/png,image/webp" required></label>
+            <label>Foto (JPG/PNG/WEBP, maks. 5 MB)<input type="file" name="foto" accept="image/jpeg,image/png,image/webp" required data-max-mb="5"></label>
             <label class="database-form-wide">Narasi<textarea name="narasi" rows="3" maxlength="5000" required></textarea></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Simpan portofolio</button></div>
         </form>
@@ -864,7 +934,7 @@
                 @csrf
                 <strong>{{ $activity->nama_kegiatan }} · {{ $activity->tanggal }}</strong>
                 <select name="tahap"><option>Selama</option><option>Sebelum</option><option>Sesudah</option></select>
-                <input type="file" name="foto[]" aria-label="Pilih foto dokumentasi" accept="image/jpeg,image/png,image/webp" multiple required data-activity-photo-input data-max-files="10">
+                <input type="file" name="foto[]" aria-label="Pilih foto dokumentasi" accept="image/jpeg,image/png,image/webp" multiple required data-activity-photo-input data-max-files="10" data-max-mb="5">
                 <input name="keterangan" maxlength="255" placeholder="Keterangan foto">
                 <button class="database-button" type="submit">Upload foto</button>
                 <div class="activity-photo-preview-grid" data-activity-photo-previews hidden aria-live="polite"></div>
@@ -1039,7 +1109,7 @@
                             <option value="Tunai">Tunai</option><option value="Transfer">Transfer</option>
                         @endif
                     </select></label>
-                    <label>Bukti transfer (wajib untuk transfer)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" @required($role === 'parent')></label>
+                    <label>Bukti transfer (JPG/PNG/PDF, maks. 5 MB)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" data-max-mb="5" @required($role === 'parent')></label>
                     <label class="database-form-wide">Catatan<input name="catatan" maxlength="255"></label>
                     <div class="database-form-wide"><button class="database-button" type="submit">Simpan pembayaran</button></div>
                 </form>

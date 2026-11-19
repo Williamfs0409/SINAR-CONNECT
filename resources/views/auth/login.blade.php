@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Masuk ke Akun — TK Cerdas Ceria')
+@section('title', 'Masuk ke Akun — TK Najmah Rugayah Darus')
 @section('body-class', 'login-page')
 
 @section('content')

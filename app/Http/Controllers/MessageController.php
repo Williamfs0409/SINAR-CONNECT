@@ -96,12 +96,23 @@ class MessageController extends Controller
             ->orderBy('name')
             ->get(['id_user', 'name', 'role', 'profile_photo_path']);
 
+        $latestByContact = $conversations->mapWithKeys(fn (array $item): array => [
+            (int) $item['contact']->getKey() => $item['latestMessage'],
+        ]);
+
+        $contacts = $contacts->sortByDesc(function (User $contact) use ($latestByContact): int {
+            $latest = $latestByContact->get((int) $contact->getKey());
+
+            return $latest ? $latest->created_at->getTimestamp() : 0;
+        })->values();
+
         return view('messages.index', [
             'user' => $user,
             'contacts' => $contacts,
             'selectedContact' => $selectedContact,
             'thread' => $thread,
             'conversations' => $conversations,
+            'latestByContact' => $latestByContact,
             'unreadCounts' => $unreadCounts,
         ]);
     }
@@ -182,6 +193,60 @@ class MessageController extends Controller
             ->update(['read_at' => now()]);
 
         return redirect()->back()->with('status', 'Semua notifikasi pesan ditandai sudah dibaca.');
+    }
+
+    public function destroy(Request $request, Message $message): RedirectResponse
+    {
+        $this->ensureMessageTableExists();
+        abort_unless((int) $message->sender_id === (int) $request->user()->getKey(), 403);
+
+        $recipientId = $message->recipient_id;
+        $message->delete();
+
+        return redirect()
+            ->route('messages.index', ['with' => $recipientId])
+            ->with('status', 'Pesan berhasil dihapus.');
+    }
+
+    public function thread(Request $request, User $contact): JsonResponse
+    {
+        $this->ensureMessageTableExists();
+        /** @var User $user */
+        $user = $request->user();
+        abort_unless($contact->is_active && (int) $contact->getKey() !== (int) $user->getKey(), 404);
+
+        Message::query()
+            ->where('sender_id', $contact->getKey())
+            ->where('recipient_id', $user->getKey())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        $messages = Message::query()
+            ->where(function ($query) use ($user, $contact): void {
+                $query->where('sender_id', $user->getKey())
+                    ->where('recipient_id', $contact->getKey());
+            })
+            ->orWhere(function ($query) use ($user, $contact): void {
+                $query->where('sender_id', $contact->getKey())
+                    ->where('recipient_id', $user->getKey());
+            })
+            ->latest()
+            ->limit(100)
+            ->get()
+            ->reverse()
+            ->values();
+
+        return response()->json([
+            'messages' => $messages->map(fn (Message $m): array => [
+                'id' => $m->getKey(),
+                'is_own' => (int) $m->sender_id === (int) $user->getKey(),
+                'body' => $m->body,
+                'time' => $m->created_at->timezone('Asia/Jakarta')->format('H:i'),
+                'date' => $m->created_at->timezone('Asia/Jakarta')->toDateString(),
+                'read' => $m->read_at !== null,
+                'delete_url' => route('messages.destroy', ['message' => $m->getKey()]),
+            ]),
+        ]);
     }
 
     private function ensureMessageTableExists(): void

@@ -40,7 +40,7 @@ class SchoolDataController extends Controller
         'data' => [
             'title' => 'Data Sekolah',
             'role_titles' => ['teacher' => 'Kelas & Siswa', 'parent' => 'Anak Saya'],
-            'modules' => ['siswa', 'guru', 'kelas', 'kapasitas-kelas', 'keluarga', 'keluarga-tanpa-akun', 'pengguna'],
+            'modules' => ['siswa', 'guru', 'kelas', 'kapasitas-kelas', 'keluarga', 'pengguna'],
         ],
         'admissions' => [
             'title' => 'Penerimaan Siswa',
@@ -119,6 +119,7 @@ class SchoolDataController extends Controller
             'title' => 'Data Guru',
             'description' => 'Data kepegawaian dan kelas yang diampu.',
             'view' => 'v_guru_lengkap',
+            'key' => 'id_guru',
             'columns' => [
                 'nama_dengan_gelar' => 'Nama guru',
                 'jabatan' => 'Jabatan',
@@ -152,6 +153,7 @@ class SchoolDataController extends Controller
             'title' => 'Tugas',
             'description' => 'Tugas kelas dan rekap pengumpulan.',
             'view' => 'v_status_pengumpulan_tugas',
+            'key' => 'id_tugas',
             'columns' => [
                 'judul' => 'Tugas',
                 'nama_kelas' => 'Kelas',
@@ -187,6 +189,7 @@ class SchoolDataController extends Controller
             'title' => 'Tagihan',
             'description' => 'Tagihan, pembayaran terverifikasi, dan sisa tagihan.',
             'view' => 'v_tagihan_detail',
+            'key' => 'id_tagihan',
             'columns' => [
                 'nama_lengkap' => 'Nama siswa',
                 'nama_kelas' => 'Kelas',
@@ -1328,15 +1331,25 @@ class SchoolDataController extends Controller
             default => $this->viewQuery($module, $scope, $role),
         };
 
-        if (in_array($section, ['kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)) {
-            return $query->paginate(30)->withQueryString();
+        if (! in_array($section, ['kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)) {
+            $direction = $module['direction'] ?? 'asc';
+            $query->orderBy($module['order'] ?? array_key_first($module['columns']), $direction);
         }
 
-        $direction = $module['direction'] ?? 'asc';
+        $search = trim((string) request()->query('q', ''));
+        if ($search !== '') {
+            $searchableColumns = array_keys($module['columns']);
+            $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search).'%';
+            $query = DB::query()
+                ->fromSub($query, 'searchable_rows')
+                ->where(function (Builder $where) use ($searchableColumns, $like): void {
+                    foreach ($searchableColumns as $column) {
+                        $where->orWhere($column, 'like', $like);
+                    }
+                });
+        }
 
-        return $query->orderBy($module['order'] ?? array_key_first($module['columns']), $direction)
-            ->paginate(30)
-            ->withQueryString();
+        return $query->paginate(30)->withQueryString();
     }
 
     private function viewQuery(array $module, array $scope, string $role): Builder
@@ -1423,6 +1436,7 @@ class SchoolDataController extends Controller
     private function classQuery(array $scope, string $role): Builder
     {
         $select = [
+            'k.id_kelas',
             'k.nama_kelas',
             'k.kelompok',
             'ta.nama as tahun_ajaran',
@@ -1457,10 +1471,13 @@ class SchoolDataController extends Controller
     private function lessonQuery(array $scope, string $role): Builder
     {
         $select = [
+            'rp.id_rencana',
             'rp.tanggal',
             'k.nama_kelas',
             'rp.tema',
             'rp.subtema',
+            'rp.kegiatan',
+            'rp.alat_bahan',
             'g.nama_lengkap as nama_guru',
             'rp.status',
         ];
@@ -1530,7 +1547,7 @@ class SchoolDataController extends Controller
     private function activityQuery(array $scope, string $role, int $userId): Builder
     {
         $query = DB::table('v_laporan_kegiatan')->select([
-            'nama_kegiatan', 'jenis', 'tanggal', 'lokasi', 'kelas_terlibat',
+            'id_kegiatan', 'nama_kegiatan', 'jenis', 'tanggal', 'lokasi', 'kelas_terlibat',
             'laporan_sebelum', 'laporan_selama', 'laporan_sesudah',
         ]);
 

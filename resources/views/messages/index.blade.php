@@ -16,7 +16,7 @@
         <header class="message-center-header">
             <a class="database-brand" href="{{ route('dashboard') }}">
                 <img class="database-brand-mark" src="{{ asset('images/sinar-school-logo.png') }}" alt="">
-                <span><strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
+                <span><strong>SINAR-CONNECT</strong><small>TK Najmah Rugayah Darus</small></span>
             </a>
             <div class="message-center-account">
                 <div class="database-topbar-profile">
@@ -54,10 +54,25 @@
                         <strong>Pengguna</strong>
                         <span>{{ $contacts->count() }}</span>
                     </div>
+                    <div class="message-contact-search">
+                        <input type="search" data-contact-search placeholder="Cari nama atau peran..." aria-label="Cari pengguna">
+                        <div class="message-role-filters" role="group" aria-label="Filter peran">
+                            <button type="button" class="message-role-chip is-active" data-contact-role="all">Semua</button>
+                            <button type="button" class="message-role-chip" data-contact-role="teacher">Guru</button>
+                            <button type="button" class="message-role-chip" data-contact-role="parent">Orang Tua</button>
+                            <button type="button" class="message-role-chip" data-contact-role="staff">Admin/Kepsek</button>
+                        </div>
+                    </div>
                     <div class="message-contact-list">
                         @forelse ($contacts as $contact)
-                            @php($contactUnreadCount = (int) ($unreadCounts[$contact->id_user] ?? 0))
+                            @php
+                                $contactUnreadCount = (int) ($unreadCounts[$contact->id_user] ?? 0);
+                                $latestMessage = ($latestByContact ?? collect())->get((int) $contact->id_user);
+                                $filterRole = in_array($contact->role, ['admin', 'principal'], true) ? 'staff' : $contact->role;
+                            @endphp
                             <a class="message-contact-link {{ $selectedContact?->is($contact) ? 'is-selected' : '' }}"
+                               data-contact-item
+                               data-role-group="{{ $filterRole }}"
                                href="{{ route('messages.index', ['with' => $contact->id_user]) }}">
                                 @if ($contact->profile_photo_path)
                                     <img class="message-contact-avatar" src="{{ route('profile.photo', ['user' => $contact->getKey()]) }}" alt="">
@@ -65,8 +80,19 @@
                                     <span class="message-contact-avatar">{{ mb_substr($contact->name, 0, 1) }}</span>
                                 @endif
                                 <span class="message-contact-copy">
-                                    <strong>{{ $contact->name }}</strong>
-                                    <small>{{ $roleLabels[$contact->role] ?? $contact->role }}</small>
+                                    <span class="message-contact-top">
+                                        <strong>{{ $contact->name }}</strong>
+                                        @if ($latestMessage)
+                                            <time>{{ $latestMessage->created_at->timezone('Asia/Jakarta')->isToday() ? $latestMessage->created_at->timezone('Asia/Jakarta')->format('H:i') : $latestMessage->created_at->timezone('Asia/Jakarta')->format('d/m') }}</time>
+                                        @endif
+                                    </span>
+                                    <small class="message-contact-preview">
+                                        @if ($latestMessage)
+                                            {{ (int) $latestMessage->sender_id === (int) $user->getKey() ? 'Anda: ' : '' }}{{ \Illuminate\Support\Str::limit($latestMessage->body, 36) }}
+                                        @else
+                                            {{ $roleLabels[$contact->role] ?? $contact->role }}
+                                        @endif
+                                    </small>
                                 </span>
                                 @if ($contactUnreadCount > 0)
                                     <span class="message-contact-unread">{{ $contactUnreadCount > 99 ? '99+' : $contactUnreadCount }}</span>
@@ -75,6 +101,7 @@
                         @empty
                             <p class="message-empty-contact">Belum ada pengguna lain yang aktif.</p>
                         @endforelse
+                        <p class="message-empty-contact" data-contact-search-empty hidden>Pengguna tidak ditemukan.</p>
                     </div>
                 </aside>
 
@@ -92,27 +119,59 @@
                             </span>
                         </header>
 
-                        <div class="message-thread" aria-live="polite">
+                        <div class="message-thread"
+                             aria-live="polite"
+                             data-message-thread
+                             data-thread-url="{{ route('messages.thread', ['contact' => $selectedContact->getKey()]) }}"
+                             data-csrf-token="{{ csrf_token() }}">
+                            @php
+                                $lastDate = null;
+                            @endphp
                             @forelse ($thread as $message)
-                                @php($isOwnMessage = (int) $message->sender_id === (int) $user->getKey())
+                                @php
+                                    $isOwnMessage = (int) $message->sender_id === (int) $user->getKey();
+                                    $msgDate = $message->created_at->timezone('Asia/Jakarta');
+                                    $dateKey = $msgDate->toDateString();
+                                    $dateLabel = $msgDate->isToday()
+                                        ? 'Hari ini'
+                                        : ($msgDate->isYesterday() ? 'Kemarin' : $msgDate->locale('id')->translatedFormat('d M Y'));
+                                @endphp
+                                @if ($lastDate !== $dateKey)
+                                    <div class="message-date-divider"><span>{{ $dateLabel }}</span></div>
+                                    @php
+                                        $lastDate = $dateKey;
+                                    @endphp
+                                @endif
                                 <article class="message-bubble {{ $isOwnMessage ? 'is-own' : 'is-incoming' }}">
                                     <p>{{ $message->body }}</p>
-                                    <time datetime="{{ $message->created_at->toIso8601String() }}">
-                                        {{ $message->created_at->timezone('Asia/Jakarta')->format('d/m/Y H:i') }}
-                                    </time>
+                                    <div class="message-bubble-meta">
+                                        <time datetime="{{ $message->created_at->toIso8601String() }}">
+                                            {{ $msgDate->format('H:i') }}
+                                        </time>
+                                        @if ($isOwnMessage)
+                                            <span class="message-read-tick {{ $message->read_at ? 'is-read' : '' }}" title="{{ $message->read_at ? 'Sudah dibaca' : 'Terkirim' }}">
+                                                {{ $message->read_at ? '✓✓' : '✓' }}
+                                            </span>
+                                            <form method="POST" action="{{ route('messages.destroy', ['message' => $message->getKey()]) }}" class="message-delete-form" data-confirm="Hapus pesan ini?">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="message-delete-button" title="Hapus pesan" aria-label="Hapus pesan">×</button>
+                                            </form>
+                                        @endif
+                                    </div>
                                 </article>
                             @empty
                                 <p class="message-thread-empty">Belum ada percakapan. Kirim pesan pertama.</p>
                             @endforelse
                         </div>
 
-                        <form class="message-compose-form" method="POST" action="{{ route('messages.store') }}">
+                        <form class="message-compose-form" method="POST" action="{{ route('messages.store') }}" data-message-compose>
                             @csrf
                             <input type="hidden" name="recipient_id" value="{{ $selectedContact->getKey() }}">
                             <label class="sr-only" for="message-body">Isi pesan</label>
-                            <textarea id="message-body" name="body" rows="3" maxlength="2000" required placeholder="Tulis pesan...">{{ old('body') }}</textarea>
+                            <textarea id="message-body" name="body" rows="2" maxlength="2000" required placeholder="Ketik pesan... (Enter untuk kirim, Shift+Enter baris baru)">{{ old('body') }}</textarea>
                             <div class="message-compose-footer">
-                                <small>Maksimal 2.000 karakter</small>
+                                <small>Maksimal 2.000 karakter · Enter untuk kirim</small>
                                 <button class="database-button database-button-primary" type="submit">Kirim pesan</button>
                             </div>
                         </form>

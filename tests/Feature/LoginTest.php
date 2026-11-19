@@ -250,32 +250,12 @@ class LoginTest extends TestCase
             ->assertSee('Pembayaran &amp; Tabungan', false);
     }
 
-    public function test_guest_can_preview_the_teacher_dashboard_without_logging_in(): void
+    public function test_guest_is_redirected_to_login_when_visiting_dashboard(): void
     {
-        $this->get(route('dashboard'))
-            ->assertOk()
-            ->assertSee('Mode pratinjau')
-            ->assertSee('Halo, Ibu Dewi (Guru)');
-        $this->assertGuest();
-    }
-
-    public function test_guest_can_choose_each_role_dashboard_preview(): void
-    {
-        $this->get(route('dashboard', ['role' => 'principal']))
-            ->assertOk()
-            ->assertSee('Halo, Ratna (Kepala Sekolah)')
-            ->assertSee('Pemantauan Akademik');
-
-        $this->get(route('dashboard', ['role' => 'parent']))
-            ->assertOk()
-            ->assertSee('Halo, Bapak Andi (Orang Tua)')
-            ->assertSee('Perkembangan Anak');
-    }
-
-    public function test_guest_cannot_preview_admin_dashboard_and_is_sent_to_login(): void
-    {
-        $this->get(route('dashboard', ['role' => 'admin']))
-            ->assertRedirect(route('login'));
+        foreach ([null, 'teacher', 'principal', 'parent', 'admin'] as $role) {
+            $this->get(route('dashboard', $role ? ['role' => $role] : []))
+                ->assertRedirect(route('login'));
+        }
         $this->assertGuest();
     }
 
@@ -283,52 +263,10 @@ class LoginTest extends TestCase
     {
         $this->get(route('dashboard.feature', ['section' => 'pendaftaran', 'role' => 'admin']))
             ->assertRedirect(route('login'));
-    }
 
-    public function test_teacher_features_open_as_separate_pages(): void
-    {
-        foreach (['absensi', 'pembelajaran', 'rencana', 'tugas', 'nilai', 'rapor', 'dokumentasi', 'pengaturan', 'jadwal'] as $section) {
+        foreach (['absensi', 'pembelajaran', 'tugas', 'nilai', 'rapor'] as $section) {
             $this->get(route('dashboard.feature', ['section' => $section]))
-                ->assertOk()
-                ->assertSee('role-feature-table-panel', false)
-                ->assertSee('Mode pratinjau');
-        }
-    }
-
-    public function test_principal_and_parent_features_open_as_separate_pages(): void
-    {
-        $roleSections = [
-            'principal' => ['guru', 'administrasi', 'akademik', 'evaluasi', 'spp', 'laporan', 'jadwal'],
-            'parent' => ['perkembangan', 'absensi', 'spp', 'tabungan', 'tugas', 'rapor', 'dokumentasi', 'siswa'],
-        ];
-
-        foreach ($roleSections as $role => $sections) {
-            foreach ($sections as $section) {
-                $this->get(route('dashboard.feature', ['section' => $section, 'role' => $role]))
-                    ->assertOk()
-                    ->assertSee('role-feature-table-panel', false);
-            }
-        }
-    }
-
-    public function test_feature_page_not_available_for_the_selected_role_returns_not_found(): void
-    {
-        $this->get(route('dashboard.feature', ['section' => 'tabungan', 'role' => 'teacher']))
-            ->assertNotFound();
-    }
-
-    public function test_schedule_has_live_clock_and_date_navigation_without_view_toggle(): void
-    {
-        foreach (['teacher', 'parent'] as $role) {
-            $this->get(route('dashboard', ['role' => $role]))
-                ->assertOk()
-                ->assertSee('data-live-clock', false)
-                ->assertSee('data-date-step="-1"', false)
-                ->assertSee('data-date-step="1"', false)
-                ->assertSee('data-month-step="-1"', false)
-                ->assertSee('data-month-step="1"', false)
-                ->assertSee('data-date-today', false)
-                ->assertDontSee('role-view-toggle', false);
+                ->assertRedirect(route('login'));
         }
     }
 }

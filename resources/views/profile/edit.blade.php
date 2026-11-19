@@ -8,7 +8,7 @@
         <header class="profile-settings-header">
             <a class="database-brand" href="{{ route('dashboard') }}">
                 <img class="database-brand-mark" src="{{ asset('images/sinar-school-logo.png') }}" alt="">
-                <span><strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
+                <span><strong>SINAR-CONNECT</strong><small>TK Najmah Rugayah Darus</small></span>
             </a>
             <a class="profile-back-link" href="{{ route('dashboard') }}">Kembali ke dashboard</a>
         </header>
@@ -83,7 +83,7 @@
                 <form method="POST" action="{{ route('profile.photo.update') }}" enctype="multipart/form-data">
                     @csrf
                     <label for="profile-photo">Pilih foto</label>
-                    <input id="profile-photo" type="file" name="photo" accept="image/jpeg,image/png,image/webp" required>
+                    <input id="profile-photo" type="file" name="photo" accept="image/jpeg,image/png,image/webp" required data-max-mb="5">
                     @error('photo')<small class="profile-photo-error">{{ $message }}</small>@enderror
                     <button class="database-button database-button-primary" type="submit">Simpan foto profil</button>
                 </form>

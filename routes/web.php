@@ -68,6 +68,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
     Route::get('/profil/foto/{user}', [ProfileController::class, 'photo'])->name('profile.photo');
     Route::get('/pesan', [MessageController::class, 'index'])->name('messages.index');
     Route::post('/pesan', [MessageController::class, 'store'])->name('messages.store');
+    Route::delete('/pesan/{message}', [MessageController::class, 'destroy'])->name('messages.destroy');
+    Route::get('/pesan/thread/{contact}', [MessageController::class, 'thread'])->name('messages.thread');
     Route::get('/pesan/notifikasi', [MessageController::class, 'notifications'])
         ->name('messages.notifications');
     Route::patch('/pesan/notifikasi/baca-semua', [MessageController::class, 'markAllNotificationsRead'])
@@ -87,12 +89,16 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.teacher.store');
     Route::patch('/dashboard/guru/{teacher}', [SchoolFeatureController::class, 'updateTeacher'])
         ->name('database.teacher.update');
+    Route::delete('/dashboard/guru/{teacher}', [SchoolFeatureController::class, 'destroyTeacher'])
+        ->name('database.teacher.destroy');
     Route::post('/dashboard/guru/kelas', [SchoolFeatureController::class, 'assignTeacherClass'])
         ->name('database.teacher.assign-class');
     Route::post('/dashboard/kelas', [SchoolFeatureController::class, 'storeClass'])
         ->name('database.class.store');
     Route::patch('/dashboard/kelas/{schoolClass}', [SchoolFeatureController::class, 'updateClass'])
         ->name('database.class.update');
+    Route::delete('/dashboard/kelas/{schoolClass}', [SchoolFeatureController::class, 'destroyClass'])
+        ->name('database.class.destroy');
     Route::post('/dashboard/tahun-ajaran', [SchoolFeatureController::class, 'storeSchoolYear'])
         ->name('database.school-year.store');
     Route::post('/dashboard/duplikat-siswa/gabung', [SchoolFeatureController::class, 'mergeDuplicateStudents'])
@@ -109,6 +115,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.user.destroy');
     Route::patch('/dashboard/tarif/{tariff}', [SchoolFeatureController::class, 'updateTariff'])
         ->name('database.tariff.update');
+    Route::delete('/dashboard/tarif/{tariff}', [SchoolFeatureController::class, 'destroyTariff'])
+        ->name('database.tariff.destroy');
     Route::post('/dashboard/tarif', [SchoolFeatureController::class, 'storeTariff'])
         ->name('database.tariff.store');
     Route::post('/dashboard/pendaftaran/{registration}/status', [SchoolFeatureController::class, 'reviewRegistration'])
@@ -127,8 +135,16 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.attendance.store');
     Route::post('/dashboard/rencana-pembelajaran', [SchoolFeatureController::class, 'storeLessonPlan'])
         ->name('database.lesson-plan.store');
+    Route::patch('/dashboard/rencana-pembelajaran/{lessonPlan}', [SchoolFeatureController::class, 'updateLessonPlan'])
+        ->name('database.lesson-plan.update');
+    Route::delete('/dashboard/rencana-pembelajaran/{lessonPlan}', [SchoolFeatureController::class, 'destroyLessonPlan'])
+        ->name('database.lesson-plan.destroy');
     Route::post('/dashboard/tugas', [SchoolFeatureController::class, 'storeTask'])
         ->name('database.task.store');
+    Route::patch('/dashboard/tugas/{task}', [SchoolFeatureController::class, 'updateTask'])
+        ->name('database.task.update');
+    Route::delete('/dashboard/tugas/{task}', [SchoolFeatureController::class, 'destroyTask'])
+        ->name('database.task.destroy');
     Route::post('/dashboard/tugas/{task}/pengumpulan', [SchoolFeatureController::class, 'submitTask'])
         ->name('database.task.submit');
     Route::patch('/dashboard/pengumpulan/{submission}/nilai', [SchoolFeatureController::class, 'gradeTask'])
@@ -145,10 +161,18 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.report.reflection');
     Route::post('/dashboard/portofolio', [SchoolFeatureController::class, 'storePortfolio'])
         ->name('database.portfolio.store');
+    Route::patch('/dashboard/portofolio/{portfolio}', [SchoolFeatureController::class, 'updatePortfolio'])
+        ->name('database.portfolio.update');
+    Route::delete('/dashboard/portofolio/{portfolio}', [SchoolFeatureController::class, 'destroyPortfolio'])
+        ->name('database.portfolio.destroy');
     Route::get('/dashboard/portofolio/{portfolio}/foto', [SchoolFeatureController::class, 'portfolioPhoto'])
         ->name('database.portfolio.photo');
     Route::post('/dashboard/kegiatan', [SchoolFeatureController::class, 'storeActivity'])
         ->name('database.activity.store');
+    Route::patch('/dashboard/kegiatan/{activity}', [SchoolFeatureController::class, 'updateActivity'])
+        ->name('database.activity.update');
+    Route::delete('/dashboard/kegiatan/{activity}', [SchoolFeatureController::class, 'destroyActivity'])
+        ->name('database.activity.destroy');
     Route::patch('/dashboard/kegiatan/{activity}/biaya', [SchoolFeatureController::class, 'updateActivityCost'])
         ->name('database.activity.cost.update');
     Route::post('/dashboard/kegiatan/{activity}/tagihan', [SchoolFeatureController::class, 'generateActivityBills'])
@@ -173,6 +197,10 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.bills.generate');
     Route::post('/dashboard/tagihan/siswa', [SchoolFeatureController::class, 'createStudentBill'])
         ->name('database.bills.store');
+    Route::patch('/dashboard/tagihan/{bill}', [SchoolFeatureController::class, 'updateStudentBill'])
+        ->name('database.bills.update');
+    Route::delete('/dashboard/tagihan/{bill}', [SchoolFeatureController::class, 'destroyStudentBill'])
+        ->name('database.bills.destroy');
     Route::post('/dashboard/keluarga/tautkan', [SchoolFeatureController::class, 'linkParentToFamily'])
         ->name('database.family.link-parent');
     Route::post('/dashboard/keluarga/akun-orang-tua', [SchoolFeatureController::class, 'createAndLinkParent'])

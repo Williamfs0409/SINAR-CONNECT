@@ -13,19 +13,19 @@ class DashboardController extends Controller
         $user = auth()->user();
         $section = $section === 'dokumentasi' ? 'kegiatan' : $section;
 
-        if (! $user && request()->query('role') === 'admin') {
+        if (! $user) {
             return redirect()->route('login');
         }
 
-        if ($user && Schema::hasTable('siswa')) {
+        if (Schema::hasTable('siswa')) {
             return app(SchoolDataController::class)->show($section);
         }
 
-        if ($user?->role === 'admin') {
+        if ($user->role === 'admin') {
             return app(AdminDashboardController::class)->show($section ?? 'ringkasan');
         }
 
-        abort_if($user && ! in_array($user->role, ['teacher', 'principal', 'parent'], true), 403);
+        abort_if(! in_array($user->role, ['teacher', 'principal', 'parent'], true), 403);
 
         return view('dashboard', ['section' => $section]);
     }

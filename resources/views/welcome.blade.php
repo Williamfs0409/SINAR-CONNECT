@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Masuk — TK Cerdas Ceria')
+@section('title', 'Masuk — SINAR TK Najmah Rugayah Darus')
 @section('body-class', 'welcome-login-page')
 
 @section('content')
@@ -10,15 +10,15 @@
     <img class="welcome-mobile-background" src="{{ asset('images/login-school-background.jpeg') }}" alt="" aria-hidden="true">
     <section class="welcome-message" aria-labelledby="welcome-title">
         <div class="welcome-message-copy">
-            <p class="welcome-eyebrow">Sistem Informasi Sekolah</p>
-            <h1 id="welcome-title">Halo, Sobat Cerdas Ceria!</h1>
+            <p class="welcome-eyebrow">Sistem Informasi Sekolah · TK Najmah Rugayah Darus</p>
+            <h1 id="welcome-title">Halo, Ayah, Bunda &amp; Guru!</h1>
             <p>Dengan SINAR, akses informasi sekolah dan dampingi setiap langkah tumbuh kembang anak.</p>
         </div>
         <p class="welcome-message-note"><span aria-hidden="true">✦</span> Belajar · Bermain · Tumbuh bersama</p>
     </section>
 
     <section class="welcome-login-card" aria-labelledby="welcome-login-title">
-        <a class="brand welcome-card-brand" href="{{ route('home') }}" aria-label="TK Cerdas Ceria">
+        <a class="brand welcome-card-brand" href="{{ route('home') }}" aria-label="TK Najmah Rugayah Darus">
             @include('components.brand')
         </a>
         <h2 id="welcome-login-title">Selamat Datang</h2>
