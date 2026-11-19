@@ -2,10 +2,16 @@
 set -e
 
 PORT="${PORT:-8080}"
+echo "[entrypoint] Booting SINAR-CONNECT on PORT=${PORT}"
 
-# Bind Apache to Railway's dynamic $PORT
-sed -ri "s/Listen [0-9]+/Listen ${PORT}/g" /etc/apache2/ports.conf
-sed -ri "s/<VirtualHost \*:[0-9]+>/<VirtualHost *:${PORT}>/g" /etc/apache2/sites-available/000-default.conf
+# Bind Apache to Railway's $PORT (and also port 80 when PORT != 80 to avoid Target Port 80/8080 mismatch)
+if [ "${PORT}" = "80" ]; then
+    printf "Listen 80\n" > /etc/apache2/ports.conf
+    sed -ri "s/<VirtualHost [^>]+>/<VirtualHost *:80>/g" /etc/apache2/sites-available/000-default.conf
+else
+    printf "Listen %s\nListen 80\n" "${PORT}" > /etc/apache2/ports.conf
+    sed -ri "s/<VirtualHost [^>]+>/<VirtualHost *:${PORT} *:80>/g" /etc/apache2/sites-available/000-default.conf
+fi
 
 # Ensure writable storage directories (especially when Railway Volume is mounted)
 mkdir -p \
@@ -29,4 +35,5 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan migrate --force || echo "[entrypoint] Migration skipped or already satisfied."
 fi
 
+apache2ctl -t
 exec apache2-foreground
