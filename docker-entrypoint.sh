@@ -34,8 +34,29 @@ php artisan config:clear || true
 php artisan config:cache || true
 php artisan view:cache || true
 
-# Run pending migrations safely (skip without crashing if existing dump lacks migrations table)
+# Run pending migrations safely (auto-mark baseline db_tk_final migrations if dump was pre-imported)
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+    php -r '
+        require "/var/www/html/vendor/autoload.php";
+        $app = require "/var/www/html/bootstrap/app.php";
+        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        if (Illuminate\Support\Facades\Schema::hasTable("audit_log") && Illuminate\Support\Facades\Schema::hasTable("siswa")) {
+            if (! Illuminate\Support\Facades\Schema::hasTable("migrations")) {
+                Illuminate\Support\Facades\Schema::create("migrations", function ($t) {
+                    $t->increments("id");
+                    $t->string("migration");
+                    $t->integer("batch");
+                });
+            }
+            $existing = Illuminate\Support\Facades\DB::table("migrations")->pluck("migration")->all();
+            foreach (glob("/var/www/html/database/migrations/0000_01_*.php") as $file) {
+                $name = basename($file, ".php");
+                if (! in_array($name, $existing, true)) {
+                    Illuminate\Support\Facades\DB::table("migrations")->insert(["migration" => $name, "batch" => 1]);
+                }
+            }
+        }
+    ' || true
     php artisan migrate --force || echo "[entrypoint] Migration skipped or already satisfied."
 fi
 
