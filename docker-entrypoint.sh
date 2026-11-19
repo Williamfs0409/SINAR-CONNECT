@@ -4,6 +4,10 @@ set -e
 PORT="${PORT:-8080}"
 echo "[entrypoint] Booting SINAR-CONNECT on PORT=${PORT}"
 
+# Ensure only mpm_prefork is loaded (prevents AH00534: More than one MPM loaded)
+rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.*
+a2enmod mpm_prefork >/dev/null 2>&1 || true
+
 # Bind Apache to Railway's $PORT (and also port 80 when PORT != 80 to avoid Target Port 80/8080 mismatch)
 if [ "${PORT}" = "80" ]; then
     printf "Listen 80\n" > /etc/apache2/ports.conf
