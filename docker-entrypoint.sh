@@ -95,6 +95,34 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
                 }
             }
         }
+        if (! Illuminate\Support\Facades\Schema::hasTable("sessions")) {
+            Illuminate\Support\Facades\Schema::create("sessions", function ($t) {
+                $t->string("id")->primary();
+                $t->unsignedBigInteger("user_id")->nullable()->index();
+                $t->string("ip_address", 45)->nullable();
+                $t->text("user_agent")->nullable();
+                $t->longText("payload");
+                $t->integer("last_activity")->index();
+            });
+            echo "[entrypoint] Created missing sessions table\n";
+        }
+        if (! Illuminate\Support\Facades\Schema::hasTable("cache")) {
+            Illuminate\Support\Facades\Schema::create("cache", function ($t) {
+                $t->string("key")->primary();
+                $t->mediumText("value");
+                $t->integer("expiration");
+            });
+        }
+        if (! Illuminate\Support\Facades\Schema::hasTable("cache_locks")) {
+            Illuminate\Support\Facades\Schema::create("cache_locks", function ($t) {
+                $t->string("key")->primary();
+                $t->string("owner");
+                $t->integer("expiration");
+            });
+        }
+        if (! Illuminate\Support\Facades\Schema::hasTable("siswa")) {
+            echo "[entrypoint] WARNING: db_tk_final tables are missing. Import data with scripts/import-db-to-railway.ps1\n";
+        }
     ' || true
     php artisan migrate --force || echo "[entrypoint] Migration skipped or already satisfied."
 fi
