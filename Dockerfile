@@ -23,11 +23,12 @@ COPY public ./public
 COPY --from=vendor /app/vendor ./vendor
 RUN npm run build
 
-# Stage 3: Production PHP 8.4 + Apache runtime
-FROM php:8.4-apache
+# Stage 3: Production PHP 8.4-FPM + Nginx runtime (no Apache / no MPM conflicts)
+FROM php:8.4-fpm
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        nginx \
         libfreetype6-dev \
         libicu-dev \
         libjpeg62-turbo-dev \
@@ -44,16 +45,8 @@ RUN apt-get update \
         opcache \
         pdo_mysql \
         zip \
-    && rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf \
-    && a2enmod mpm_prefork rewrite headers \
+    && rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf \
     && rm -rf /var/lib/apt/lists/*
-
-# Configure Apache DocumentRoot to /var/www/html/public
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
-    && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
-    && printf 'ServerName localhost\n<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>\n' > /etc/apache2/conf-available/laravel.conf \
-    && a2enconf laravel
 
 # Configure PHP limits for image/document uploads (5 MB app limit) and OPcache
 RUN printf '%s\n' \
@@ -65,13 +58,22 @@ RUN printf '%s\n' \
     'opcache.validate_timestamps=0' \
     > /usr/local/etc/php/conf.d/99-sinar-connect.ini
 
+# Ensure PHP-FPM preserves Railway environment variables and logs worker output
+RUN printf '%s\n' \
+    '[www]' \
+    'clear_env = no' \
+    'catch_workers_output = yes' \
+    'decorate_workers_output = no' \
+    > /usr/local/etc/php-fpm.d/zz-sinar-connect.conf
+
 WORKDIR /var/www/html
 
 COPY . .
 COPY --from=vendor /app/vendor ./vendor
 COPY --from=assets /app/public/build ./public/build
 
-RUN mkdir -p \
+RUN rm -f public/hot \
+    && mkdir -p \
         storage/app/private \
         storage/app/public \
         storage/framework/cache/data \

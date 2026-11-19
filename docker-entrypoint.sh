@@ -2,20 +2,59 @@
 set -e
 
 PORT="${PORT:-8080}"
-echo "[entrypoint] Booting SINAR-CONNECT on PORT=${PORT}"
+echo "[entrypoint] Booting SINAR-CONNECT (PHP-FPM + Nginx) on PORT=${PORT}"
 
-# Ensure only mpm_prefork is loaded (prevents AH00534: More than one MPM loaded)
-rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf
-a2enmod mpm_prefork >/dev/null 2>&1 || true
-
-# Bind Apache to Railway's $PORT (and also port 80 when PORT != 80 to avoid Target Port 80/8080 mismatch)
-if [ "${PORT}" = "80" ]; then
-    printf "Listen 80\n" > /etc/apache2/ports.conf
-    sed -ri "s/<VirtualHost [^>]+>/<VirtualHost *:80>/g" /etc/apache2/sites-available/000-default.conf
-else
-    printf "Listen %s\nListen 80\n" "${PORT}" > /etc/apache2/ports.conf
-    sed -ri "s/<VirtualHost [^>]+>/<VirtualHost *:${PORT} *:80>/g" /etc/apache2/sites-available/000-default.conf
+# Build Nginx listen directives (IPv4 + IPv6 when available, plus port 80 fallback)
+LISTEN_BLOCK="    listen ${PORT} default_server;"
+if [ -f /proc/net/if_inet6 ]; then
+    LISTEN_BLOCK="${LISTEN_BLOCK}
+    listen [::]:${PORT} default_server;"
 fi
+if [ "${PORT}" != "80" ]; then
+    LISTEN_BLOCK="${LISTEN_BLOCK}
+    listen 80 default_server;"
+    if [ -f /proc/net/if_inet6 ]; then
+        LISTEN_BLOCK="${LISTEN_BLOCK}
+    listen [::]:80 default_server;"
+    fi
+fi
+
+cat > /etc/nginx/conf.d/default.conf <<EOF
+server {
+${LISTEN_BLOCK}
+    server_name _;
+
+    root /var/www/html/public;
+    index index.php;
+
+    client_max_body_size 25M;
+    charset utf-8;
+
+    access_log /dev/stdout;
+    error_log /dev/stderr warn;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+        fastcgi_read_timeout 60;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+EOF
 
 # Ensure writable storage directories (especially when Railway Volume is mounted)
 mkdir -p \
@@ -60,5 +99,7 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan migrate --force || echo "[entrypoint] Migration skipped or already satisfied."
 fi
 
-apache2ctl -t
-exec apache2-foreground
+php-fpm -t
+php-fpm -D
+nginx -t
+exec nginx -g "daemon off;"
