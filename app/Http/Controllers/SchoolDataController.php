@@ -146,6 +146,7 @@ class SchoolDataController extends Controller
                 'persen_hadir' => 'Kehadiran (%)',
             ],
             'scope' => 'student',
+            'teacher_scope' => 'class',
             'order' => 'tahun',
             'direction' => 'desc',
         ],
@@ -182,6 +183,7 @@ class SchoolDataController extends Controller
                 'tanpa_keterangan' => 'Alfa',
             ],
             'scope' => 'student',
+            'teacher_scope' => 'roster',
             'order' => 'tanggal_rapor',
             'direction' => 'desc',
         ],
@@ -489,7 +491,11 @@ class SchoolDataController extends Controller
                     'k.kelompok',
                 ])
                 ->orderBy('s.nama_lengkap');
-            if ($role !== 'admin') {
+            if ($role === 'teacher') {
+                $students->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+                    ->whereIn('r.id_kelas', $scope['classIds'])
+                    ->where('ta.is_aktif', true);
+            } elseif ($role === 'parent') {
                 $students->whereIn('r.id_siswa', $scope['studentIds']);
             }
             $data['rosters'] = $students->get();
@@ -934,7 +940,7 @@ class SchoolDataController extends Controller
                     ->whereNotNull('id_rapor')
                     ->orderByDesc('tanggal_rapor');
                 if ($role === 'teacher') {
-                    $detailedReportsQuery->whereIn('id_siswa', $scope['studentIds']);
+                    $detailedReportsQuery->whereIn('id_rombel', $scope['rosterIds']);
                 }
                 $data['detailedReports'] = $detailedReportsQuery->get($reportColumns);
                 if (in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('guru')) {
@@ -1130,22 +1136,38 @@ class SchoolDataController extends Controller
 
     private function scopeFor(User $user, string $role): array
     {
-        $scope = ['studentIds' => [], 'classIds' => []];
+        $scope = ['studentIds' => [], 'classIds' => [], 'rosterIds' => []];
 
         if ($role === 'teacher') {
             $teacherId = DB::table('guru')->where('id_user', $user->getKey())->value('id_guru');
             if ($teacherId !== null) {
-                $scope['classIds'] = DB::table('guru_kelas')
-                    ->where('id_guru', $teacherId)
-                    ->pluck('id_kelas')
+                $scope['classIds'] = DB::table('guru_kelas as gk')
+                    ->join('kelas as k', 'k.id_kelas', '=', 'gk.id_kelas')
+                    ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+                    ->where('gk.id_guru', $teacherId)
+                    ->where('ta.is_aktif', true)
+                    ->pluck('gk.id_kelas')
+                    ->map(fn ($id): int => (int) $id)
+                    ->unique()
+                    ->values()
                     ->all();
             }
             if ($scope['classIds'] !== []) {
-                $scope['studentIds'] = DB::table('rombel_siswa')
+                $activeRosters = DB::table('rombel_siswa')
                     ->whereIn('id_kelas', $scope['classIds'])
                     ->where('status', 'Aktif')
-                    ->pluck('id_siswa')
+                    ->get(['id_rombel', 'id_siswa']);
+                $scope['rosterIds'] = $activeRosters
+                    ->pluck('id_rombel')
+                    ->map(fn ($id): int => (int) $id)
                     ->unique()
+                    ->values()
+                    ->all();
+                $scope['studentIds'] = $activeRosters
+                    ->pluck('id_siswa')
+                    ->map(fn ($id): int => (int) $id)
+                    ->unique()
+                    ->values()
                     ->all();
             }
         } elseif ($role === 'parent') {
@@ -1296,6 +1318,9 @@ class SchoolDataController extends Controller
     private function recordsFor(string $section, array $module, array $scope, string $role, User $user): mixed
     {
         $query = match ($section) {
+            'siswa' => $role === 'teacher'
+                ? $this->teacherStudentsQuery($scope)
+                : $this->viewQuery($module, $scope, $role),
             'kelas' => $this->classQuery($scope, $role),
             'keluarga' => $this->familyQuery(),
             'pembelajaran' => $this->lessonQuery($scope, $role),
@@ -1331,7 +1356,8 @@ class SchoolDataController extends Controller
             default => $this->viewQuery($module, $scope, $role),
         };
 
-        if (! in_array($section, ['kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)) {
+        if (! in_array($section, ['kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)
+            && ! ($section === 'siswa' && $role === 'teacher')) {
             $direction = $module['direction'] ?? 'asc';
             $query->orderBy($module['order'] ?? array_key_first($module['columns']), $direction);
         }
@@ -1360,13 +1386,40 @@ class SchoolDataController extends Controller
         }
         $query = DB::table($module['view'])->select(array_unique($columns));
 
-        if (in_array($role, ['teacher', 'parent'], true) && ($module['scope'] ?? 'all') === 'student') {
+        $effectiveScope = $role === 'teacher'
+            ? ($module['teacher_scope'] ?? $module['scope'] ?? 'all')
+            : ($module['scope'] ?? 'all');
+
+        if (in_array($role, ['teacher', 'parent'], true) && $effectiveScope === 'student') {
             $query->whereIn('id_siswa', $scope['studentIds']);
-        } elseif (in_array($role, ['teacher', 'parent'], true) && ($module['scope'] ?? 'all') === 'class') {
+        } elseif (in_array($role, ['teacher', 'parent'], true) && $effectiveScope === 'class') {
             $query->whereIn('id_kelas', $scope['classIds']);
+        } elseif ($role === 'teacher' && $effectiveScope === 'roster') {
+            $query->whereIn('id_rombel', $scope['rosterIds']);
         }
 
         return $query;
+    }
+
+    private function teacherStudentsQuery(array $scope): Builder
+    {
+        return DB::table('rombel_siswa as r')
+            ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+            ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+            ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+            ->whereIn('r.id_kelas', $scope['classIds'])
+            ->where('r.status', 'Aktif')
+            ->where('ta.is_aktif', true)
+            ->select([
+                's.id_siswa',
+                's.nama_lengkap',
+                'k.nama_kelas',
+                'k.kelompok',
+                'ta.nama as tahun_ajaran',
+            ])
+            ->distinct()
+            ->orderBy('s.nama_lengkap')
+            ->orderBy('k.nama_kelas');
     }
 
     private function familyQuery(): Builder
@@ -1513,7 +1566,9 @@ class SchoolDataController extends Controller
                 'i.semester_2',
             ]);
 
-        if (in_array($role, ['teacher', 'parent'], true)) {
+        if ($role === 'teacher') {
+            $query->whereIn('i.id_rombel', $scope['rosterIds']);
+        } elseif ($role === 'parent') {
             $query->whereIn('i.id_siswa', $scope['studentIds']);
         }
 
