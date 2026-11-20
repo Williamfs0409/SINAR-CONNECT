@@ -174,6 +174,148 @@ class SchoolDataDashboardTest extends TestCase
             ->assertDontSee('NISN');
     }
 
+    public function test_teacher_siswa_and_academic_modules_only_show_active_year_assigned_class_without_duplicates(): void
+    {
+        $this->createSiswaData();
+        Schema::create('guru', function (Blueprint $table): void {
+            $table->id('id_guru');
+            $table->unsignedBigInteger('id_user');
+            $table->string('nama_lengkap')->default('Guru Uji');
+        });
+        Schema::create('guru_kelas', function (Blueprint $table): void {
+            $table->unsignedBigInteger('id_guru');
+            $table->unsignedBigInteger('id_kelas');
+            $table->string('peran')->default('Wali Kelas');
+        });
+        Schema::create('rombel_siswa', function (Blueprint $table): void {
+            $table->id('id_rombel');
+            $table->unsignedBigInteger('id_siswa');
+            $table->unsignedBigInteger('id_kelas');
+            $table->string('status');
+        });
+
+        DB::table('tahun_ajaran')->insert([
+            ['id_tahun_ajaran' => 1, 'nama' => '2024-2025', 'tahun_mulai' => 2024, 'is_aktif' => false],
+            ['id_tahun_ajaran' => 2, 'nama' => '2025-2026', 'tahun_mulai' => 2025, 'is_aktif' => false],
+            ['id_tahun_ajaran' => 3, 'nama' => '2026-2027', 'tahun_mulai' => 2026, 'is_aktif' => true],
+        ]);
+        DB::table('kelas')->insert([
+            ['id_kelas' => 1, 'id_tahun_ajaran' => 1, 'kelompok' => 'KB', 'nama_kelas' => 'PG'],
+            ['id_kelas' => 2, 'id_tahun_ajaran' => 2, 'kelompok' => 'TK A', 'nama_kelas' => 'Abu Bakar'],
+            ['id_kelas' => 3, 'id_tahun_ajaran' => 3, 'kelompok' => 'TK B', 'nama_kelas' => 'Marwah'],
+            ['id_kelas' => 4, 'id_tahun_ajaran' => 3, 'kelompok' => 'TK B', 'nama_kelas' => 'Safa'],
+        ]);
+
+        DB::table('siswa')->insert([
+            [
+                'id_siswa' => 1,
+                'id_keluarga' => 1,
+                'nama_lengkap' => 'Arsyila Qiana Afiqah',
+                'jenis_kelamin' => 'Perempuan',
+                'nama_kelas' => 'Marwah',
+                'kelompok' => 'TK B',
+                'tahun_ajaran' => '2026-2027',
+            ],
+            [
+                'id_siswa' => 2,
+                'id_keluarga' => 2,
+                'nama_lengkap' => 'Muhammad Ghiffari Lubis',
+                'jenis_kelamin' => 'Laki-Laki',
+                'nama_kelas' => 'Safa',
+                'kelompok' => 'TK B',
+                'tahun_ajaran' => '2026-2027',
+            ],
+        ]);
+
+        DB::table('rombel_siswa')->insert([
+            ['id_rombel' => 10, 'id_siswa' => 1, 'id_kelas' => 1, 'status' => 'Lulus'],
+            ['id_rombel' => 11, 'id_siswa' => 1, 'id_kelas' => 2, 'status' => 'Aktif'],
+            ['id_rombel' => 12, 'id_siswa' => 1, 'id_kelas' => 3, 'status' => 'Aktif'],
+            ['id_rombel' => 20, 'id_siswa' => 2, 'id_kelas' => 4, 'status' => 'Aktif'],
+        ]);
+
+        $teacher = User::factory()->create(['role' => 'teacher', 'name' => 'Lidya Wuri']);
+        DB::table('guru')->insert(['id_guru' => 1, 'id_user' => $teacher->getKey(), 'nama_lengkap' => 'Lidya Wuri']);
+        DB::table('guru_kelas')->insert([
+            ['id_guru' => 1, 'id_kelas' => 2, 'peran' => 'Wali Kelas'],
+            ['id_guru' => 1, 'id_kelas' => 3, 'peran' => 'Wali Kelas'],
+        ]);
+
+        $response = $this->actingAs($teacher)
+            ->get(route('dashboard.feature', ['section' => 'siswa']))
+            ->assertOk()
+            ->assertSee('Arsyila Qiana Afiqah')
+            ->assertSee('Marwah')
+            ->assertSee('2026-2027')
+            ->assertSee('1 data total')
+            ->assertDontSee('Abu Bakar')
+            ->assertDontSee('2025-2026')
+            ->assertDontSee('2024-2025')
+            ->assertDontSee('Muhammad Ghiffari Lubis');
+
+        $this->assertSame(1, substr_count($response->getContent(), 'data-record-row'));
+
+        $this->actingAs($teacher)
+            ->get(route('dashboard.feature', ['section' => 'siswa', 'q' => 'Abu Bakar']))
+            ->assertOk()
+            ->assertSee('0 data total')
+            ->assertDontSee('Arsyila Qiana Afiqah');
+
+        $this->actingAs($teacher)
+            ->get(route('dashboard.feature', ['section' => 'siswa', 'q' => 'Ghiffari']))
+            ->assertOk()
+            ->assertSee('0 data total')
+            ->assertDontSee('Muhammad Ghiffari Lubis');
+
+        $this->actingAs($teacher)
+            ->get(route('dashboard.feature', ['section' => 'kelas']))
+            ->assertOk()
+            ->assertSee('Marwah')
+            ->assertSee('1 data total')
+            ->assertDontSee('Abu Bakar')
+            ->assertDontSee('Safa');
+
+        DB::statement(
+            'CREATE VIEW v_rekap_kehadiran_bulanan AS '
+            ."SELECT 1 AS id_siswa, 'Arsyila Qiana Afiqah' AS nama_lengkap, 3 AS id_kelas, 'Marwah' AS nama_kelas, 2026 AS tahun, 11 AS bulan, 10 AS hadir, 0 AS izin, 0 AS sakit, 0 AS alfa, 100 AS persen_hadir "
+            .'UNION ALL '
+            ."SELECT 1 AS id_siswa, 'Arsyila Qiana Afiqah' AS nama_lengkap, 2 AS id_kelas, 'Abu Bakar' AS nama_kelas, 2025 AS tahun, 11 AS bulan, 8 AS hadir, 1 AS izin, 0 AS sakit, 0 AS alfa, 88.9 AS persen_hadir"
+        );
+        $this->actingAs($teacher)
+            ->get(route('dashboard.feature', ['section' => 'absensi']))
+            ->assertOk()
+            ->assertSee('Marwah')
+            ->assertSee('1 data total')
+            ->assertDontSee('Abu Bakar');
+
+        DB::statement(
+            'CREATE VIEW v_rapor_iqro AS '
+            ."SELECT 12 AS id_rombel, 1 AS id_siswa, 1 AS id_indikator, 'Hafalan' AS kategori, 'Surah TK B' AS indikator, 1 AS urutan, 'BSB' AS semester_1, NULL AS semester_2 "
+            .'UNION ALL '
+            ."SELECT 11 AS id_rombel, 1 AS id_siswa, 2 AS id_indikator, 'Hafalan' AS kategori, 'Surah TK A Lama' AS indikator, 2 AS urutan, 'BSH' AS semester_1, NULL AS semester_2"
+        );
+        $this->actingAs($teacher)
+            ->get(route('dashboard.feature', ['section' => 'nilai']))
+            ->assertOk()
+            ->assertSee('Surah TK B')
+            ->assertSee('1 data total')
+            ->assertDontSee('Surah TK A Lama');
+
+        DB::statement(
+            'CREATE VIEW v_rapor_lengkap AS '
+            ."SELECT 101 AS id_rapor, 12 AS id_rombel, 1 AS id_siswa, 'Arsyila Qiana Afiqah' AS nama_lengkap, 'Marwah' AS nama_kelas, 'TK B' AS kelompok, '2026-2027' AS tahun_ajaran, 'Ganjil' AS semester, 'Draft' AS status, '2026-12-20' AS tanggal_rapor, 110 AS tinggi_badan, 18 AS berat_badan, 0 AS sakit, 0 AS izin, 0 AS tanpa_keterangan, '' AS narasi_agama_budi_pekerti, '' AS narasi_jati_diri, '' AS narasi_literasi_steam, '' AS narasi_p5, '' AS refleksi_orang_tua, 'Lidya Wuri' AS guru_kelas, 'Lidya Wuri' AS guru_iqro, 'Kepsek' AS kepala_sekolah "
+            .'UNION ALL '
+            ."SELECT 100 AS id_rapor, 11 AS id_rombel, 1 AS id_siswa, 'Arsyila Qiana Afiqah' AS nama_lengkap, 'Abu Bakar' AS nama_kelas, 'TK A' AS kelompok, '2025-2026' AS tahun_ajaran, 'Genap' AS semester, 'Final' AS status, '2026-06-20' AS tanggal_rapor, 105 AS tinggi_badan, 16 AS berat_badan, 0 AS sakit, 0 AS izin, 0 AS tanpa_keterangan, '' AS narasi_agama_budi_pekerti, '' AS narasi_jati_diri, '' AS narasi_literasi_steam, '' AS narasi_p5, '' AS refleksi_orang_tua, 'Guru Lama' AS guru_kelas, 'Guru Lama' AS guru_iqro, 'Kepsek' AS kepala_sekolah"
+        );
+        $this->actingAs($teacher)
+            ->get(route('dashboard.feature', ['section' => 'rapor']))
+            ->assertOk()
+            ->assertSee('Marwah')
+            ->assertSee('1 data total')
+            ->assertDontSee('Abu Bakar')
+            ->assertDontSee('2025-2026');
+    }
+
     public function test_parent_payment_form_displays_school_transfer_account(): void
     {
         $parentForm = view('dashboard.feature-actions', [
