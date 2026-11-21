@@ -1135,9 +1135,59 @@
                     </div>
                 </form>
             @empty
-                <p class="database-empty-note">Belum ada tugas yang dikumpulkan untuk kelas ini.</p>
+                <p class="database-empty-note">Tidak ada pengumpulan tugas yang menunggu penilaian.</p>
             @endforelse
         </div>
+
+        @php
+            $gradeLabels = [
+                'BB' => 'Belum Berkembang',
+                'MB' => 'Mulai Berkembang',
+                'BSH' => 'Berkembang Sesuai Harapan',
+                'BSB' => 'Berkembang Sangat Baik',
+            ];
+        @endphp
+        <h3 class="database-subheading" style="margin-top: 22px;">Sudah dinilai</h3>
+        @if (($actions['gradedSubmissions'] ?? collect())->isNotEmpty())
+            <div class="database-table-wrap">
+                <table class="database-table">
+                    <thead>
+                        <tr>
+                            <th>Nama siswa</th>
+                            <th>Tugas</th>
+                            <th>Waktu pengumpulan</th>
+                            <th>Nilai</th>
+                            <th>Umpan balik guru</th>
+                            <th>File</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($actions['gradedSubmissions'] as $submission)
+                            <tr>
+                                <td><strong>{{ $submission->nama_lengkap }}</strong></td>
+                                <td>{{ $submission->judul }}</td>
+                                <td>{{ $submission->dikumpulkan_pada }}</td>
+                                <td>
+                                    <span class="database-badge is-success">
+                                        {{ $submission->nilai }}{{ isset($gradeLabels[$submission->nilai]) ? ' — '.$gradeLabels[$submission->nilai] : '' }}
+                                    </span>
+                                </td>
+                                <td>{{ $submission->umpan_balik ?: '—' }}</td>
+                                <td>
+                                    @if ($submission->file_path)
+                                        <a class="database-button database-button-secondary" href="{{ route('database.task.submission.file', ['submission' => $submission->id_pengumpulan]) }}" target="_blank" rel="noopener">Lihat file</a>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="database-empty-note">Belum ada tugas yang selesai dinilai.</p>
+        @endif
     </section>
 @endif
 
