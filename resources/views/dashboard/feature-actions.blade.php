@@ -1101,6 +1101,7 @@
         </form>
 
         <h3 class="database-subheading">Pengumpulan untuk dinilai</h3>
+        <p class="database-empty-note" style="margin: 0 0 10px;"><strong>Keterangan:</strong> BSB = Berkembang Sangat Baik · BSH = Berkembang Sesuai Harapan · MB = Mulai Berkembang · BB = Belum Berkembang</p>
         <div class="submission-card-list">
             @forelse ($actions['submissions'] ?? [] as $submission)
                 <form method="POST" action="{{ route('database.task.grade', ['submission' => $submission->id_pengumpulan]) }}" class="submission-card">
@@ -1121,8 +1122,8 @@
                         <label class="submission-grade-field">
                             <span>Nilai</span>
                             <select name="nilai" required aria-label="Nilai tugas">
-                                @foreach (['BB', 'MB', 'BSH', 'BSB'] as $grade)
-                                    <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }}</option>
+                                @foreach (['BB' => 'Belum Berkembang', 'MB' => 'Mulai Berkembang', 'BSH' => 'Berkembang Sesuai Harapan', 'BSB' => 'Berkembang Sangat Baik'] as $grade => $gradeLabel)
+                                    <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }} = {{ $gradeLabel }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -1134,9 +1135,75 @@
                     </div>
                 </form>
             @empty
-                <p class="database-empty-note">Belum ada tugas yang dikumpulkan untuk kelas ini.</p>
+                <p class="database-empty-note">Tidak ada pengumpulan tugas yang menunggu penilaian.</p>
             @endforelse
         </div>
+
+        @php
+            $gradeLabels = [
+                'BB' => 'Belum Berkembang',
+                'MB' => 'Mulai Berkembang',
+                'BSH' => 'Berkembang Sesuai Harapan',
+                'BSB' => 'Berkembang Sangat Baik',
+            ];
+        @endphp
+        <h3 class="database-subheading" style="margin-top: 22px;">Sudah dinilai</h3>
+        @if (($actions['gradedSubmissions'] ?? collect())->isNotEmpty())
+            <div class="database-table-wrap">
+                <table class="database-table">
+                    <thead>
+                        <tr>
+                            <th>Nama siswa</th>
+                            <th>Tugas</th>
+                            <th>Waktu pengumpulan</th>
+                            <th>Nilai</th>
+                            <th>Umpan balik guru</th>
+                            <th>File</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($actions['gradedSubmissions'] as $submission)
+                            <tr>
+                                <td><strong>{{ $submission->nama_lengkap }}</strong></td>
+                                <td>{{ $submission->judul }}</td>
+                                <td>{{ $submission->dikumpulkan_pada }}</td>
+                                <td>
+                                    <span class="database-badge is-success">
+                                        {{ $submission->nilai }}{{ isset($gradeLabels[$submission->nilai]) ? ' — '.$gradeLabels[$submission->nilai] : '' }}
+                                    </span>
+                                </td>
+                                <td>{{ $submission->umpan_balik ?: '—' }}</td>
+                                <td>
+                                    @if ($submission->file_path)
+                                        <a class="database-button database-button-secondary" href="{{ route('database.task.submission.file', ['submission' => $submission->id_pengumpulan]) }}" target="_blank" rel="noopener">Lihat file</a>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td>
+                                    <details class="database-student-editor" style="border-top: 0; padding: 0;">
+                                        <summary class="database-button database-button-secondary" style="display: inline-flex; list-style: none;">Edit nilai</summary>
+                                        <form method="POST" action="{{ route('database.task.grade', ['submission' => $submission->id_pengumpulan]) }}" class="database-inline-form" style="margin-top: 8px;">
+                                            @csrf @method('PATCH')
+                                            <select name="nilai" required aria-label="Edit nilai tugas">
+                                                @foreach ($gradeLabels as $grade => $gradeLabel)
+                                                    <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }} = {{ $gradeLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                            <input name="umpan_balik" value="{{ $submission->umpan_balik }}" placeholder="Tulis umpan balik untuk siswa...">
+                                            <button class="database-button" type="submit">Simpan</button>
+                                        </form>
+                                    </details>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="database-empty-note">Belum ada tugas yang selesai dinilai.</p>
+        @endif
     </section>
 @endif
 
@@ -1176,9 +1243,59 @@
                     </div>
                 </form>
             @empty
-                <p class="database-empty-note">Belum ada tugas pada kelas anak yang terhubung.</p>
+                <p class="database-empty-note">Tidak ada tugas yang belum dinilai pada kelas anak yang terhubung.</p>
             @endforelse
         </div>
+
+        @php
+            $parentGradeLabels = [
+                'BB' => 'Belum Berkembang',
+                'MB' => 'Mulai Berkembang',
+                'BSH' => 'Berkembang Sesuai Harapan',
+                'BSB' => 'Berkembang Sangat Baik',
+            ];
+        @endphp
+        <h3 class="database-subheading" style="margin-top: 22px;">Sudah dinilai</h3>
+        @if (($actions['parentGradedTasks'] ?? collect())->isNotEmpty())
+            <div class="database-table-wrap">
+                <table class="database-table">
+                    <thead>
+                        <tr>
+                            <th>Nama siswa</th>
+                            <th>Tugas</th>
+                            <th>Tenggat</th>
+                            <th>Nilai</th>
+                            <th>Umpan balik guru</th>
+                            <th>File</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($actions['parentGradedTasks'] as $task)
+                            <tr>
+                                <td><strong>{{ $task->nama_lengkap }}</strong></td>
+                                <td>{{ $task->judul }}</td>
+                                <td>{{ $task->tenggat }}</td>
+                                <td>
+                                    <span class="database-badge is-success">
+                                        {{ $task->nilai }}{{ isset($parentGradeLabels[$task->nilai]) ? ' — '.$parentGradeLabels[$task->nilai] : '' }}
+                                    </span>
+                                </td>
+                                <td>{{ $task->umpan_balik ?: '—' }}</td>
+                                <td>
+                                    @if ($task->submission_file)
+                                        <a class="database-button database-button-secondary" href="{{ route('database.task.submission.file', ['submission' => $task->id_pengumpulan]) }}" target="_blank" rel="noopener">Lihat pengumpulan</a>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="database-empty-note">Belum ada tugas yang selesai dinilai.</p>
+        @endif
     </section>
 @endif
 
@@ -1202,7 +1319,7 @@
                 </select>
             </label>
             <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
-            <label>Capaian<select name="skala"><option>BB</option><option>MB</option><option value="BSH" selected>BSH</option><option>BSB</option></select></label>
+            <label>Capaian<select name="skala"><option value="BB">BB = Belum Berkembang</option><option value="MB">MB = Mulai Berkembang</option><option value="BSH" selected>BSH = Berkembang Sesuai Harapan</option><option value="BSB">BSB = Berkembang Sangat Baik</option></select></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Simpan nilai</button></div>
         </form>
     </section>
@@ -1230,7 +1347,7 @@
             <label>Siswa / kelas<select name="id_rombel" required>@foreach ($rosterOptions as $roster)<option value="{{ $roster->id_rombel }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }}</option>@endforeach</select></label>
             <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
             <label>Tanggal rapor<input type="date" name="tanggal_rapor" value="{{ now()->toDateString() }}"></label>
-            <label>Status<select name="status"><option>Draft</option><option>Final</option></select></label>
+            <label>Status<select name="status"><option value="Final" selected>Final</option></select></label>
             <label>Tinggi badan (cm)<input type="number" step="0.1" name="tinggi_badan" min="30" max="180"></label>
             <label>Berat badan (kg)<input type="number" step="0.1" name="berat_badan" min="5" max="120"></label>
             @if (($actions['iqroTeachers'] ?? collect())->isNotEmpty())

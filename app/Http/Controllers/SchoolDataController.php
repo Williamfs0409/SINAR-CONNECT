@@ -1145,27 +1145,36 @@ class SchoolDataController extends Controller
 
         if ($section === 'tugas') {
             if (in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('pengumpulan_tugas')) {
-                $submissionsQuery = DB::table('pengumpulan_tugas as pt')
+                $baseSubmissionsQuery = DB::table('pengumpulan_tugas as pt')
                     ->join('tugas as t', 't.id_tugas', '=', 'pt.id_tugas')
                     ->join('rombel_siswa as r', 'r.id_rombel', '=', 'pt.id_rombel')
-                    ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
-                    ->orderByDesc('pt.dikumpulkan_pada');
+                    ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa');
                 if ($role === 'teacher') {
-                    $submissionsQuery->whereIn('t.id_kelas', $scope['classIds']);
+                    $baseSubmissionsQuery->whereIn('t.id_kelas', $scope['classIds']);
                 }
-                $data['submissions'] = $submissionsQuery->get([
+                $submissionColumns = [
                     'pt.id_pengumpulan',
                     't.id_kelas',
                     't.judul',
                     's.nama_lengkap',
                     'pt.dikumpulkan_pada',
+                    'pt.dinilai_pada',
                     DB::raw("CASE WHEN pt.nilai IS NULL THEN 'Menunggu Penilaian' ELSE 'Dinilai' END as status"),
                     'pt.nilai',
                     'pt.umpan_balik',
                     'pt.file_path',
-                ]);
+                ];
+                $data['submissions'] = (clone $baseSubmissionsQuery)
+                    ->whereNull('pt.nilai')
+                    ->orderByDesc('pt.dikumpulkan_pada')
+                    ->get($submissionColumns);
+                $data['gradedSubmissions'] = (clone $baseSubmissionsQuery)
+                    ->whereNotNull('pt.nilai')
+                    ->orderByDesc('pt.dinilai_pada')
+                    ->orderByDesc('pt.dikumpulkan_pada')
+                    ->get($submissionColumns);
             } elseif ($role === 'parent') {
-                $data['parentTasks'] = DB::table('tugas as t')
+                $baseParentTasksQuery = DB::table('tugas as t')
                     ->join('rombel_siswa as r', 'r.id_kelas', '=', 't.id_kelas')
                     ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
                     ->leftJoin('pengumpulan_tugas as pt', function ($join): void {
@@ -1173,19 +1182,30 @@ class SchoolDataController extends Controller
                             ->on('pt.id_rombel', '=', 'r.id_rombel');
                     })
                     ->whereIn('r.id_siswa', $scope['studentIds'])
-                    ->where('r.status', 'Aktif')
+                    ->where('r.status', 'Aktif');
+                $parentTaskColumns = [
+                    't.id_tugas',
+                    'r.id_siswa',
+                    't.judul',
+                    't.lampiran as has_attachment',
+                    's.nama_lengkap',
+                    't.tenggat',
+                    'pt.id_pengumpulan',
+                    'pt.dikumpulkan_pada',
+                    'pt.dinilai_pada',
+                    'pt.nilai',
+                    'pt.umpan_balik',
+                    'pt.file_path as submission_file',
+                ];
+                $data['parentTasks'] = (clone $baseParentTasksQuery)
+                    ->whereNull('pt.nilai')
                     ->orderByDesc('t.tenggat')
-                    ->get([
-                        't.id_tugas',
-                        'r.id_siswa',
-                        't.judul',
-                        't.lampiran as has_attachment',
-                        's.nama_lengkap',
-                        't.tenggat',
-                        'pt.id_pengumpulan',
-                        'pt.dikumpulkan_pada',
-                        'pt.file_path as submission_file',
-                    ]);
+                    ->get($parentTaskColumns);
+                $data['parentGradedTasks'] = (clone $baseParentTasksQuery)
+                    ->whereNotNull('pt.nilai')
+                    ->orderByDesc('pt.dinilai_pada')
+                    ->orderByDesc('t.tenggat')
+                    ->get($parentTaskColumns);
             }
         }
 
