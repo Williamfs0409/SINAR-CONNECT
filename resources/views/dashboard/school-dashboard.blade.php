@@ -424,17 +424,26 @@
                                                 </td>
                                             @endforeach
                                             @if ($section === 'pengguna')
+                                                @php
+                                                    $isProtectedAdminRow = data_get($record, 'role') === 'admin'
+                                                        || (int) data_get($record, 'id_user') === (int) auth()->id()
+                                                        || strcasecmp((string) data_get($record, 'email'), (string) config('admin.bootstrap_email')) === 0;
+                                                @endphp
                                                 <td>
-                                                    <form method="POST" action="{{ route('admin.users.role', ['user' => data_get($record, 'id_user')]) }}" class="database-inline-form database-user-role-form">
-                                                        @csrf
-                                                        @method('PATCH')
-                                                        <select name="role" aria-label="Peran {{ data_get($record, 'name') }}">
-                                                            @foreach (['admin' => 'Administrator', 'teacher' => 'Guru', 'principal' => 'Kepala sekolah', 'parent' => 'Orang tua'] as $roleValue => $roleLabel)
-                                                                <option value="{{ $roleValue }}" @selected(($roleInternal[data_get($record, 'role')] ?? data_get($record, 'role')) === $roleValue)>{{ $roleLabel }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                        <button class="database-button database-button-secondary" type="submit">Perbarui</button>
-                                                    </form>
+                                                    @if ($isProtectedAdminRow)
+                                                        <span class="database-badge is-info">Super Admin</span>
+                                                    @else
+                                                        <form method="POST" action="{{ route('admin.users.role', ['user' => data_get($record, 'id_user')]) }}" class="database-inline-form database-user-role-form">
+                                                            @csrf
+                                                            @method('PATCH')
+                                                            <select name="role" aria-label="Peran {{ data_get($record, 'name') }}">
+                                                                @foreach (['admin' => 'Administrator', 'teacher' => 'Guru', 'principal' => 'Kepala sekolah', 'parent' => 'Orang tua'] as $roleValue => $roleLabel)
+                                                                    <option value="{{ $roleValue }}" @selected(($roleInternal[data_get($record, 'role')] ?? data_get($record, 'role')) === $roleValue)>{{ $roleLabel }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                            <button class="database-button database-button-secondary" type="submit">Perbarui</button>
+                                                        </form>
+                                                    @endif
                                                 </td>
                                             @endif
                                             @if ($showActionColumn)
@@ -487,27 +496,31 @@
                                                             </form>
                                                         </div>
                                                     @elseif ($section === 'pengguna')
-                                                        <div class="database-row-actions">
-                                                            <details class="database-row-editor">
-                                                                <summary class="database-icon-button" aria-label="Edit akun {{ data_get($record, 'name') }}" title="Edit akun">
-                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
-                                                                </summary>
-                                                                <form method="POST" action="{{ route('database.user.profile.update', ['user' => data_get($record, 'id_user')]) }}" class="database-row-editor-form">
+                                                        @if ($isProtectedAdminRow ?? false)
+                                                            <span class="database-empty-note" title="Akun Super Admin terkunci">—</span>
+                                                        @else
+                                                            <div class="database-row-actions">
+                                                                <details class="database-row-editor">
+                                                                    <summary class="database-icon-button" aria-label="Edit akun {{ data_get($record, 'name') }}" title="Edit akun">
+                                                                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                                                                    </summary>
+                                                                    <form method="POST" action="{{ route('database.user.profile.update', ['user' => data_get($record, 'id_user')]) }}" class="database-row-editor-form">
+                                                                        @csrf
+                                                                        @method('PATCH')
+                                                                        <label>Nama<input name="name" value="{{ data_get($record, 'name') }}" maxlength="100" required></label>
+                                                                        <label>Email<input type="email" name="email" value="{{ data_get($record, 'email') }}" maxlength="150" required></label>
+                                                                        <button class="database-button database-button-secondary" type="submit">Simpan perubahan</button>
+                                                                    </form>
+                                                                </details>
+                                                                <form method="POST" action="{{ route('database.user.destroy', ['user' => data_get($record, 'id_user')]) }}" data-confirm="Hapus akun {{ data_get($record, 'name') }}? Akun yang masih memiliki riwayat atau relasi akan ditolak.">
                                                                     @csrf
-                                                                    @method('PATCH')
-                                                                    <label>Nama<input name="name" value="{{ data_get($record, 'name') }}" maxlength="100" required></label>
-                                                                    <label>Email<input type="email" name="email" value="{{ data_get($record, 'email') }}" maxlength="150" required></label>
-                                                                    <button class="database-button database-button-secondary" type="submit">Simpan perubahan</button>
+                                                                    @method('DELETE')
+                                                                    <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus akun {{ data_get($record, 'name') }}" title="Hapus akun">
+                                                                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                                                                    </button>
                                                                 </form>
-                                                            </details>
-                                                            <form method="POST" action="{{ route('database.user.destroy', ['user' => data_get($record, 'id_user')]) }}" data-confirm="Hapus akun {{ data_get($record, 'name') }}? Akun yang masih memiliki riwayat atau relasi akan ditolak.">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus akun {{ data_get($record, 'name') }}" title="Hapus akun">
-                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
-                                                                </button>
-                                                            </form>
-                                                        </div>
+                                                            </div>
+                                                        @endif
                                                     @elseif ($section === 'guru')
                                                         <div class="database-row-actions">
                                                             <form method="POST" action="{{ route('database.teacher.destroy', ['teacher' => data_get($record, 'id_guru')]) }}" data-confirm="Hapus data guru {{ data_get($record, 'nama_dengan_gelar') }}? Data yang masih memiliki riwayat kelas/rapor akan ditolak.">
