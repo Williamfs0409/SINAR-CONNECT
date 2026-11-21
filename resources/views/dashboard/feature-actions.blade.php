@@ -602,7 +602,7 @@
                 <div class="database-attendance-list">
                     @foreach ($actions['attendanceRoster'] as $index => $student)
                         @php
-                            $currentStatus = $student->status_absensi ?? 'Hadir';
+                            $currentStatus = $student->status_absensi;
                         @endphp
                         <div class="database-attendance-row">
                             <div class="attendance-student-name">
