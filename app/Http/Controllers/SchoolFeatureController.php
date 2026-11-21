@@ -3148,12 +3148,53 @@ class SchoolFeatureController extends Controller
         $bill = DB::table('tagihan')->where('id_tagihan', $billId)->first();
         abort_unless($bill !== null, 404);
 
-        $this->assertNoDeleteDependencies($billId, [
-            ['alokasi_pembayaran', 'id_tagihan', 'riwayat alokasi pembayaran'],
-        ], 'tagihan');
+        if (Schema::hasTable('alokasi_pembayaran') && Schema::hasTable('pembayaran')) {
+            $hasActivePayment = DB::table('alokasi_pembayaran as a')
+                ->join('pembayaran as p', 'p.id_pembayaran', '=', 'a.id_pembayaran')
+                ->where('a.id_tagihan', $billId)
+                ->whereNotIn('p.status', ['Dibatalkan', 'Ditolak'])
+                ->exists();
+
+            if ($hasActivePayment) {
+                throw ValidationException::withMessages([
+                    'delete' => 'Tidak dapat menghapus tagihan karena masih memiliki pembayaran terverifikasi atau menunggu verifikasi.',
+                ]);
+            }
+        }
 
         try {
-            DB::table('tagihan')->where('id_tagihan', $billId)->delete();
+            DB::transaction(function () use ($billId): void {
+                if (Schema::hasTable('alokasi_pembayaran') && Schema::hasTable('pembayaran')) {
+                    $canceledPaymentIds = DB::table('alokasi_pembayaran as a')
+                        ->join('pembayaran as p', 'p.id_pembayaran', '=', 'a.id_pembayaran')
+                        ->where('a.id_tagihan', $billId)
+                        ->whereIn('p.status', ['Dibatalkan', 'Ditolak'])
+                        ->pluck('a.id_pembayaran')
+                        ->unique()
+                        ->all();
+
+                    if ($canceledPaymentIds !== []) {
+                        DB::table('alokasi_pembayaran')
+                            ->where('id_tagihan', $billId)
+                            ->whereIn('id_pembayaran', $canceledPaymentIds)
+                            ->delete();
+
+                        foreach ($canceledPaymentIds as $paymentId) {
+                            $stillUsed = DB::table('alokasi_pembayaran')
+                                ->where('id_pembayaran', $paymentId)
+                                ->exists();
+                            if (! $stillUsed) {
+                                DB::table('pembayaran')
+                                    ->where('id_pembayaran', $paymentId)
+                                    ->whereIn('status', ['Dibatalkan', 'Ditolak'])
+                                    ->delete();
+                            }
+                        }
+                    }
+                }
+
+                DB::table('tagihan')->where('id_tagihan', $billId)->delete();
+            });
         } catch (QueryException $exception) {
             $sqlState = $exception->errorInfo[0] ?? '';
             $message = $exception->errorInfo[2] ?? $exception->getMessage();
