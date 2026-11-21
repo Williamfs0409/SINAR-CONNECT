@@ -1457,6 +1457,26 @@
                 <p class="database-empty-note">Tidak ada pembayaran yang menunggu verifikasi.</p>
             @endforelse
 
+            @if (($actions['pendingSavingsTransfers'] ?? collect())->isNotEmpty())
+                <div class="database-section-heading database-subsection-heading"><div><h2>Verifikasi setoran tabungan (Transfer)</h2><p>Periksa bukti transfer setoran tabungan dari orang tua sebelum masuk ke saldo tabungan siswa.</p></div></div>
+                @foreach ($actions['pendingSavingsTransfers'] as $deposit)
+                    <form method="POST" action="{{ route('database.savings.transfer.review', ['deposit' => $deposit->id]) }}" class="database-action-row">
+                        @csrf @method('PATCH')
+                        <div>
+                            <strong>{{ $deposit->nama_lengkap }} · Setor Tabungan</strong>
+                            <small>{{ $deposit->created_at }} · {{ $deposit->metode }} · Rp {{ number_format((float) $deposit->jumlah, 0, ',', '.') }}</small>
+                            @if (! empty($deposit->catatan))
+                                <small>Catatan orang tua: {{ $deposit->catatan }}</small>
+                            @endif
+                        </div>
+                        <a class="database-button database-button-secondary" href="{{ route('database.savings.transfer.proof', ['deposit' => $deposit->id]) }}" target="_blank" rel="noopener">Lihat bukti</a>
+                        <input name="catatan" maxlength="255" placeholder="Catatan verifikasi">
+                        <button class="database-button" type="submit" name="decision" value="verify">Setujui</button>
+                        <button class="database-button database-button-danger" type="submit" name="decision" value="reject">Tolak</button>
+                    </form>
+                @endforeach
+            @endif
+
             @if (($actions['cancellablePayments'] ?? collect())->isNotEmpty())
                 <div class="database-section-heading database-subsection-heading"><div><h2>Batalkan kuitansi pembayaran</h2><p>Pembatalan tidak menghapus baris transaksi (immutable ledger), melainkan mengubah status menjadi Dibatalkan dengan alasan wajib.</p></div></div>
                 @foreach ($actions['cancellablePayments'] as $cancellable)
@@ -1474,10 +1494,21 @@
                     </form>
                 @endforeach
             @endif
+
+            <div class="database-section-heading database-subsection-heading"><div><h2>Catat transaksi tabungan siswa</h2><p>Transaksi setor dan tarik disimpan sebagai riwayat tabungan; transaksi yang sudah tercatat tidak dapat dihapus.</p></div></div>
+            <form method="POST" action="{{ route('database.savings.store') }}" class="database-form-grid">
+                @csrf
+                <label>Siswa<select name="id_siswa" required>@foreach ($actions['activeStudents'] ?? [] as $student)<option value="{{ $student->id_siswa }}">{{ $student->nama_lengkap }}</option>@endforeach</select></label>
+                <label>Jenis<select name="jenis"><option>Setor</option><option>Tarik</option></select></label>
+                <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
+                <label>Metode<select name="metode"><option>Tunai</option><option>Transfer</option></select></label>
+                <label class="database-form-wide">Keterangan<input name="keterangan" maxlength="255"></label>
+                <div class="database-form-wide"><button class="database-button" type="submit">Catat transaksi tabungan</button></div>
+            </form>
         @endif
 
         @if ($section === 'pembayaran')
-            <div class="database-section-heading"><div><h2>{{ $role === 'parent' ? 'Kirim pembayaran' : 'Catat pembayaran' }}</h2><p>Pembayaran transfer membutuhkan bukti; transaksi tunai oleh administrator langsung tercatat.</p></div></div>
+            <div class="database-section-heading @if ($role === 'admin') database-subsection-heading @endif"><div><h2>{{ $role === 'parent' ? 'Kirim pembayaran' : 'Catat pembayaran tagihan' }}</h2><p>{{ $role === 'parent' ? 'Pilih jenis pembayaran (Tagihan atau Setor Tabungan) menggunakan metode Transfer dan unggah bukti transfer.' : 'Pembayaran transfer membutuhkan bukti; transaksi tunai oleh administrator langsung tercatat.' }}</p></div></div>
             @if ($role === 'parent')
                 @if ($actions['paymentSettings'] ?? null)
                     <div class="database-bank-details" role="note" aria-label="Informasi rekening pembayaran">
@@ -1489,37 +1520,120 @@
                             <span id="payment-account-copy-status" aria-live="polite"></span>
                         </div>
                         <div><span>Atas nama</span><strong>{{ $actions['paymentSettings']->account_holder }}</strong></div>
-                        <p>Transfer sesuai sisa tagihan, lalu unggah bukti transfer agar pembayaran dapat diverifikasi.</p>
+                        <p>Transfer sesuai nominal yang diinginkan, lalu unggah bukti transfer agar dapat diverifikasi admin.</p>
                     </div>
                 @else
                     <p class="database-form-errors">Informasi rekening belum disiapkan. Hubungi administrator sebelum membayar.</p>
                 @endif
-            @endif
-            @if (($actions['payableBills'] ?? collect())->isEmpty())
-                <p class="database-empty-note">Belum ada tagihan dengan sisa pembayaran yang dapat dibayar.</p>
-            @else
-                <form method="POST" action="{{ route('database.payment.store') }}" enctype="multipart/form-data" class="database-form-grid">
-                    @csrf
-                    <label>Tagihan<select name="id_tagihan" required>
-                        @foreach ($actions['payableBills'] as $bill)
-                            <option value="{{ $bill->id_tagihan }}">{{ $bill->nama_lengkap }} · {{ $bill->jenis_biaya }} · Sisa Rp {{ number_format($bill->sisa, 0, ',', '.') }}</option>
-                        @endforeach
-                    </select></label>
-                    <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
-                    <label>Metode<select name="metode" required>
-                        @if ($role === 'parent')
-                            <option value="Transfer" selected>Transfer</option>
+
+                @php
+                    $defaultPayMode = old('payment_mode', (($actions['payableBills'] ?? collect())->isEmpty() && ($actions['parentStudents'] ?? collect())->isNotEmpty()) ? 'savings' : 'bill');
+                @endphp
+                <div class="payment-mode-switcher" data-payment-mode-root>
+                    <div class="payment-mode-tabs" role="tablist" aria-label="Pilih jenis pembayaran">
+                        <button type="button" role="tab" class="payment-mode-btn @if ($defaultPayMode === 'bill') is-active @endif" data-payment-mode-btn="bill" aria-selected="{{ $defaultPayMode === 'bill' ? 'true' : 'false' }}">
+                            Bayar Tagihan (Transfer)
+                        </button>
+                        <button type="button" role="tab" class="payment-mode-btn @if ($defaultPayMode === 'savings') is-active @endif" data-payment-mode-btn="savings" aria-selected="{{ $defaultPayMode === 'savings' ? 'true' : 'false' }}">
+                            Setor Tabungan (Transfer)
+                        </button>
+                    </div>
+
+                    <div class="payment-mode-panel" data-payment-mode-panel="bill" @if ($defaultPayMode !== 'bill') hidden @endif>
+                        @if (($actions['payableBills'] ?? collect())->isEmpty())
+                            <p class="database-empty-note">Belum ada tagihan dengan sisa pembayaran yang dapat dibayar.</p>
                         @else
-                            <option value="Tunai">Tunai</option><option value="Transfer">Transfer</option>
+                            <form method="POST" action="{{ route('database.payment.store') }}" enctype="multipart/form-data" class="database-form-grid">
+                                @csrf
+                                <input type="hidden" name="payment_mode" value="bill">
+                                <label>Tagihan<select name="id_tagihan" required>
+                                    @foreach ($actions['payableBills'] as $bill)
+                                        <option value="{{ $bill->id_tagihan }}">{{ $bill->nama_lengkap }} · {{ $bill->jenis_biaya }} · Sisa Rp {{ number_format($bill->sisa, 0, ',', '.') }}</option>
+                                    @endforeach
+                                </select></label>
+                                <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
+                                <label>Metode<select name="metode" required>
+                                    <option value="Transfer" selected>Transfer</option>
+                                </select></label>
+                                <label>Bukti transfer (JPG/PNG/PDF, maks. 5 MB)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" data-max-mb="5" required></label>
+                                <label class="database-form-wide">Catatan<input name="catatan" maxlength="255"></label>
+                                <div class="database-form-wide"><button class="database-button" type="submit">Simpan pembayaran</button></div>
+                            </form>
                         @endif
-                    </select></label>
-                    <label>Bukti transfer (JPG/PNG/PDF, maks. 5 MB)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" data-max-mb="5" @required($role === 'parent')></label>
-                    <label class="database-form-wide">Catatan<input name="catatan" maxlength="255"></label>
-                    <div class="database-form-wide"><button class="database-button" type="submit">Simpan pembayaran</button></div>
-                </form>
-            @endif
-            @if ($role === 'parent')
+                    </div>
+
+                    <div class="payment-mode-panel" data-payment-mode-panel="savings" @if ($defaultPayMode !== 'savings') hidden @endif>
+                        @if (($actions['parentStudents'] ?? collect())->isEmpty())
+                            <p class="database-empty-note">Belum ada data anak yang terhubung untuk setoran tabungan.</p>
+                        @else
+                            <form method="POST" action="{{ route('database.savings.transfer.store') }}" enctype="multipart/form-data" class="database-form-grid">
+                                @csrf
+                                <input type="hidden" name="payment_mode" value="savings">
+                                <label>Siswa<select name="id_siswa" required>
+                                    @foreach ($actions['parentStudents'] as $student)
+                                        <option value="{{ $student->id_siswa }}">{{ $student->nama_lengkap }}</option>
+                                    @endforeach
+                                </select></label>
+                                <label>Jumlah setoran<input type="number" name="jumlah" min="1" step="0.01" required></label>
+                                <label>Metode<select name="metode" disabled><option value="Transfer" selected>Transfer</option></select></label>
+                                <label>Bukti transfer (JPG/PNG/PDF, maks. 5 MB)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" data-max-mb="5" required></label>
+                                <label class="database-form-wide">Catatan<input name="catatan" maxlength="255" placeholder="Contoh: Setoran tabungan bulan ini"></label>
+                                <div class="database-form-wide"><button class="database-button" type="submit">Kirim setoran tabungan</button></div>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+
+                @if (($actions['parentSavingsTransfers'] ?? collect())->isNotEmpty())
+                    <div class="database-section-heading database-subsection-heading"><div><h2>Riwayat pengajuan setoran tabungan (Transfer)</h2><p>Setoran tabungan yang telah disetujui admin otomatis masuk ke Saldo Tabungan dan Riwayat Tabungan.</p></div></div>
+                    <div class="parent-savings-transfer-list">
+                        @foreach ($actions['parentSavingsTransfers'] as $deposit)
+                            @php
+                                $depositClass = match ($deposit->status) {
+                                    'Terverifikasi' => 'is-valid',
+                                    'Ditolak' => 'is-invalid',
+                                    default => 'is-pending',
+                                };
+                            @endphp
+                            <div class="database-action-row">
+                                <div>
+                                    <strong>{{ $deposit->nama_lengkap }} · Rp {{ number_format((float) $deposit->jumlah, 0, ',', '.') }}</strong>
+                                    <small>{{ $deposit->created_at }} · {{ $deposit->metode }}</small>
+                                    @if (! empty($deposit->catatan))
+                                        <small>Catatan: {{ $deposit->catatan }}</small>
+                                    @endif
+                                </div>
+                                <span class="parent-reg-doc-badge {{ $depositClass }}">
+                                    <span class="parent-reg-status-dot" aria-hidden="true"></span>
+                                    {{ $deposit->status }}
+                                </span>
+                                <a class="database-button database-button-secondary" href="{{ route('database.savings.transfer.proof', ['deposit' => $deposit->id]) }}" target="_blank" rel="noopener">Lihat bukti</a>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
                 <p class="database-empty-note">Status pembayaran: <strong>Menunggu Verifikasi</strong> sedang diperiksa admin, <strong>Terverifikasi</strong> sudah disetujui, dan <strong>Ditolak</strong> perlu ditindaklanjuti.</p>
+            @else
+                @if (($actions['payableBills'] ?? collect())->isEmpty())
+                    <p class="database-empty-note">Belum ada tagihan dengan sisa pembayaran yang dapat dibayar.</p>
+                @else
+                    <form method="POST" action="{{ route('database.payment.store') }}" enctype="multipart/form-data" class="database-form-grid">
+                        @csrf
+                        <label>Tagihan<select name="id_tagihan" required>
+                            @foreach ($actions['payableBills'] as $bill)
+                                <option value="{{ $bill->id_tagihan }}">{{ $bill->nama_lengkap }} · {{ $bill->jenis_biaya }} · Sisa Rp {{ number_format($bill->sisa, 0, ',', '.') }}</option>
+                            @endforeach
+                        </select></label>
+                        <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
+                        <label>Metode<select name="metode" required>
+                            <option value="Tunai">Tunai</option><option value="Transfer">Transfer</option>
+                        </select></label>
+                        <label>Bukti transfer (JPG/PNG/PDF, maks. 5 MB)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" data-max-mb="5"></label>
+                        <label class="database-form-wide">Catatan<input name="catatan" maxlength="255"></label>
+                        <div class="database-form-wide"><button class="database-button" type="submit">Simpan pembayaran</button></div>
+                    </form>
+                @endif
             @endif
         @endif
     </section>
@@ -1590,21 +1704,6 @@
                 <div class="database-form-wide"><button class="database-button" type="submit">Hubungkan akun</button></div>
             </form>
         @endif
-    </section>
-@endif
-
-@if ($section === 'tabungan' && $role === 'admin')
-    <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Catat transaksi tabungan</h2><p>Transaksi setor dan tarik disimpan sebagai riwayat; transaksi yang sudah tercatat tidak dihapus.</p></div></div>
-        <form method="POST" action="{{ route('database.savings.store') }}" class="database-form-grid">
-            @csrf
-            <label>Siswa<select name="id_siswa" required>@foreach ($actions['activeStudents'] ?? [] as $student)<option value="{{ $student->id_siswa }}">{{ $student->nama_lengkap }}</option>@endforeach</select></label>
-            <label>Jenis<select name="jenis"><option>Setor</option><option>Tarik</option></select></label>
-            <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
-            <label>Metode<select name="metode"><option>Tunai</option><option>Transfer</option></select></label>
-            <label class="database-form-wide">Keterangan<input name="keterangan" maxlength="255"></label>
-            <div class="database-form-wide"><button class="database-button" type="submit">Catat transaksi</button></div>
-        </form>
     </section>
 @endif
 
