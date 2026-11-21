@@ -13,12 +13,13 @@
         </div>
         @forelse ($actions['parentApplications'] ?? [] as $application)
             @php
+                $isAppRejected = $application->status === 'Ditolak';
                 $totalDocs = $application->requiredDocuments->count();
                 $uploadedDocs = $application->requiredDocuments->filter(fn ($item) => (bool) $item['document'])->count();
-                $validDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && $item['document']->status_verifikasi === 'Valid')->count();
-                $rejectedDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && $item['document']->status_verifikasi === 'Tidak Valid')->count();
-                $documentsToUpload = $application->requiredDocuments->filter(function ($item) {
-                    return ! $item['document'] || $item['document']->status_verifikasi === 'Tidak Valid';
+                $validDocs = $application->requiredDocuments->filter(fn ($item) => ! $isAppRejected && $item['document'] && $item['document']->status_verifikasi === 'Valid')->count();
+                $rejectedDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && ($isAppRejected || $item['document']->status_verifikasi === 'Tidak Valid'))->count();
+                $documentsToUpload = $application->requiredDocuments->filter(function ($item) use ($isAppRejected) {
+                    return ! $item['document'] || $isAppRejected || $item['document']->status_verifikasi === 'Tidak Valid';
                 });
                 $appStatusClass = match ($application->status) {
                     'Diverifikasi', 'Diterima' => 'is-valid',
@@ -40,7 +41,7 @@
                                     · {{ $validDocs }} valid
                                 @endif
                                 @if ($rejectedDocs > 0)
-                                    · {{ $rejectedDocs }} perlu diperbaiki
+                                    · {{ $rejectedDocs }} ditolak
                                 @endif
                             </span>
                         </div>
@@ -87,11 +88,16 @@
                     @foreach ($application->requiredDocuments as $requiredDocument)
                         @php
                             $document = $requiredDocument['document'];
-                            $docStatusLabel = $document ? $document->status_verifikasi : 'Belum diunggah';
+                            $isDocRejected = $document && ($isAppRejected || $document->status_verifikasi === 'Tidak Valid');
+                            $docStatusLabel = match (true) {
+                                ! $document => 'Belum diunggah',
+                                $isDocRejected => 'Ditolak',
+                                default => $document->status_verifikasi,
+                            };
                             $docStateClass = match (true) {
                                 ! $document => 'is-missing',
+                                $isDocRejected => 'is-invalid',
                                 $document->status_verifikasi === 'Valid' => 'is-valid',
-                                $document->status_verifikasi === 'Tidak Valid' => 'is-invalid',
                                 default => 'is-pending',
                             };
                             $docExt = $document ? strtolower(pathinfo((string) ($document->file_path ?? ''), PATHINFO_EXTENSION)) : '';
@@ -204,25 +210,84 @@
                                 @php
                                     $documentKey = $requiredDocument['key'];
                                     $document = $requiredDocument['document'];
-                                    $mustReupload = ! $document || $document->status_verifikasi === 'Tidak Valid';
+                                    $mustReupload = ! $document;
                                     $documentError = $errors->first('documents.'.$documentKey);
+                                    $prevExt = $document ? strtolower(pathinfo((string) ($document->file_path ?? ''), PATHINFO_EXTENSION)) : '';
+                                    $prevIsImage = in_array($prevExt, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
+                                    $prevUrl = $document ? route('database.registration.document.file', ['document' => $document->id_dokumen]) : null;
                                 @endphp
-                                <label>
-                                    {{ $requiredDocument['label'] }}
-                                    <span class="parent-reg-resubmit-doc-hint @if ($mustReupload) is-required @endif">
-                                        ({{ $mustReupload ? 'Wajib diunggah' : 'Opsional — ganti jika perlu' }})
-                                    </span>
-                                    <input
-                                        type="file"
-                                        name="documents[{{ $documentKey }}]"
-                                        accept=".pdf,.jpg,.jpeg,.png"
-                                        data-max-bytes="5242880"
-                                        @required($mustReupload)
-                                    >
-                                    @if ($documentError)
-                                        <small class="registration-upload-feedback is-error">{{ $documentError }}</small>
+                                <div class="parent-reg-doc-upload-card">
+                                    <label>
+                                        <span>
+                                            {{ $requiredDocument['label'] }}
+                                            <span class="parent-reg-resubmit-doc-hint @if ($mustReupload) is-required @endif">
+                                                ({{ $mustReupload ? 'Wajib diunggah' : 'Opsional — ganti jika perlu' }})
+                                            </span>
+                                        </span>
+                                        <input
+                                            type="file"
+                                            name="documents[{{ $documentKey }}]"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            data-max-bytes="5242880"
+                                            @required($mustReupload)
+                                        >
+                                        @if ($documentError)
+                                            <small class="registration-upload-feedback is-error">{{ $documentError }}</small>
+                                        @endif
+                                    </label>
+                                    @if ($document && $prevUrl)
+                                        <div class="parent-reg-prev-file">
+                                            <div class="parent-reg-prev-file-left">
+                                                @if ($prevIsImage)
+                                                    <a
+                                                        class="parent-reg-prev-thumb-link"
+                                                        href="{{ $prevUrl }}"
+                                                        data-doc-preview
+                                                        data-doc-name="{{ $application->nama_lengkap }} · {{ $requiredDocument['label'] }} (Sebelumnya)"
+                                                        data-doc-ext="{{ $prevExt }}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        title="Pratinjau {{ $requiredDocument['label'] }} sebelumnya"
+                                                    >
+                                                        <img class="parent-reg-prev-thumb" src="{{ $prevUrl }}" alt="Pratinjau {{ $requiredDocument['label'] }}" loading="lazy">
+                                                    </a>
+                                                @else
+                                                    <a
+                                                        class="parent-reg-prev-pdf"
+                                                        href="{{ $prevUrl }}"
+                                                        data-doc-preview
+                                                        data-doc-name="{{ $application->nama_lengkap }} · {{ $requiredDocument['label'] }} (Sebelumnya)"
+                                                        data-doc-ext="{{ $prevExt }}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        title="Pratinjau {{ $requiredDocument['label'] }} sebelumnya"
+                                                    >
+                                                        {{ strtoupper($prevExt ?: 'FILE') }}
+                                                    </a>
+                                                @endif
+                                                <div class="parent-reg-prev-meta">
+                                                    <span class="parent-reg-prev-title">Berkas sebelumnya ({{ strtoupper($prevExt ?: 'FILE') }})</span>
+                                                    <span class="parent-reg-prev-sub">Status: Ditolak · klik pratinjau untuk melihat</span>
+                                                </div>
+                                            </div>
+                                            <a
+                                                class="parent-reg-prev-btn"
+                                                href="{{ $prevUrl }}"
+                                                data-doc-preview
+                                                data-doc-name="{{ $application->nama_lengkap }} · {{ $requiredDocument['label'] }} (Sebelumnya)"
+                                                data-doc-ext="{{ $prevExt }}"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                                                    <circle cx="12" cy="12" r="3"/>
+                                                </svg>
+                                                <span>Pratinjau</span>
+                                            </a>
+                                        </div>
                                     @endif
-                                </label>
+                                </div>
                             @endforeach
 
                             <div class="database-form-wide parent-reg-upload-footer">
