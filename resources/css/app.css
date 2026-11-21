@@ -4538,3 +4538,417 @@ input[type="file"].is-invalid {
 .message-delete-button:hover {
     background: rgba(220, 53, 69, .85);
 }
+
+/* ==========================================================================
+   Perbaikan Responsif Menyeluruh (Tablet & Mobile <= 900px / 768px / 480px)
+   ========================================================================== */
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.database-table-wrap,
+.database-main,
+.database-action-panel,
+.database-list-section {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.database-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 960px) {
+    .portal-dashboard-header {
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) auto;
+        gap: 10px;
+        padding: 10px 16px;
+    }
+
+    .portal-dashboard-term {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .database-dashboard-portal {
+        display: block;
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Header 2 baris rapi: Baris 1 = Brand + Akun, Baris 2 = Search full width */
+    .portal-dashboard-header {
+        position: sticky;
+        top: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px 12px;
+        min-height: auto;
+        padding: 10px 12px 12px;
+    }
+
+    .portal-dashboard-brand {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .portal-dashboard-brand-mark {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+    }
+
+    .portal-dashboard-brand > span:last-child {
+        min-width: 0;
+    }
+
+    .portal-dashboard-brand strong {
+        font-size: 13px;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-dashboard-brand small {
+        font-size: 9px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-dashboard-account {
+        flex: 0 0 auto;
+        gap: 8px;
+    }
+
+    .portal-dashboard-header .portal-profile-trigger {
+        min-width: 0;
+        max-width: 150px;
+        padding: 4px 8px 4px 5px;
+        gap: 6px;
+    }
+
+    .portal-profile-copy {
+        min-width: 0;
+    }
+
+    .portal-profile-copy strong {
+        max-width: 78px;
+        font-size: 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-profile-copy small {
+        font-size: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-dashboard-search {
+        order: 3;
+        flex: 1 0 100%;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        min-height: 38px;
+        padding: 0 12px;
+    }
+
+    .portal-dashboard-search input {
+        font-size: 12px;
+    }
+
+    .portal-global-search-results {
+        left: 0;
+        right: 0;
+        width: 100%;
+        min-width: 0;
+        max-height: 60vh;
+    }
+
+    .portal-profile-dropdown,
+    [data-role-notification-panel],
+    [data-message-notification-panel] {
+        max-width: calc(100vw - 24px);
+    }
+
+    /* Navigasi horizontal mobile yang halus tanpa terpotong */
+    .database-dashboard-portal .database-sidebar {
+        position: static;
+        height: auto;
+        width: 100%;
+        padding: 8px 10px;
+        border-right: 0;
+        border-bottom: 1px solid #203f60;
+    }
+
+    .database-dashboard-portal .database-navigation {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 2px 2px 4px;
+    }
+
+    .database-dashboard-portal .database-navigation::-webkit-scrollbar {
+        display: none;
+    }
+
+    .database-dashboard-portal .database-navigation-group {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: row;
+        gap: 6px;
+        margin: 0 !important;
+    }
+
+    .database-dashboard-portal .database-navigation-heading {
+        display: none;
+    }
+
+    .database-dashboard-portal .database-navigation a {
+        min-height: 36px;
+        margin-inline: 0;
+        padding: 0 11px;
+        gap: 6px;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        font-size: 11px;
+        border-radius: 9px;
+    }
+
+    .database-dashboard-portal .database-navigation a > span {
+        width: 18px;
+        height: 18px;
+        flex-basis: 18px;
+    }
+
+    /* Konten utama, kartu, heading, pencarian, dan form */
+    .database-dashboard-portal .database-main {
+        padding: 16px 12px 28px;
+    }
+
+    .database-stat-grid,
+    .database-quick-action-grid,
+    .database-module-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .database-section-heading {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .database-list-controls,
+    .database-record-search-form {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .database-record-search {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .database-record-search input {
+        width: 100%;
+    }
+
+    .database-form-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .database-action-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .panel-inline-search {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    /* Daftar absensi mobile-friendly */
+    .database-attendance-header {
+        display: none;
+    }
+
+    .database-attendance-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .attendance-status-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    /* Preview file upload mobile-friendly */
+    .file-picker-preview {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .file-picker-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    /* Halaman Pesan (WhatsApp-style) pada layar kecil */
+    .message-center-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .message-center-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    /* Halaman Pendaftaran */
+    .registration-main {
+        width: calc(100% - 20px);
+        margin: 14px auto 28px;
+        padding: 16px 14px;
+    }
+
+    .registration-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .registration-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px 14px;
+    }
+
+    /* Paginasi, aksi tabel, kartu inline, dan jadwal mengajar */
+    .database-pagination {
+        justify-content: center;
+    }
+
+    .database-pagination nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .database-inline-actions,
+    .database-record-edit-summary,
+    .database-schedule-header,
+    .database-schedule-controls,
+    .submission-card-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .database-schedule-days {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(46px, 1fr));
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 6px;
+    }
+
+    .database-student-editor > summary {
+        flex-wrap: wrap;
+        gap: 6px;
+        line-height: 1.35;
+    }
+
+    .database-activity-gallery,
+    .database-portfolio-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .database-dashboard-portal .database-intro.database-welcome,
+    .database-dashboard .database-intro.database-welcome,
+    .database-welcome {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 16px;
+    }
+
+    .database-welcome h2 {
+        font-size: 18px;
+        line-height: 1.25;
+        word-break: break-word;
+    }
+
+    .database-welcome-mark {
+        display: none;
+    }
+
+    /* Modal preview file di layar kecil */
+    .file-preview-modal {
+        padding: 10px;
+    }
+
+    .file-preview-modal-dialog {
+        width: 100%;
+        max-height: 92vh;
+    }
+
+    .file-preview-modal-head {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+    }
+
+    /* Halaman Profil & Auth */
+    .profile-settings-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px 14px;
+    }
+
+    .profile-photo-card {
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
+
+    .auth-card,
+    .login-card,
+    .registration-success-card {
+        width: calc(100% - 24px);
+        max-width: 100%;
+        padding: 20px 16px;
+    }
+}
+
+@media (max-width: 420px) {
+    .portal-dashboard-brand small {
+        display: none;
+    }
+
+    .portal-profile-copy small {
+        display: none;
+    }
+
+    .portal-profile-copy strong {
+        max-width: 68px;
+    }
+}
