@@ -908,7 +908,7 @@ class SchoolDataController extends Controller
                 ? collect()
                 : DB::table('dokumen_pendaftaran')
                     ->whereIn('id_pendaftaran', $applicationIds)
-                    ->get(['id_dokumen', 'id_pendaftaran', 'jenis', 'status_verifikasi', 'catatan'])
+                    ->get(['id_dokumen', 'id_pendaftaran', 'jenis', 'file_path', 'status_verifikasi', 'catatan'])
                     ->groupBy('id_pendaftaran');
 
             $data['parentApplications'] = $applications->map(function ($application) use ($documents): object {
