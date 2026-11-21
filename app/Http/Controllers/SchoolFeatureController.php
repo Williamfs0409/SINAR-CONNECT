@@ -3029,7 +3029,17 @@ class SchoolFeatureController extends Controller
             ['alokasi_pembayaran', 'id_tagihan', 'riwayat alokasi pembayaran'],
         ], 'tagihan');
 
-        DB::table('tagihan')->where('id_tagihan', $billId)->delete();
+        try {
+            DB::table('tagihan')->where('id_tagihan', $billId)->delete();
+        } catch (QueryException $exception) {
+            $sqlState = $exception->errorInfo[0] ?? '';
+            $message = $exception->errorInfo[2] ?? $exception->getMessage();
+            if ($sqlState === '45000' || str_contains($message, '1644')) {
+                $cleanMessage = preg_replace('/^.*1644\s*/', '', (string) $message);
+                throw ValidationException::withMessages(['delete' => $cleanMessage ?: 'Tagihan ini tidak dapat dihapus.']);
+            }
+            throw $exception;
+        }
 
         return back()->with('status', 'Tagihan siswa berhasil dihapus.');
     }

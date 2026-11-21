@@ -597,7 +597,13 @@ document.querySelectorAll('.database-action-panel select, .registration-form sel
             ? `${originalOptions.filter((opt) => opt.value !== '').length} opsi`
             : `${selectableMatches.length} cocok`;
 
-        if (filtered.some((opt) => opt.value === previousValue)) {
+        if (query !== '' && selectableMatches.length > 0) {
+            if (previousValue !== '' && selectableMatches.some((opt) => opt.value === previousValue)) {
+                select.value = previousValue;
+            } else {
+                select.value = selectableMatches[0].value;
+            }
+        } else if (filtered.some((opt) => opt.value === previousValue)) {
             select.value = previousValue;
         } else if (selectableMatches.length > 0) {
             select.value = selectableMatches[0].value;
