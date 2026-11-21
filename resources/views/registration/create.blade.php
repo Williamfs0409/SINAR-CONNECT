@@ -112,7 +112,8 @@
                                 $documentInputId = 'registration-document-'.$documentKey;
                                 $documentFeedbackId = $documentInputId.'-feedback';
                             @endphp
-                            <label for="{{ $documentInputId }}">{{ $documentLabel }} (PDF/JPG/PNG, maks. 5 MB)
+                            <div class="registration-upload-field">
+                                <label for="{{ $documentInputId }}">{{ $documentLabel }} (PDF/JPG/PNG, maks. 5 MB)</label>
                                 <input
                                     id="{{ $documentInputId }}"
                                     type="file"
@@ -128,7 +129,7 @@
                                     role="status"
                                     aria-live="polite"
                                 >@error('documents.'.$documentKey){{ $message }}@else Wajib diunggah. Maksimal 5 MB dan 20 megapiksel per gambar.@enderror</small>
-                            </label>
+                            </div>
                         @endforeach
                     </div>
                 </fieldset>

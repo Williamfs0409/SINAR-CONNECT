@@ -1173,7 +1173,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .registration-card fieldset { margin: 0 0 16px; padding: 15px; border: 1px solid #e5edf3; border-radius: 10px; }
 .registration-card legend { padding: 0 7px; color: #355873; font-size: 11px; font-weight: 800; }
 .registration-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.registration-grid label { display: flex; flex-direction: column; gap: 5px; color: #526b81; font-size: 10px; font-weight: 700; }
+.registration-grid label,
+.registration-upload-field { display: flex; flex-direction: column; gap: 5px; color: #526b81; font-size: 10px; font-weight: 700; }
 .registration-grid .registration-wide { grid-column: 1 / -1; }
 .registration-grid input, .registration-grid select, .registration-grid textarea { width: 100%; min-height: 38px; padding: 9px 10px; border: 1px solid #d8e3ec; border-radius: 7px; color: #314d67; background: #fff; font: inherit; font-size: 11px; }
 .registration-grid textarea { resize: vertical; }
@@ -3350,6 +3351,283 @@ input[type="file"].is-invalid {
     border-color: #d03b3f !important;
     background: #fff8f8 !important;
     outline: 3px solid rgba(208, 59, 63, .12);
+}
+
+.file-picker {
+    position: relative;
+    width: 100%;
+}
+
+.file-picker-native {
+    position: absolute;
+    width: 1px !important;
+    height: 1px !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0 !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.file-picker-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 6px 10px;
+    border: 1px dashed #b9cde0;
+    border-radius: 8px;
+    background: #f8fbfe;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+.file-picker-trigger:hover {
+    border-color: #1b4d7e;
+    background: #eef5fc;
+}
+
+.file-picker-trigger[hidden],
+.file-picker-preview[hidden],
+.file-preview-modal[hidden] {
+    display: none !important;
+}
+
+.file-picker-btn {
+    padding: 5px 11px;
+    border: 1px solid #1b4d7e;
+    border-radius: 6px;
+    background: #1b4d7e;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.file-picker-placeholder {
+    color: #6b8197;
+    font-size: 11px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-picker-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #c6daec;
+    border-radius: 8px;
+    background: #f5f9fd;
+}
+
+.file-picker-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #d5e3f0;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.file-picker-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.file-picker-badge {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    padding: 4px 6px;
+    border-radius: 5px;
+}
+
+.file-picker-badge.is-pdf {
+    background: #fdecec;
+    color: #b42318;
+}
+
+.file-picker-badge.is-doc {
+    background: #e3effa;
+    color: #1b4d7e;
+}
+
+.file-picker-meta {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.file-picker-name {
+    color: #17324d;
+    font-size: 11px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-picker-size {
+    color: #516a82;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.file-picker-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.file-picker-action {
+    padding: 5px 9px;
+    border-radius: 6px;
+    border: 1px solid #c6daec;
+    background: #fff;
+    color: #1b4d7e;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.file-picker-action.is-view {
+    background: #1b4d7e;
+    border-color: #1b4d7e;
+    color: #fff;
+}
+
+.file-picker-action.is-remove {
+    border-color: #f2c6c6;
+    color: #b42318;
+}
+
+.file-picker-action:hover {
+    filter: brightness(.96);
+}
+
+.file-preview-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.file-preview-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 76, .68);
+}
+
+.file-preview-modal-dialog {
+    position: relative;
+    z-index: 1;
+    width: min(860px, 100%);
+    max-height: 90vh;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(16, 44, 76, .35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.file-preview-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #d5e3f0;
+    background: #f5f9fd;
+}
+
+.file-preview-modal-head strong {
+    color: #17324d;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-preview-modal-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.file-preview-open-tab {
+    font-size: 11px;
+    font-weight: 700;
+    color: #1b4d7e;
+    text-decoration: underline;
+}
+
+.file-preview-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #c6daec;
+    background: #fff;
+    color: #17324d;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.file-preview-modal-body {
+    padding: 16px;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef4fa;
+    min-height: 300px;
+    max-height: calc(90vh - 56px);
+}
+
+.file-preview-modal-image {
+    max-width: 100%;
+    max-height: 75vh;
+    border-radius: 8px;
+    object-fit: contain;
+    background: #fff;
+}
+
+.file-preview-modal-pdf {
+    width: 100%;
+    height: 75vh;
+    border: 0;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.file-preview-modal-fallback {
+    color: #314d67;
+    font-size: 13px;
+    text-align: center;
 }
 
 .database-form-grid input[type="file"],
