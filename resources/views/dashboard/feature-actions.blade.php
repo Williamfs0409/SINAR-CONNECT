@@ -1439,7 +1439,13 @@
             @forelse ($actions['pendingPayments'] ?? [] as $payment)
                 <form method="POST" action="{{ route('database.payment.review', ['payment' => $payment->id_pembayaran]) }}" class="database-action-row">
                     @csrf @method('PATCH')
-                    <div><strong>{{ $payment->no_kuitansi }}</strong><small>{{ $payment->tanggal_bayar }} · {{ $payment->metode }} · Rp {{ number_format($payment->total_bayar, 0, ',', '.') }}</small></div>
+                    <div>
+                        <strong>{{ $payment->no_kuitansi }}</strong>
+                        <small>{{ $payment->tanggal_bayar }} · {{ $payment->metode }} · Rp {{ number_format($payment->total_bayar, 0, ',', '.') }}</small>
+                        @if (! empty($payment->catatan))
+                            <small>Catatan orang tua: {{ $payment->catatan }}</small>
+                        @endif
+                    </div>
                     @if ($payment->metode === 'Transfer')
                         <a class="database-button database-button-secondary" href="{{ route('database.payment.proof', ['payment' => $payment->id_pembayaran]) }}" target="_blank" rel="noopener">Lihat bukti</a>
                     @endif
@@ -1456,7 +1462,13 @@
                 @foreach ($actions['cancellablePayments'] as $cancellable)
                     <form method="POST" action="{{ route('database.payment.cancel', ['payment' => $cancellable->id_pembayaran]) }}" class="database-action-row" onsubmit="return confirm('Batalkan kuitansi pembayaran ini?');">
                         @csrf @method('PATCH')
-                        <div><strong>{{ $cancellable->no_kuitansi }}</strong><small>{{ $cancellable->tanggal_bayar }} · {{ $cancellable->metode }} · Rp {{ number_format($cancellable->total_bayar, 0, ',', '.') }}</small></div>
+                        <div>
+                            <strong>{{ $cancellable->no_kuitansi }}</strong>
+                            <small>{{ $cancellable->tanggal_bayar }} · {{ $cancellable->metode }} · Rp {{ number_format($cancellable->total_bayar, 0, ',', '.') }}</small>
+                            @if (! empty($cancellable->catatan))
+                                <small>Catatan: {{ $cancellable->catatan }}</small>
+                            @endif
+                        </div>
                         <input name="catatan" maxlength="255" placeholder="Alasan pembatalan (wajib)" required>
                         <button class="database-button database-button-danger" type="submit">Batalkan kuitansi</button>
                     </form>
