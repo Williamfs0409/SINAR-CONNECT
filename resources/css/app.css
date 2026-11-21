@@ -5120,6 +5120,15 @@ body {
     flex-shrink: 0;
 }
 
+.reg-doc-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid rgba(27, 77, 126, .2);
+    flex-shrink: 0;
+}
+
 .reg-doc-chip-btn.is-valid {
     border-color: #b7e2c7;
     background: #eef9f2;

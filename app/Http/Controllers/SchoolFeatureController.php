@@ -576,20 +576,18 @@ class SchoolFeatureController extends Controller
                     ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
                     ->where('r.id_siswa', $application->id_siswa)
                     ->where('k.id_tahun_ajaran', $application->id_tahun_ajaran)
-                    ->where('r.status', 'Aktif')
                     ->select(['r.id_rombel', 'r.id_kelas'])
                     ->first();
 
                 if ($existingRoster) {
-                    if ((int) $existingRoster->id_kelas !== (int) $class->id_kelas) {
-                        DB::table('rombel_siswa')
-                            ->where('id_rombel', $existingRoster->id_rombel)
-                            ->update([
-                                'id_kelas' => $class->id_kelas,
-                                'tanggal_masuk' => now()->toDateString(),
-                                'updated_at' => now(),
-                            ]);
-                    }
+                    DB::table('rombel_siswa')
+                        ->where('id_rombel', $existingRoster->id_rombel)
+                        ->update([
+                            'id_kelas' => $class->id_kelas,
+                            'status' => 'Aktif',
+                            'tanggal_masuk' => now()->toDateString(),
+                            'updated_at' => now(),
+                        ]);
                     $rosterId = $existingRoster->id_rombel;
                 } else {
                     $rosterId = DB::table('rombel_siswa')->insertGetId([
@@ -602,22 +600,30 @@ class SchoolFeatureController extends Controller
                 }
 
                 if (! empty($data['teacher_id']) && Schema::hasTable('guru_kelas') && Schema::hasTable('guru')) {
+                    $teacherId = (int) $data['teacher_id'];
                     $teacherExists = DB::table('guru')
-                        ->where('id_guru', (int) $data['teacher_id'])
+                        ->where('id_guru', $teacherId)
                         ->where('status', 'Aktif')
                         ->exists();
                     if ($teacherExists) {
-                        $existingAssignment = DB::table('guru_kelas')
+                        $samePairExists = DB::table('guru_kelas')
                             ->where('id_kelas', $class->id_kelas)
-                            ->where('peran', 'Wali Kelas')
-                            ->first();
-                        if ($existingAssignment) {
+                            ->where('id_guru', $teacherId)
+                            ->exists();
+
+                        if ($samePairExists) {
                             DB::table('guru_kelas')
-                                ->where('id_guru_kelas', $existingAssignment->id_guru_kelas)
-                                ->update(['id_guru' => (int) $data['teacher_id']]);
+                                ->where('id_kelas', $class->id_kelas)
+                                ->where('id_guru', $teacherId)
+                                ->update(['peran' => 'Wali Kelas']);
                         } else {
+                            DB::table('guru_kelas')
+                                ->where('id_kelas', $class->id_kelas)
+                                ->where('peran', 'Wali Kelas')
+                                ->delete();
+
                             DB::table('guru_kelas')->insert([
-                                'id_guru' => (int) $data['teacher_id'],
+                                'id_guru' => $teacherId,
                                 'id_kelas' => $class->id_kelas,
                                 'peran' => 'Wali Kelas',
                             ]);

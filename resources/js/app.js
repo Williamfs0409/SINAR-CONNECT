@@ -761,6 +761,22 @@ const openFilePreviewModal = (file, objectUrl) => {
     modal.hidden = false;
 };
 
+document.addEventListener('click', (event) => {
+    const docLink = event.target.closest('[data-doc-preview]');
+    if (!docLink) {
+        return;
+    }
+    event.preventDefault();
+    const ext = (docLink.dataset.docExt || '').toLowerCase();
+    const mime = ext === 'pdf'
+        ? 'application/pdf'
+        : (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? `image/${ext === 'jpg' ? 'jpeg' : ext}` : '');
+    openFilePreviewModal(
+        { name: `${docLink.dataset.docName || 'Dokumen'}${ext ? '.' + ext : ''}`, type: mime },
+        docLink.href,
+    );
+});
+
 const formatPickerBytes = (bytes) => {
     const megabytes = bytes / (1024 * 1024);
     const formatter = new Intl.NumberFormat('id-ID', {
