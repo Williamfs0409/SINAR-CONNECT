@@ -547,9 +547,32 @@ class SchoolFeatureController extends Controller
                         throw ValidationException::withMessages(['decision' => 'Status pendaftaran ini tidak dapat ditolak.']);
                     }
 
+                    $rejectNote = isset($data['note']) && trim((string) $data['note']) !== ''
+                        ? trim((string) $data['note'])
+                        : null;
+
+                    DB::table('dokumen_pendaftaran')
+                        ->where('id_pendaftaran', $registrationId)
+                        ->update([
+                            'status_verifikasi' => 'Tidak Valid',
+                            'updated_at' => now(),
+                        ]);
+
+                    if ($rejectNote !== null) {
+                        DB::table('dokumen_pendaftaran')
+                            ->where('id_pendaftaran', $registrationId)
+                            ->where(function ($query): void {
+                                $query->whereNull('catatan')->orWhere('catatan', '');
+                            })
+                            ->update([
+                                'catatan' => $rejectNote,
+                                'updated_at' => now(),
+                            ]);
+                    }
+
                     DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
                         'status' => 'Ditolak',
-                        'catatan_verifikasi' => $data['note'] ?? null,
+                        'catatan_verifikasi' => $rejectNote,
                         'id_user_verifikator' => $user->getKey(),
                         'tanggal_verifikasi' => now(),
                     ]);
@@ -835,8 +858,8 @@ class SchoolFeatureController extends Controller
                     $existing = $existingDocuments->get($label);
                     $hasNewFile = isset($uploadedFiles[$key]) && $uploadedFiles[$key] !== null;
 
-                    if (! $hasNewFile && (! $existing || $existing->status_verifikasi === 'Tidak Valid')) {
-                        $missingErrors["documents.{$key}"] = "Berkas {$label} wajib diunggah ulang sebelum mengajukan pendaftaran kembali.";
+                    if (! $hasNewFile && ! $existing) {
+                        $missingErrors["documents.{$key}"] = "Berkas {$label} wajib diunggah sebelum mengajukan pendaftaran kembali.";
                     }
                 }
 
@@ -864,12 +887,14 @@ class SchoolFeatureController extends Controller
                     ]);
 
                 $previousPaths = [];
+                $replacedLabels = [];
                 foreach ($uploadedFiles as $key => $file) {
                     if ($file === null) {
                         continue;
                     }
 
                     $label = $requiredDocuments[$key];
+                    $replacedLabels[] = $label;
                     $existing = $existingDocuments->get($label);
                     $path = $this->imageUploads->store($file, 'pendaftaran', "documents.{$key}");
                     $storedPaths[] = $path;
@@ -894,6 +919,18 @@ class SchoolFeatureController extends Controller
                         ]);
                     }
                 }
+
+                $keptQuery = DB::table('dokumen_pendaftaran')
+                    ->where('id_pendaftaran', $registrationId)
+                    ->where('status_verifikasi', 'Tidak Valid');
+                if ($replacedLabels !== []) {
+                    $keptQuery->whereNotIn('jenis', $replacedLabels);
+                }
+                $keptQuery->update([
+                    'status_verifikasi' => 'Menunggu',
+                    'catatan' => null,
+                    'updated_at' => now(),
+                ]);
 
                 DB::table('pendaftaran')
                     ->where('id_pendaftaran', $registrationId)
