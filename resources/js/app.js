@@ -692,6 +692,91 @@ document.querySelectorAll('.database-attendance-list').forEach((list) => {
     }
 });
 
+/* Format otomatis pemisah ribuan titik (100.000) untuk semua input nominal/rupiah */
+const formatRupiahDigits = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+document.querySelectorAll(
+    'input[type="number"][name="jumlah"], input[type="number"][name="nominal"], input[type="number"][name="biaya"], input[type="number"][name="diskon"], input[type="number"][name="amount"]',
+).forEach((input) => {
+    if (input.dataset.currencyInitialized === '1') {
+        return;
+    }
+    input.dataset.currencyInitialized = '1';
+
+    const fieldName = input.getAttribute('name');
+    const minVal = input.getAttribute('min') !== null ? Number(input.getAttribute('min')) : null;
+    const maxVal = input.getAttribute('max') !== null ? Number(input.getAttribute('max')) : null;
+
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = fieldName;
+
+    input.removeAttribute('name');
+    input.type = 'text';
+    input.setAttribute('inputmode', 'numeric');
+    input.setAttribute('autocomplete', 'off');
+    if (!input.placeholder) {
+        input.placeholder = 'Contoh: 100.000';
+    }
+    input.insertAdjacentElement('afterend', hiddenInput);
+
+    const normalizeInitial = (rawValue) => {
+        if (rawValue === '' || rawValue === null || rawValue === undefined) {
+            return '';
+        }
+        const parsed = Number(rawValue);
+        if (!Number.isNaN(parsed)) {
+            return String(Math.round(parsed));
+        }
+        return String(rawValue).replace(/\D+/g, '');
+    };
+
+    const syncValue = (digits) => {
+        const cleaned = digits.replace(/^0+(?=\d)/, '');
+        hiddenInput.value = cleaned;
+        input.value = cleaned === '' ? '' : formatRupiahDigits(cleaned);
+
+        if (cleaned !== '') {
+            const numeric = Number(cleaned);
+            if (minVal !== null && numeric < minVal) {
+                input.setCustomValidity(`Nilai minimal ${formatRupiahDigits(String(Math.ceil(minVal)))}.`);
+            } else if (maxVal !== null && numeric > maxVal) {
+                input.setCustomValidity(`Nilai maksimal ${formatRupiahDigits(String(Math.floor(maxVal)))}.`);
+            } else {
+                input.setCustomValidity('');
+            }
+        } else {
+            input.setCustomValidity('');
+        }
+    };
+
+    syncValue(normalizeInitial(input.value));
+
+    input.addEventListener('input', () => {
+        const cursorPos = input.selectionStart ?? input.value.length;
+        const digitsBeforeCursor = input.value.slice(0, cursorPos).replace(/\D+/g, '').length;
+        const allDigits = input.value.replace(/\D+/g, '');
+
+        syncValue(allDigits);
+
+        let seenDigits = 0;
+        let nextCursor = input.value.length;
+        for (let i = 0; i < input.value.length; i += 1) {
+            if (/\d/.test(input.value[i])) {
+                seenDigits += 1;
+            }
+            if (seenDigits >= digitsBeforeCursor) {
+                nextCursor = i + 1;
+                break;
+            }
+        }
+        if (digitsBeforeCursor === 0) {
+            nextCursor = 0;
+        }
+        input.setSelectionRange(nextCursor, nextCursor);
+    });
+});
+
 document.querySelectorAll('.password-toggle').forEach((passwordToggle) => {
     const passwordInput = document.getElementById(passwordToggle.getAttribute('aria-controls'))
         ?? passwordToggle.closest('.input-wrap, .registration-password-wrap')?.querySelector('input');
