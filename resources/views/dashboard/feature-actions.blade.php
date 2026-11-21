@@ -520,6 +520,8 @@
 @if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true))
     @php
         $selectableClasses = ($actions['attendanceClasses'] ?? $classOptions)->values();
+        $academicYears = ($actions['attendanceAcademicYears'] ?? collect())->values();
+        $selectedAcademicYear = $actions['selectedAcademicYear'] ?? ($selectableClasses->first()->tahun_ajaran ?? null);
         $currentAttendanceDate = $actions['attendanceDate'] ?? now()->toDateString();
         $selectedClassId = (int) ($actions['selectedClass'] ?? 0);
     @endphp
@@ -527,24 +529,43 @@
         <div class="database-section-heading">
             <div>
                 <h2>Catat kehadiran</h2>
-                <p>Klik kotak kelas di atas untuk memilih kelas, lalu klik tombol bulat status kehadiran pada masing-masing siswa.</p>
+                <p>Pilih tahun ajaran dan klik kotak kelas di bawah untuk memilih kelas, lalu klik tombol bulat status kehadiran pada masing-masing siswa.</p>
             </div>
         </div>
 
         @if ($selectableClasses->isNotEmpty())
             <div class="attendance-class-picker">
+                @if ($academicYears->isNotEmpty())
+                    <form method="GET" action="{{ route('dashboard.feature', ['section' => 'absensi']) }}" class="attendance-year-filter">
+                        <input type="hidden" name="tanggal" value="{{ $currentAttendanceDate }}">
+                        <label class="attendance-year-select-label">
+                            <span>Pilih Tahun Ajaran</span>
+                            <select name="tahun_ajaran" class="attendance-year-select" onchange="this.form.submit()">
+                                @foreach ($academicYears as $yearOption)
+                                    <option value="{{ $yearOption->tahun_ajaran }}" @selected($selectedAcademicYear === $yearOption->tahun_ajaran)>
+                                        T.A. {{ $yearOption->tahun_ajaran }}{{ $yearOption->tahun_ajaran_aktif ? ' (Aktif)' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </label>
+                    </form>
+                @endif
+
                 <span class="attendance-picker-label">Pilih Kelas</span>
-                <div class="attendance-class-grid" role="list" aria-label="Daftar kelas absensi">
+                <div class="attendance-class-grid" role="list" aria-label="Daftar kelas absensi {{ $selectedAcademicYear }}">
                     @foreach ($selectableClasses as $class)
                         @php
                             $isSelectedClass = $selectedClassId === (int) $class->id_kelas;
                         @endphp
                         <a
-                            href="{{ route('dashboard.feature', ['section' => 'absensi', 'kelas' => $class->id_kelas, 'tanggal' => $currentAttendanceDate]) }}"
+                            href="{{ route('dashboard.feature', ['section' => 'absensi', 'tahun_ajaran' => $selectedAcademicYear, 'kelas' => $class->id_kelas, 'tanggal' => $currentAttendanceDate]) }}"
                             class="attendance-class-card{{ $isSelectedClass ? ' is-selected' : '' }}"
                             @if ($isSelectedClass) aria-current="page" @endif
                         >
-                            <span class="attendance-class-badge">{{ $class->kelompok }}</span>
+                            <div class="attendance-class-top">
+                                <span class="attendance-class-badge">{{ $class->kelompok }}</span>
+                                <span class="attendance-class-year">{{ $class->tahun_ajaran }}</span>
+                            </div>
                             <strong>{{ $class->nama_kelas }}</strong>
                             <small>{{ $isSelectedClass ? 'Kelas aktif dipilih' : 'Klik untuk buka absensi' }}</small>
                         </a>
@@ -554,6 +575,7 @@
 
             <div class="attendance-toolbar">
                 <form method="GET" action="{{ route('dashboard.feature', ['section' => 'absensi']) }}" class="attendance-date-form" data-attendance-date-form>
+                    <input type="hidden" name="tahun_ajaran" value="{{ $selectedAcademicYear }}">
                     <input type="hidden" name="kelas" value="{{ $selectedClassId }}">
                     <label class="attendance-date-label">
                         <span>Tanggal Absensi</span>

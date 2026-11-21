@@ -685,8 +685,10 @@ class SchoolDataController extends Controller
         $data = [];
         $classes = DB::table('kelas as k')
             ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
-            ->select(['k.id_kelas', 'k.nama_kelas', 'k.kelompok', 'ta.nama as tahun_ajaran'])
+            ->select(['k.id_kelas', 'k.nama_kelas', 'k.kelompok', 'ta.nama as tahun_ajaran', 'ta.is_aktif as tahun_ajaran_aktif'])
+            ->orderByDesc('ta.is_aktif')
             ->orderByDesc('ta.tahun_mulai')
+            ->orderBy('k.kelompok')
             ->orderBy('k.nama_kelas');
 
         if ($role === 'teacher' && $section === 'kegiatan') {
@@ -722,12 +724,37 @@ class SchoolDataController extends Controller
         }
 
         if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('rombel_siswa') && Schema::hasTable('absensi')) {
-            $attendanceClasses = $role === 'admin'
+            $allAttendanceClasses = $role === 'admin'
                 ? $data['classes']->where('nama_kelas', '<>', 'Belum Ditentukan')->values()
                 : $data['classes'];
-            $selectedClass = request()->query('kelas');
-            if ($selectedClass !== null) {
-                abort_unless($attendanceClasses->contains('id_kelas', (int) $selectedClass), 403);
+            $academicYears = $allAttendanceClasses
+                ->unique('tahun_ajaran')
+                ->map(fn ($item) => (object) [
+                    'tahun_ajaran' => $item->tahun_ajaran,
+                    'tahun_ajaran_aktif' => (bool) ($item->tahun_ajaran_aktif ?? false),
+                ])
+                ->values();
+
+            $selectedClassParam = request()->query('kelas');
+            $selectedYearParam = request()->query('tahun_ajaran');
+
+            if ($selectedYearParam !== null && $academicYears->contains('tahun_ajaran', $selectedYearParam)) {
+                $selectedAcademicYear = $selectedYearParam;
+            } elseif ($selectedClassParam !== null && $allAttendanceClasses->contains('id_kelas', (int) $selectedClassParam)) {
+                $selectedAcademicYear = $allAttendanceClasses->firstWhere('id_kelas', (int) $selectedClassParam)->tahun_ajaran;
+            } else {
+                $selectedAcademicYear = $academicYears->first()->tahun_ajaran ?? null;
+            }
+
+            $attendanceClasses = $selectedAcademicYear !== null
+                ? $allAttendanceClasses->where('tahun_ajaran', $selectedAcademicYear)->values()
+                : $allAttendanceClasses;
+
+            if ($selectedClassParam !== null) {
+                abort_unless($allAttendanceClasses->contains('id_kelas', (int) $selectedClassParam), 403);
+                $selectedClass = $attendanceClasses->contains('id_kelas', (int) $selectedClassParam)
+                    ? (int) $selectedClassParam
+                    : ($attendanceClasses->first()->id_kelas ?? null);
             } else {
                 $selectedClass = $attendanceClasses->first()->id_kelas ?? null;
             }
@@ -735,6 +762,8 @@ class SchoolDataController extends Controller
             $date = request()->query('tanggal', now('Asia/Jakarta')->toDateString());
             $data['attendanceDate'] = $date;
             $data['selectedClass'] = $selectedClass;
+            $data['selectedAcademicYear'] = $selectedAcademicYear;
+            $data['attendanceAcademicYears'] = $academicYears;
             $data['attendanceClasses'] = $attendanceClasses;
             $data['attendanceRoster'] = $selectedClass
                 ? DB::table('rombel_siswa as r')
