@@ -5328,6 +5328,83 @@ body {
     background: linear-gradient(90deg, #1b4d7e 0%, #28855c 100%);
 }
 
+.parent-reg-progress-fill.is-rejected {
+    background: linear-gradient(90deg, #d93829 0%, #ef6b5b 100%);
+}
+
+.parent-reg-rejected-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 20px;
+    background: linear-gradient(90deg, #fff3f3 0%, #fff9f8 100%);
+    border-bottom: 1px solid #f4cece;
+}
+
+.parent-reg-rejected-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: #fde2e2;
+    color: #b42318;
+    flex-shrink: 0;
+}
+
+.parent-reg-rejected-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.parent-reg-rejected-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.parent-reg-rejected-body strong {
+    color: #912018;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.parent-reg-rejected-body p {
+    margin: 0;
+    color: #7a271a;
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.parent-reg-resubmit-box {
+    padding: 18px 20px 20px;
+    background: #f8fbfe;
+    border-top: 1px solid #dfebf6;
+}
+
+.parent-reg-resubmit-section-title {
+    grid-column: 1 / -1;
+    margin: 6px 0 0;
+    padding-top: 12px;
+    border-top: 1px dashed #d3e2f0;
+    color: #17324d;
+    font-size: 12.5px;
+    font-weight: 800;
+}
+
+.parent-reg-resubmit-doc-hint {
+    display: inline-block;
+    margin-left: 4px;
+    color: #6b8299;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.parent-reg-resubmit-doc-hint.is-required {
+    color: #b42318;
+}
+
 .parent-reg-doc-table {
     display: flex;
     flex-direction: column;
@@ -5600,7 +5677,9 @@ body {
     }
 
     .parent-reg-complete-banner,
-    .parent-reg-upload-box {
+    .parent-reg-upload-box,
+    .parent-reg-rejected-banner,
+    .parent-reg-resubmit-box {
         padding: 13px 16px;
     }
 }
