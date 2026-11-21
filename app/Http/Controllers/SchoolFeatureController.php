@@ -1383,7 +1383,7 @@ class SchoolFeatureController extends Controller
             'narasi_jati_diri' => ['nullable', 'string', 'max:5000'],
             'narasi_literasi_steam' => ['nullable', 'string', 'max:5000'],
             'narasi_p5' => ['nullable', 'string', 'max:5000'],
-            'status' => ['required', Rule::in(['Draft', 'Final'])],
+            'status' => ['required', Rule::in(['Final'])],
         ]);
 
         if ($data['status'] === 'Final') {
@@ -1413,7 +1413,7 @@ class SchoolFeatureController extends Controller
             ->first();
         if ($existing?->status === 'Final' && $data['status'] === 'Final') {
             throw ValidationException::withMessages([
-                'semester' => 'Rapor final terkunci dan tidak dapat diubah. Pilih status Draft terlebih dahulu jika ingin membuka kunci.',
+                'semester' => 'Rapor final terkunci dan tidak dapat diubah.',
             ]);
         }
 

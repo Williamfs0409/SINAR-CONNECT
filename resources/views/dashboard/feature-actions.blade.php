@@ -1347,7 +1347,7 @@
             <label>Siswa / kelas<select name="id_rombel" required>@foreach ($rosterOptions as $roster)<option value="{{ $roster->id_rombel }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }}</option>@endforeach</select></label>
             <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
             <label>Tanggal rapor<input type="date" name="tanggal_rapor" value="{{ now()->toDateString() }}"></label>
-            <label>Status<select name="status"><option>Draft</option><option>Final</option></select></label>
+            <label>Status<select name="status"><option value="Final" selected>Final</option></select></label>
             <label>Tinggi badan (cm)<input type="number" step="0.1" name="tinggi_badan" min="30" max="180"></label>
             <label>Berat badan (kg)<input type="number" step="0.1" name="berat_badan" min="5" max="120"></label>
             @if (($actions['iqroTeachers'] ?? collect())->isNotEmpty())
