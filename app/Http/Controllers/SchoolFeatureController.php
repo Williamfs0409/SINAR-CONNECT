@@ -386,17 +386,75 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Profil akun pengguna berhasil diperbarui.');
     }
 
-    public function destroyStudent(int $studentId): RedirectResponse
+    public function destroyStudent(Request $request, int $studentId): RedirectResponse
     {
         $this->userFor(['admin']);
         abort_unless(DB::table('siswa')->where('id_siswa', $studentId)->exists(), 404);
-        $this->assertNoDeleteDependencies($studentId, [
-            ['pendaftaran', 'id_siswa', 'pendaftaran'],
-            ['rombel_siswa', 'id_siswa', 'riwayat kelas'],
-            ['transaksi_tabungan', 'id_siswa', 'transaksi tabungan'],
-        ], 'siswa');
 
-        DB::table('siswa')->where('id_siswa', $studentId)->delete();
+        if (! $request->boolean('force')) {
+            $this->assertNoDeleteDependencies($studentId, [
+                ['pendaftaran', 'id_siswa', 'pendaftaran'],
+                ['rombel_siswa', 'id_siswa', 'riwayat kelas'],
+                ['transaksi_tabungan', 'id_siswa', 'transaksi tabungan'],
+            ], 'siswa');
+
+            DB::table('siswa')->where('id_siswa', $studentId)->delete();
+
+            return back()->with('status', 'Data siswa berhasil dihapus.');
+        }
+
+        // Lindungi siswa yang sudah memiliki transaksi keuangan (tagihan / tabungan)
+        if (Schema::hasTable('transaksi_tabungan')
+            && DB::table('transaksi_tabungan')->where('id_siswa', $studentId)->exists()) {
+            throw ValidationException::withMessages([
+                'delete' => 'Data siswa tidak dapat dihapus karena masih memiliki riwayat transaksi tabungan.',
+            ]);
+        }
+
+        $rosterIds = Schema::hasTable('rombel_siswa')
+            ? DB::table('rombel_siswa')->where('id_siswa', $studentId)->pluck('id_rombel')->all()
+            : [];
+
+        if ($rosterIds !== [] && Schema::hasTable('tagihan')
+            && DB::table('tagihan')->whereIn('id_rombel', $rosterIds)->exists()) {
+            throw ValidationException::withMessages([
+                'delete' => 'Data siswa tidak dapat dihapus karena masih memiliki data tagihan/pembayaran.',
+            ]);
+        }
+
+        DB::transaction(function () use ($studentId, $rosterIds): void {
+            if (Schema::hasTable('pendaftaran')) {
+                $registrationIds = DB::table('pendaftaran')
+                    ->where('id_siswa', $studentId)
+                    ->pluck('id_pendaftaran')
+                    ->all();
+
+                if ($registrationIds !== [] && Schema::hasTable('dokumen_pendaftaran')) {
+                    $docPaths = DB::table('dokumen_pendaftaran')
+                        ->whereIn('id_pendaftaran', $registrationIds)
+                        ->pluck('file_path')
+                        ->filter()
+                        ->all();
+                    foreach ($docPaths as $path) {
+                        Storage::disk('local')->delete($path);
+                    }
+                    DB::table('dokumen_pendaftaran')->whereIn('id_pendaftaran', $registrationIds)->delete();
+                }
+
+                DB::table('pendaftaran')->where('id_siswa', $studentId)->delete();
+            }
+
+            if ($rosterIds !== []) {
+                foreach (['absensi', 'nilai_iqro', 'pengumpulan_tugas', 'portofolio', 'rapor'] as $table) {
+                    if (Schema::hasTable($table)) {
+                        DB::table($table)->whereIn('id_rombel', $rosterIds)->delete();
+                    }
+                }
+                DB::table('rombel_siswa')->whereIn('id_rombel', $rosterIds)->delete();
+            }
+
+            DB::table('siswa')->where('id_siswa', $studentId)->delete();
+        });
 
         return back()->with('status', 'Data siswa berhasil dihapus.');
     }

@@ -444,9 +444,10 @@
                                                             <button type="button" class="database-icon-button" data-open-editor="student-profile-editor-{{ data_get($record, 'id_siswa') }}" aria-label="Edit profil {{ data_get($record, 'nama_lengkap') }}" title="Edit profil">
                                                                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
                                                             </button>
-                                                        <form method="POST" action="{{ route('database.student.destroy', ['student' => data_get($record, 'id_siswa')]) }}" data-confirm="Hapus data siswa {{ data_get($record, 'nama_lengkap') }}? Data yang masih memiliki riwayat akan ditolak.">
+                                                        <form method="POST" action="{{ route('database.student.destroy', ['student' => data_get($record, 'id_siswa')]) }}" data-confirm="Hapus data siswa {{ data_get($record, 'nama_lengkap') }} beserta riwayat kelas dan pendaftarannya?">
                                                             @csrf
                                                             @method('DELETE')
+                                                            <input type="hidden" name="force" value="1">
                                                             <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus data {{ data_get($record, 'nama_lengkap') }}" title="Hapus data">
                                                                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
                                                             </button>

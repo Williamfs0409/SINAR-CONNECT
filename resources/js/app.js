@@ -734,27 +734,28 @@ document.querySelectorAll('.database-copy-button').forEach((button) => {
     });
 });
 
-document.querySelectorAll('form[data-confirm]').forEach((form) => {
-    form.addEventListener('submit', (event) => {
-        if (!window.confirm(form.dataset.confirm)) {
-            event.preventDefault();
-        }
-    });
-});
-
-document.querySelectorAll('[data-open-editor]').forEach((button) => {
-    const editor = document.getElementById(button.dataset.openEditor);
-
-    if (!editor) {
-        console.error('Student profile editor was not found.');
+document.addEventListener('submit', (event) => {
+    const form = event.target.closest('form[data-confirm]');
+    if (!form) {
         return;
     }
+    if (!window.confirm(form.dataset.confirm)) {
+        event.preventDefault();
+    }
+});
 
-    button.addEventListener('click', () => {
-        editor.open = true;
-        editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        editor.querySelector('input, textarea, select')?.focus();
-    });
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-open-editor]');
+    if (!button) {
+        return;
+    }
+    const editor = document.getElementById(button.dataset.openEditor);
+    if (!editor) {
+        return;
+    }
+    editor.open = true;
+    editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    editor.querySelector('input, textarea, select')?.focus();
 });
 
 const uploadValidatorsByForm = new Map();
