@@ -764,7 +764,8 @@ class SchoolFeatureController extends Controller
         }
 
         if ($user->role === 'teacher') {
-            $this->teacherId($user);
+            $teacherId = $this->teacherId($user);
+            $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
         }
         $roster = DB::table('rombel_siswa')
             ->where('id_kelas', $data['id_kelas'])
@@ -2799,9 +2800,12 @@ class SchoolFeatureController extends Controller
 
     private function assertTeacherClass(int $teacherId, int $classId): void
     {
-        abort_unless(DB::table('guru_kelas')
-            ->where('id_guru', $teacherId)
-            ->where('id_kelas', $classId)
+        abort_unless(DB::table('guru_kelas as gk')
+            ->join('kelas as k', 'k.id_kelas', '=', 'gk.id_kelas')
+            ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
+            ->where('gk.id_guru', $teacherId)
+            ->where('gk.id_kelas', $classId)
+            ->where('ta.is_aktif', true)
             ->exists(), 403);
     }
 
@@ -2809,9 +2813,12 @@ class SchoolFeatureController extends Controller
     {
         abort_unless(DB::table('rombel_siswa as r')
             ->join('guru_kelas as gk', 'gk.id_kelas', '=', 'r.id_kelas')
+            ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+            ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
             ->where('r.id_rombel', $rosterId)
             ->where('r.status', 'Aktif')
             ->where('gk.id_guru', $teacherId)
+            ->where('ta.is_aktif', true)
             ->exists(), 403);
     }
 
