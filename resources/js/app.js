@@ -1868,3 +1868,22 @@ composeTextarea?.addEventListener('keydown', (event) => {
         }
     }
 });
+
+document.querySelectorAll('[data-payment-mode-root]').forEach((root) => {
+    const buttons = Array.from(root.querySelectorAll('[data-payment-mode-btn]'));
+    const panels = Array.from(root.querySelectorAll('[data-payment-mode-panel]'));
+
+    buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.paymentModeBtn;
+            buttons.forEach((item) => {
+                const active = item.dataset.paymentModeBtn === target;
+                item.classList.toggle('is-active', active);
+                item.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            panels.forEach((panel) => {
+                panel.hidden = panel.dataset.paymentModePanel !== target;
+            });
+        });
+    });
+});

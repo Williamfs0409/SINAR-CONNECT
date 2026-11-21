@@ -2007,6 +2007,129 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Transaksi tabungan berhasil dicatat.');
     }
 
+    public function storeParentSavingsTransfer(Request $request): RedirectResponse
+    {
+        $user = $this->userFor(['parent']);
+        abort_unless(Schema::hasTable('setoran_tabungan'), 503, 'Tabel setoran tabungan belum tersedia. Jalankan migrasi terlebih dahulu.');
+
+        $data = $request->validate([
+            'id_siswa' => ['required', 'integer', Rule::exists('siswa', 'id_siswa')],
+            'jumlah' => ['required', 'numeric', 'min:1', 'max:100000000'],
+            'bukti_transfer' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'catatan' => ['nullable', 'string', 'max:255'],
+        ], [
+            'bukti_transfer.required' => 'Bukti transfer wajib diunggah untuk setoran tabungan.',
+            'bukti_transfer.mimes' => 'Bukti transfer harus berformat JPG, PNG, atau PDF.',
+            'bukti_transfer.max' => 'Ukuran bukti transfer melebihi batas maksimal 5 MB.',
+        ]);
+
+        $familyId = $this->familyId($user);
+        $student = DB::table('siswa')
+            ->where('id_siswa', $data['id_siswa'])
+            ->first(['id_siswa', 'id_keluarga']);
+        abort_unless($student !== null, 404);
+        abort_unless((int) $student->id_keluarga === $familyId, 403);
+
+        $proofPath = $this->imageUploads->store(
+            $request->file('bukti_transfer'),
+            'bukti-pembayaran',
+            'bukti_transfer'
+        );
+
+        DB::table('setoran_tabungan')->insert([
+            'id_siswa' => $student->id_siswa,
+            'jumlah' => $data['jumlah'],
+            'metode' => 'Transfer',
+            'bukti_transfer' => $proofPath,
+            'status' => 'Menunggu Verifikasi',
+            'catatan' => isset($data['catatan']) && trim((string) $data['catatan']) !== '' ? trim((string) $data['catatan']) : null,
+            'id_user_pencatat' => $user->getKey(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Setoran tabungan transfer berhasil dikirim dan menunggu verifikasi admin.');
+    }
+
+    public function reviewSavingsTransfer(Request $request, int $depositId): RedirectResponse
+    {
+        $user = $this->userFor(['admin']);
+        abort_unless(Schema::hasTable('setoran_tabungan'), 503, 'Tabel setoran tabungan belum tersedia.');
+
+        $data = $request->validate([
+            'decision' => ['required', Rule::in(['verify', 'reject'])],
+            'catatan' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        DB::transaction(function () use ($data, $depositId, $user): void {
+            $deposit = DB::table('setoran_tabungan')
+                ->where('id', $depositId)
+                ->lockForUpdate()
+                ->first();
+            abort_unless($deposit !== null, 404);
+
+            if ($deposit->status !== 'Menunggu Verifikasi') {
+                throw ValidationException::withMessages([
+                    'decision' => 'Hanya setoran tabungan yang menunggu verifikasi dapat diproses.',
+                ]);
+            }
+
+            $existingNote = trim((string) ($deposit->catatan ?? ''));
+            $adminNote = trim((string) ($data['catatan'] ?? ''));
+            if ($adminNote === '') {
+                $finalNote = $existingNote !== '' ? $existingNote : null;
+            } elseif ($existingNote !== '') {
+                $finalNote = Str::limit("Orang tua: {$existingNote} | Admin: {$adminNote}", 255, '');
+            } else {
+                $finalNote = $adminNote;
+            }
+
+            $transactionId = null;
+            if ($data['decision'] === 'verify') {
+                $transactionId = DB::table('transaksi_tabungan')->insertGetId([
+                    'id_siswa' => $deposit->id_siswa,
+                    'jenis' => 'Setor',
+                    'jumlah' => $deposit->jumlah,
+                    'metode' => 'Transfer',
+                    'keterangan' => $finalNote ?? 'Setoran tabungan via Transfer',
+                    'id_user_pencatat' => $user->getKey(),
+                    'created_at' => now(),
+                ]);
+            }
+
+            DB::table('setoran_tabungan')
+                ->where('id', $depositId)
+                ->update([
+                    'status' => $data['decision'] === 'verify' ? 'Terverifikasi' : 'Ditolak',
+                    'catatan' => $finalNote,
+                    'id_user_verifikator' => $user->getKey(),
+                    'tanggal_verifikasi' => now(),
+                    'id_transaksi' => $transactionId,
+                    'updated_at' => now(),
+                ]);
+        });
+
+        return back()->with('status', 'Status setoran tabungan transfer berhasil diperbarui.');
+    }
+
+    public function savingsTransferProof(int $depositId): StreamedResponse
+    {
+        $user = $this->userFor(['admin', 'parent']);
+        abort_unless(Schema::hasTable('setoran_tabungan'), 404);
+
+        $deposit = DB::table('setoran_tabungan as st')
+            ->join('siswa as s', 's.id_siswa', '=', 'st.id_siswa')
+            ->where('st.id', $depositId)
+            ->first(['st.bukti_transfer', 's.id_keluarga']);
+        abort_unless($deposit !== null && $deposit->bukti_transfer !== null, 404);
+
+        if ($user->role === 'parent') {
+            abort_unless((int) $deposit->id_keluarga === $this->familyId($user), 403);
+        }
+
+        return $this->privateFileResponse($deposit->bukti_transfer);
+    }
+
     public function generateMonthlyBills(Request $request): RedirectResponse
     {
         $this->userFor(['admin']);

@@ -201,6 +201,12 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.payment.proof');
     Route::post('/dashboard/tabungan', [SchoolFeatureController::class, 'storeSavings'])
         ->name('database.savings.store');
+    Route::post('/dashboard/pembayaran/tabungan', [SchoolFeatureController::class, 'storeParentSavingsTransfer'])
+        ->name('database.savings.transfer.store');
+    Route::patch('/dashboard/pembayaran/tabungan/{deposit}/verifikasi', [SchoolFeatureController::class, 'reviewSavingsTransfer'])
+        ->name('database.savings.transfer.review');
+    Route::get('/dashboard/pembayaran/tabungan/{deposit}/bukti', [SchoolFeatureController::class, 'savingsTransferProof'])
+        ->name('database.savings.transfer.proof');
     Route::post('/dashboard/tagihan/spp', [SchoolFeatureController::class, 'generateMonthlyBills'])
         ->name('database.bills.generate');
     Route::post('/dashboard/tagihan/siswa', [SchoolFeatureController::class, 'createStudentBill'])
