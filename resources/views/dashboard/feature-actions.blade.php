@@ -1387,6 +1387,27 @@
                         <div class="database-registration-address"><dt>4. Projek Penguatan Profil Pelajar Pancasila (P5)</dt><dd>{{ $detailReport->narasi_p5 ?: 'Belum diisi' }}</dd></div>
                         <div class="database-registration-address"><dt>Refleksi Orang Tua</dt><dd>{{ $detailReport->refleksi_orang_tua ?: 'Belum diisi oleh orang tua' }}</dd></div>
                     </dl>
+                    @if (in_array($role, ['teacher', 'admin'], true))
+                        <details class="database-report-inline-editor" style="margin-top: 12px;">
+                            <summary class="database-button database-button-secondary" style="display: flex; width: fit-content; margin-left: auto; list-style: none;">Edit rapor</summary>
+                            <form method="POST" action="{{ route('database.report.store') }}" class="database-form-grid" style="margin-top: 12px;">
+                                @csrf
+                                <input type="hidden" name="id_rombel" value="{{ $detailReport->id_rombel }}">
+                                <input type="hidden" name="semester" value="{{ $detailReport->semester }}">
+                                <input type="hidden" name="status" value="Final">
+                                <label>Tanggal rapor<input type="date" name="tanggal_rapor" value="{{ $detailReport->tanggal_rapor ?: now()->toDateString() }}"></label>
+                                <label>Tinggi badan (cm)<input type="number" step="0.1" name="tinggi_badan" value="{{ $detailReport->tinggi_badan }}" min="30" max="180"></label>
+                                <label>Berat badan (kg)<input type="number" step="0.1" name="berat_badan" value="{{ $detailReport->berat_badan }}" min="5" max="120"></label>
+                                <label class="database-form-wide">Agama dan budi pekerti<textarea name="narasi_agama_budi_pekerti" rows="2" required>{{ $detailReport->narasi_agama_budi_pekerti }}</textarea></label>
+                                <label class="database-form-wide">Jati diri<textarea name="narasi_jati_diri" rows="2" required>{{ $detailReport->narasi_jati_diri }}</textarea></label>
+                                <label class="database-form-wide">Literasi dan STEAM<textarea name="narasi_literasi_steam" rows="2" required>{{ $detailReport->narasi_literasi_steam }}</textarea></label>
+                                <label class="database-form-wide">Projek P5<textarea name="narasi_p5" rows="2" required>{{ $detailReport->narasi_p5 }}</textarea></label>
+                                <div class="database-form-wide" style="display: flex; justify-content: flex-end;">
+                                    <button class="database-button" type="submit">Simpan perubahan</button>
+                                </div>
+                            </form>
+                        </details>
+                    @endif
                 </div>
             </details>
         @endforeach
