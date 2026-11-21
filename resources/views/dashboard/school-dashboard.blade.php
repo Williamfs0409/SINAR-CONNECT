@@ -98,7 +98,22 @@
                 </div>
             </div>
         </header>
-        <aside class="database-sidebar">
+        <div class="mobile-drawer-backdrop" data-mobile-drawer-backdrop hidden></div>
+        <button type="button" class="mobile-drawer-toggle" data-mobile-drawer-toggle aria-expanded="false" aria-controls="mobile-sidebar-drawer" aria-label="Buka menu navigasi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="5" cy="7" r="1" fill="currentColor" stroke="none"/>
+                <line x1="9" y1="7" x2="19" y2="7"/>
+                <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/>
+                <line x1="9" y1="12" x2="19" y2="12"/>
+                <circle cx="5" cy="17" r="1" fill="currentColor" stroke="none"/>
+                <line x1="9" y1="17" x2="19" y2="17"/>
+            </svg>
+        </button>
+        <aside class="database-sidebar" id="mobile-sidebar-drawer">
+            <div class="mobile-drawer-head">
+                <span>Menu Navigasi</span>
+                <button type="button" class="mobile-drawer-close" data-mobile-drawer-close aria-label="Tutup menu">✕</button>
+            </div>
             <a class="database-brand" href="{{ route('dashboard') }}">
                 <img class="database-brand-mark" src="{{ asset('images/sinar-school-logo.png') }}" alt="">
                 <span><strong>SINAR-CONNECT</strong><small>Portal sekolah</small></span>
