@@ -1341,6 +1341,27 @@ class SchoolDataController extends Controller
                     'v.id_pembayaran', 'v.no_kuitansi', 'v.tanggal_bayar',
                     'v.metode', 'v.status', 'v.total_bayar', 'p.catatan',
                 ]);
+            $data['activeStudents'] = DB::table('rombel_siswa as r')
+                ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                ->where('r.status', 'Aktif')
+                ->orderBy('s.nama_lengkap')
+                ->distinct()
+                ->get(['s.id_siswa', 's.nama_lengkap']);
+            $data['pendingSavingsTransfers'] = Schema::hasTable('setoran_tabungan')
+                ? DB::table('setoran_tabungan as st')
+                    ->join('siswa as s', 's.id_siswa', '=', 'st.id_siswa')
+                    ->where('st.status', 'Menunggu Verifikasi')
+                    ->orderByDesc('st.created_at')
+                    ->get([
+                        'st.id',
+                        'st.id_siswa',
+                        's.nama_lengkap',
+                        'st.jumlah',
+                        'st.metode',
+                        'st.catatan',
+                        'st.created_at',
+                    ])
+                : collect();
         }
 
         if ($section === 'kegiatan' && $role === 'admin') {
@@ -1370,6 +1391,28 @@ class SchoolDataController extends Controller
             $data['payableBills'] = collect($data['bills'] ?? [])
                 ->filter(fn (object $bill): bool => (float) $bill->sisa > 0)
                 ->values();
+            if ($role === 'parent') {
+                $data['parentStudents'] = DB::table('siswa')
+                    ->whereIn('id_siswa', $scope['studentIds'])
+                    ->orderBy('nama_lengkap')
+                    ->get(['id_siswa', 'nama_lengkap']);
+                $data['parentSavingsTransfers'] = Schema::hasTable('setoran_tabungan')
+                    ? DB::table('setoran_tabungan as st')
+                        ->join('siswa as s', 's.id_siswa', '=', 'st.id_siswa')
+                        ->whereIn('st.id_siswa', $scope['studentIds'])
+                        ->orderByDesc('st.created_at')
+                        ->limit(20)
+                        ->get([
+                            'st.id',
+                            's.nama_lengkap',
+                            'st.jumlah',
+                            'st.metode',
+                            'st.status',
+                            'st.catatan',
+                            'st.created_at',
+                        ])
+                    : collect();
+            }
         }
 
         if ($section === 'keluarga' && $role === 'admin') {
@@ -1391,14 +1434,6 @@ class SchoolDataController extends Controller
                 ->whereNull('f.id_keluarga')
                 ->orderBy('u.name')
                 ->get(['u.id_user', 'u.name', 'u.email']);
-        }
-
-        if ($section === 'tabungan' && $role === 'admin') {
-            $data['activeStudents'] = DB::table('rombel_siswa as r')
-                ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
-                ->where('r.status', 'Aktif')
-                ->orderBy('s.nama_lengkap')
-                ->get(['s.id_siswa', 's.nama_lengkap']);
         }
 
         if ($section === 'tarif' && $role === 'admin') {
