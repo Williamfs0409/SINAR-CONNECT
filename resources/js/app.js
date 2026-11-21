@@ -763,6 +763,7 @@ const initSingleFilePicker = (fileInput) => {
 
     let currentObjectUrl = null;
     let currentFile = null;
+    const clearDraftInput = fileInput.closest('.registration-upload-field')?.querySelector('[data-draft-clear]') ?? null;
 
     const revokeCurrentUrl = () => {
         if (currentObjectUrl) {
@@ -780,9 +781,41 @@ const initSingleFilePicker = (fileInput) => {
     const renderPickerState = () => {
         revokeCurrentUrl();
         const file = fileInput.files?.[0] ?? null;
-        currentFile = file;
 
         if (!file) {
+            const draftName = fileInput.dataset.draftName;
+            const draftUrl = fileInput.dataset.draftUrl;
+            if (draftName && draftUrl) {
+                const draftSize = Number(fileInput.dataset.draftSize || 0);
+                const draftMime = fileInput.dataset.draftMime || '';
+                currentFile = { name: draftName, type: draftMime, size: draftSize };
+                currentObjectUrl = null;
+                trigger.hidden = true;
+                preview.hidden = false;
+
+                const isImage = draftMime.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(draftName);
+                const isPdf = draftMime === 'application/pdf' || /\.pdf$/i.test(draftName);
+
+                thumbEl.innerHTML = '';
+                if (isImage) {
+                    const img = document.createElement('img');
+                    img.src = draftUrl;
+                    img.alt = draftName;
+                    thumbEl.appendChild(img);
+                } else {
+                    const badge = document.createElement('span');
+                    badge.className = `file-picker-badge ${isPdf ? 'is-pdf' : 'is-doc'}`;
+                    badge.textContent = isPdf ? 'PDF' : 'FILE';
+                    thumbEl.appendChild(badge);
+                }
+
+                nameEl.textContent = draftName;
+                nameEl.title = draftName;
+                sizeEl.textContent = `${formatPickerBytes(draftSize)} · Tersimpan`;
+                return;
+            }
+
+            currentFile = null;
             trigger.hidden = false;
             preview.hidden = true;
             thumbEl.innerHTML = '';
@@ -790,6 +823,15 @@ const initSingleFilePicker = (fileInput) => {
             sizeEl.textContent = '';
             return;
         }
+
+        if (clearDraftInput) {
+            clearDraftInput.value = '0';
+        }
+        delete fileInput.dataset.draftName;
+        delete fileInput.dataset.draftSize;
+        delete fileInput.dataset.draftMime;
+        delete fileInput.dataset.draftUrl;
+        currentFile = file;
 
         trigger.hidden = true;
         preview.hidden = false;
@@ -823,8 +865,9 @@ const initSingleFilePicker = (fileInput) => {
     const handlePreviewOpen = (event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (currentFile && currentObjectUrl) {
-            openFilePreviewModal(currentFile, currentObjectUrl);
+        const previewUrl = currentObjectUrl || fileInput.dataset.draftUrl;
+        if (currentFile && previewUrl) {
+            openFilePreviewModal(currentFile, previewUrl);
         }
     };
     viewBtn.addEventListener('click', handlePreviewOpen);
@@ -839,6 +882,16 @@ const initSingleFilePicker = (fileInput) => {
         event.preventDefault();
         event.stopPropagation();
         fileInput.value = '';
+        if (clearDraftInput) {
+            clearDraftInput.value = '1';
+        }
+        delete fileInput.dataset.draftName;
+        delete fileInput.dataset.draftSize;
+        delete fileInput.dataset.draftMime;
+        delete fileInput.dataset.draftUrl;
+        if (fileInput.dataset.wasRequired === '1') {
+            fileInput.required = true;
+        }
         renderPickerState();
         fileInput.dispatchEvent(new Event('change', { bubbles: true }));
     });

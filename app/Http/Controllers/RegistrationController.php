@@ -10,17 +10,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class RegistrationController extends Controller
 {
     public function __construct(private readonly ImageUploadService $imageUploads) {}
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $registrationOpen = $this->registrationIsOpen();
         $schoolYear = $registrationOpen
@@ -35,6 +38,20 @@ class RegistrationController extends Controller
             'schoolYear' => $schoolYear,
             'registrationOpen' => $registrationOpen,
             'requiredDocuments' => config('registration.required_documents'),
+            'draftDocuments' => $this->validDraftDocuments($request),
+        ]);
+    }
+
+    public function draftPreview(Request $request, string $key): StreamedResponse
+    {
+        $requiredDocuments = config('registration.required_documents');
+        abort_unless(array_key_exists($key, $requiredDocuments), 404);
+
+        $draft = $this->validDraftDocuments($request)[$key] ?? null;
+        abort_unless($draft && Storage::disk('local')->exists($draft['path']), 404);
+
+        return Storage::disk('local')->response($draft['path'], $draft['name'], [
+            'Content-Disposition' => 'inline; filename="'.addslashes($draft['name']).'"',
         ]);
     }
 
@@ -53,6 +70,10 @@ class RegistrationController extends Controller
         }
 
         $requiredDocuments = config('registration.required_documents');
+        $draftDocuments = $this->syncDraftDocuments($request, $requiredDocuments);
+        $hasAnyUploadedFile = collect(array_keys($requiredDocuments))
+            ->contains(fn (string $key): bool => $request->hasFile("documents.{$key}"));
+
         $rules = [
             'student_name' => ['required', 'string', 'max:100'],
             'student_nickname' => ['nullable', 'string', 'max:100'],
@@ -67,7 +88,7 @@ class RegistrationController extends Controller
             'family_card_number' => ['nullable', 'digits:16'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'password' => ['required', 'confirmed', PasswordPolicy::rule()],
-            'documents' => ['required', 'array:'.implode(',', array_keys($requiredDocuments))],
+            'documents' => [$hasAnyUploadedFile || $draftDocuments === [] ? 'required' : 'nullable', 'array:'.implode(',', array_keys($requiredDocuments))],
         ];
         $messages = [
             'student_birthdate.before_or_equal' => 'Tanggal lahir tidak boleh di masa depan.',
@@ -76,7 +97,8 @@ class RegistrationController extends Controller
             'password.confirmed' => 'Konfirmasi kata sandi tidak sama.',
         ];
         foreach ($requiredDocuments as $key => $label) {
-            $rules["documents.{$key}"] = ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
+            $hasDraft = isset($draftDocuments[$key]['path']) && Storage::disk('local')->exists($draftDocuments[$key]['path']);
+            $rules["documents.{$key}"] = [$hasDraft ? 'nullable' : 'required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
             $messages["documents.{$key}.required"] = "Berkas {$label} wajib diunggah.";
             $messages["documents.{$key}.mimes"] = "Berkas {$label} harus berformat PDF, JPG, atau PNG.";
             $messages["documents.{$key}.max"] = "Ukuran berkas {$label} maksimal 5 MB.";
@@ -90,11 +112,23 @@ class RegistrationController extends Controller
         $documentPaths = [];
         try {
             foreach ($requiredDocuments as $key => $label) {
-                $documentPaths[$key] = $this->imageUploads->store(
-                    $data['documents'][$key],
-                    'pendaftaran',
-                    "documents.{$key}"
-                );
+                $uploadedFile = $data['documents'][$key] ?? null;
+                if ($uploadedFile) {
+                    $documentPaths[$key] = $this->imageUploads->store(
+                        $uploadedFile,
+                        'pendaftaran',
+                        "documents.{$key}"
+                    );
+                } elseif (isset($draftDocuments[$key]['path']) && Storage::disk('local')->exists($draftDocuments[$key]['path'])) {
+                    $extension = pathinfo($draftDocuments[$key]['path'], PATHINFO_EXTENSION) ?: 'bin';
+                    $targetPath = 'pendaftaran/'.Str::random(40).'.'.$extension;
+                    Storage::disk('local')->copy($draftDocuments[$key]['path'], $targetPath);
+                    $documentPaths[$key] = $targetPath;
+                } else {
+                    throw ValidationException::withMessages([
+                        "documents.{$key}" => "Berkas {$label} wajib diunggah.",
+                    ]);
+                }
             }
 
             DB::transaction(function () use ($data, $schoolYear, $documentPaths, $requiredDocuments): void {
@@ -171,10 +205,83 @@ class RegistrationController extends Controller
             throw $exception;
         }
 
+        foreach ($draftDocuments as $draft) {
+            if (! empty($draft['path'])) {
+                Storage::disk('local')->delete($draft['path']);
+            }
+        }
+        $request->session()->forget('registration_draft_documents');
+
         $request->session()->regenerate();
 
         return redirect()->route('registration.success')
             ->with('registration_submitted', true);
+    }
+
+    private function validDraftDocuments(Request $request): array
+    {
+        $drafts = $request->session()->get('registration_draft_documents', []);
+        if (! is_array($drafts)) {
+            return [];
+        }
+
+        return array_filter($drafts, function ($item): bool {
+            return is_array($item)
+                && ! empty($item['path'])
+                && Storage::disk('local')->exists($item['path']);
+        });
+    }
+
+    private function syncDraftDocuments(Request $request, array $requiredDocuments): array
+    {
+        $drafts = $this->validDraftDocuments($request);
+        $sessionId = $request->session()->getId() ?: Str::random(16);
+        $draftDirectory = 'registration-drafts/'.preg_replace('/[^A-Za-z0-9_-]/', '', $sessionId);
+
+        foreach (array_keys($requiredDocuments) as $key) {
+            if ($request->boolean("clear_draft_documents.{$key}") && ! $request->hasFile("documents.{$key}")) {
+                if (! empty($drafts[$key]['path'])) {
+                    Storage::disk('local')->delete($drafts[$key]['path']);
+                }
+                unset($drafts[$key]);
+                continue;
+            }
+
+            if (! $request->hasFile("documents.{$key}")) {
+                continue;
+            }
+
+            $file = $request->file("documents.{$key}");
+            $fileValidator = Validator::make(
+                ['file' => $file],
+                ['file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120']]
+            );
+
+            if ($fileValidator->fails()) {
+                continue;
+            }
+
+            try {
+                $storedPath = $this->imageUploads->store($file, $draftDirectory, "documents.{$key}");
+            } catch (ValidationException) {
+                continue;
+            }
+
+            if (! empty($drafts[$key]['path']) && $drafts[$key]['path'] !== $storedPath) {
+                Storage::disk('local')->delete($drafts[$key]['path']);
+            }
+
+            $drafts[$key] = [
+                'path' => $storedPath,
+                'name' => $file->getClientOriginalName(),
+                'size' => (int) ($file->getSize() ?: Storage::disk('local')->size($storedPath)),
+                'mime' => (string) ($file->getMimeType() ?: 'application/octet-stream'),
+            ];
+        }
+
+        $request->session()->put('registration_draft_documents', $drafts);
+
+        return $drafts;
     }
 
     private function registrationIsOpen(bool $lockForUpdate = false): bool

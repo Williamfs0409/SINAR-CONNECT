@@ -111,24 +111,35 @@
                             @php
                                 $documentInputId = 'registration-document-'.$documentKey;
                                 $documentFeedbackId = $documentInputId.'-feedback';
+                                $draftDocument = ($draftDocuments ?? [])[$documentKey] ?? null;
+                                $hasDocumentError = $errors->has('documents.'.$documentKey);
                             @endphp
                             <div class="registration-upload-field">
                                 <label for="{{ $documentInputId }}">{{ $documentLabel }} (PDF/JPG/PNG, maks. 5 MB)</label>
+                                <input type="hidden" name="clear_draft_documents[{{ $documentKey }}]" value="0" data-draft-clear>
                                 <input
                                     id="{{ $documentInputId }}"
                                     type="file"
                                     name="documents[{{ $documentKey }}]"
                                     accept=".pdf,.jpg,.jpeg,.png"
                                     data-max-bytes="5242880"
+                                    data-was-required="1"
                                     aria-describedby="{{ $documentFeedbackId }}"
-                                    required
+                                    @if ($draftDocument)
+                                        data-draft-name="{{ $draftDocument['name'] }}"
+                                        data-draft-size="{{ $draftDocument['size'] }}"
+                                        data-draft-mime="{{ $draftDocument['mime'] }}"
+                                        data-draft-url="{{ route('registration.draft-preview', ['key' => $documentKey]) }}"
+                                    @else
+                                        required
+                                    @endif
                                 >
                                 <small
                                     id="{{ $documentFeedbackId }}"
-                                    class="registration-upload-feedback @error('documents.'.$documentKey) is-error @enderror"
+                                    class="registration-upload-feedback @if ($hasDocumentError) is-error @elseif ($draftDocument) is-success @endif"
                                     role="status"
                                     aria-live="polite"
-                                >@error('documents.'.$documentKey){{ $message }}@else Wajib diunggah. Maksimal 5 MB dan 20 megapiksel per gambar.@enderror</small>
+                                >@if ($hasDocumentError){{ $errors->first('documents.'.$documentKey) }}@elseif ($draftDocument)✓ {{ $draftDocument['name'] }} tersimpan sementara dan siap dikirim.@else Wajib diunggah. Maksimal 5 MB dan 20 megapiksel per gambar.@endif</small>
                             </div>
                         @endforeach
                     </div>

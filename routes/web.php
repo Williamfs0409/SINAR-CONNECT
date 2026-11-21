@@ -28,6 +28,8 @@ Route::post('/pendaftaran', [RegistrationController::class, 'store'])
     ->name('registration.store');
 Route::get('/pendaftaran/berhasil', [RegistrationController::class, 'success'])
     ->name('registration.success');
+Route::get('/pendaftaran/draft/{key}', [RegistrationController::class, 'draftPreview'])
+    ->name('registration.draft-preview');
 Route::get('/kata-sandi/lupa', [PasswordSecurityController::class, 'showRequestForm'])
     ->middleware('guest')
     ->name('password.request');
