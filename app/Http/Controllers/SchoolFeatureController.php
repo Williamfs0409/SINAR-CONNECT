@@ -3232,7 +3232,7 @@ class SchoolFeatureController extends Controller
 
         $year = (int) $data['tahun'];
         $month = (int) $data['bulan'];
-        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        $daysInMonth = (int) date('t', strtotime(sprintf('%04d-%02d-01', $year, $month)));
         $today = now('Asia/Jakarta')->toDateString();
         $monthStart = sprintf('%04d-%02d-01', $year, $month);
         $monthEnd = sprintf('%04d-%02d-%02d', $year, $month, $daysInMonth);
