@@ -1411,11 +1411,6 @@ class SchoolFeatureController extends Controller
             ->where('id_rombel', $data['id_rombel'])
             ->where('semester', $data['semester'])
             ->first();
-        if ($existing?->status === 'Final' && $data['status'] === 'Final') {
-            throw ValidationException::withMessages([
-                'semester' => 'Rapor final terkunci dan tidak dapat diubah.',
-            ]);
-        }
 
         $values = collect($data)->except(['id_rombel', 'id_guru_iqro'])->all() + [
             'id_guru_kelas' => $teacherId,
@@ -1426,6 +1421,9 @@ class SchoolFeatureController extends Controller
         }
 
         if ($existing) {
+            if ($existing->status === 'Final') {
+                DB::table('rapor')->where('id_rapor', $existing->id_rapor)->update(['status' => 'Draft']);
+            }
             DB::table('rapor')->where('id_rapor', $existing->id_rapor)->update($values);
         } else {
             DB::table('rapor')->insert($values + [

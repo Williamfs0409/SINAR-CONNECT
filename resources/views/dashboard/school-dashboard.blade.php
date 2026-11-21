@@ -359,8 +359,8 @@
                         </div>
                     @else
                         @php
-                            $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'pembelajaran', 'tugas', 'perkembangan', 'kegiatan'], true))
-                                || ($role === 'teacher' && in_array($section, ['pembelajaran', 'tugas', 'perkembangan', 'kegiatan'], true));
+                            $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true))
+                                || ($role === 'teacher' && in_array($section, ['pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true));
                         @endphp
                         <div class="database-table-wrap">
                             <table class="database-table">
@@ -705,6 +705,28 @@
                                                                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
                                                                 </button>
                                                             </form>
+                                                        </div>
+                                                    @elseif ($section === 'rapor')
+                                                        <div class="database-row-actions">
+                                                            <details class="database-row-editor">
+                                                                <summary class="database-icon-button" aria-label="Edit rapor {{ data_get($record, 'nama_lengkap') }}" title="Edit rapor">
+                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                                                                </summary>
+                                                                <form method="POST" action="{{ route('database.report.store') }}" class="database-row-editor-form">
+                                                                    @csrf
+                                                                    <input type="hidden" name="id_rombel" value="{{ data_get($record, 'id_rombel') }}">
+                                                                    <input type="hidden" name="semester" value="{{ data_get($record, 'semester') }}">
+                                                                    <input type="hidden" name="status" value="Final">
+                                                                    <label>Tanggal rapor<input type="date" name="tanggal_rapor" value="{{ data_get($record, 'tanggal_rapor') ?: now()->toDateString() }}"></label>
+                                                                    <label>Tinggi badan (cm)<input type="number" step="0.1" name="tinggi_badan" value="{{ data_get($record, 'tinggi_badan') }}" min="30" max="180"></label>
+                                                                    <label>Berat badan (kg)<input type="number" step="0.1" name="berat_badan" value="{{ data_get($record, 'berat_badan') }}" min="5" max="120"></label>
+                                                                    <label>Agama dan budi pekerti<textarea name="narasi_agama_budi_pekerti" rows="2" required>{{ data_get($record, 'narasi_agama_budi_pekerti') }}</textarea></label>
+                                                                    <label>Jati diri<textarea name="narasi_jati_diri" rows="2" required>{{ data_get($record, 'narasi_jati_diri') }}</textarea></label>
+                                                                    <label>Literasi dan STEAM<textarea name="narasi_literasi_steam" rows="2" required>{{ data_get($record, 'narasi_literasi_steam') }}</textarea></label>
+                                                                    <label>Projek P5<textarea name="narasi_p5" rows="2" required>{{ data_get($record, 'narasi_p5') }}</textarea></label>
+                                                                    <button class="database-button database-button-secondary" type="submit">Simpan perubahan</button>
+                                                                </form>
+                                                            </details>
                                                         </div>
                                                     @endif
                                                 </td>
