@@ -359,8 +359,8 @@
                         </div>
                     @else
                         @php
-                            $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true))
-                                || ($role === 'teacher' && in_array($section, ['pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true));
+                            $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'absensi', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true))
+                                || ($role === 'teacher' && in_array($section, ['absensi', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true));
                         @endphp
                         <div class="database-table-wrap">
                             <table class="database-table">
@@ -578,6 +578,27 @@
                                                                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
                                                                 </button>
                                                             </form>
+                                                        </div>
+                                                    @elseif ($section === 'absensi')
+                                                        <div class="database-row-actions">
+                                                            <details class="database-row-editor">
+                                                                <summary class="database-icon-button" aria-label="Edit kehadiran {{ data_get($record, 'nama_lengkap') }}" title="Edit rekap kehadiran">
+                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>
+                                                                </summary>
+                                                                <form method="POST" action="{{ route('database.attendance.recap.update') }}" class="database-row-editor-form">
+                                                                    @csrf
+                                                                    @method('PATCH')
+                                                                    <input type="hidden" name="id_siswa" value="{{ data_get($record, 'id_siswa') }}">
+                                                                    <input type="hidden" name="id_kelas" value="{{ data_get($record, 'id_kelas') }}">
+                                                                    <input type="hidden" name="tahun" value="{{ data_get($record, 'tahun') }}">
+                                                                    <input type="hidden" name="bulan" value="{{ data_get($record, 'bulan') }}">
+                                                                    <label>Hadir<input type="number" name="hadir" value="{{ (int) data_get($record, 'hadir') }}" min="0" max="31" required></label>
+                                                                    <label>Izin<input type="number" name="izin" value="{{ (int) data_get($record, 'izin') }}" min="0" max="31" required></label>
+                                                                    <label>Sakit<input type="number" name="sakit" value="{{ (int) data_get($record, 'sakit') }}" min="0" max="31" required></label>
+                                                                    <label>Alfa<input type="number" name="alfa" value="{{ (int) data_get($record, 'alfa') }}" min="0" max="31" required></label>
+                                                                    <button class="database-button database-button-secondary" type="submit">Simpan rekap</button>
+                                                                </form>
+                                                            </details>
                                                         </div>
                                                     @elseif ($section === 'tagihan')
                                                         <div class="database-row-actions">

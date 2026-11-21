@@ -1734,6 +1734,10 @@ class SchoolDataController extends Controller
         if (isset($module['key'])) {
             $columns[] = $module['key'];
         }
+        if (($module['view'] ?? null) === 'v_rekap_kehadiran_bulanan') {
+            $columns[] = 'id_siswa';
+            $columns[] = 'id_kelas';
+        }
         $query = DB::table($module['view'])->select(array_unique($columns));
 
         $effectiveScope = $role === 'teacher'

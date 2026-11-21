@@ -141,6 +141,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.attendance.init');
     Route::post('/dashboard/absensi', [SchoolFeatureController::class, 'storeAttendance'])
         ->name('database.attendance.store');
+    Route::patch('/dashboard/absensi/rekap', [SchoolFeatureController::class, 'updateAttendanceRecap'])
+        ->name('database.attendance.recap.update');
     Route::post('/dashboard/rencana-pembelajaran', [SchoolFeatureController::class, 'storeLessonPlan'])
         ->name('database.lesson-plan.store');
     Route::patch('/dashboard/rencana-pembelajaran/{lessonPlan}', [SchoolFeatureController::class, 'updateLessonPlan'])

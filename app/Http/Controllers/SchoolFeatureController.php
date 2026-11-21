@@ -3206,6 +3206,106 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Tagihan siswa berhasil dihapus.');
     }
 
+    public function updateAttendanceRecap(Request $request): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $data = $request->validate([
+            'id_siswa' => ['required', 'integer'],
+            'id_kelas' => ['required', 'integer'],
+            'tahun' => ['required', 'integer', 'min:2020', 'max:2099'],
+            'bulan' => ['required', 'integer', 'min:1', 'max:12'],
+            'hadir' => ['required', 'integer', 'min:0', 'max:31'],
+            'izin' => ['required', 'integer', 'min:0', 'max:31'],
+            'sakit' => ['required', 'integer', 'min:0', 'max:31'],
+            'alfa' => ['required', 'integer', 'min:0', 'max:31'],
+        ]);
+
+        if ($user->role === 'teacher') {
+            $this->assertTeacherClass($this->teacherId($user), (int) $data['id_kelas']);
+        }
+
+        $roster = DB::table('rombel_siswa')
+            ->where('id_siswa', (int) $data['id_siswa'])
+            ->where('id_kelas', (int) $data['id_kelas'])
+            ->first();
+        abort_unless($roster !== null, 404);
+
+        $year = (int) $data['tahun'];
+        $month = (int) $data['bulan'];
+        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        $today = now('Asia/Jakarta')->toDateString();
+        $monthStart = sprintf('%04d-%02d-01', $year, $month);
+        $monthEnd = sprintf('%04d-%02d-%02d', $year, $month, $daysInMonth);
+
+        $statuses = array_merge(
+            array_fill(0, (int) $data['hadir'], 'Hadir'),
+            array_fill(0, (int) $data['izin'], 'Izin'),
+            array_fill(0, (int) $data['sakit'], 'Sakit'),
+            array_fill(0, (int) $data['alfa'], 'Alfa')
+        );
+        $targetCount = count($statuses);
+
+        $availableDates = [];
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $candidate = sprintf('%04d-%02d-%02d', $year, $month, $day);
+            if ($candidate <= $today) {
+                $availableDates[] = $candidate;
+            }
+        }
+
+        if ($targetCount > count($availableDates)) {
+            throw ValidationException::withMessages([
+                'hadir' => 'Total hari kehadiran melebihi jumlah hari yang sudah berjalan pada bulan tersebut (maks. '.count($availableDates).' hari).',
+            ]);
+        }
+
+        DB::transaction(function () use ($roster, $monthStart, $monthEnd, $statuses, $targetCount, $availableDates, $user): void {
+            $existing = DB::table('absensi')
+                ->where('id_rombel', $roster->id_rombel)
+                ->whereBetween('tanggal', [$monthStart, $monthEnd])
+                ->orderBy('tanggal')
+                ->get(['id_absensi', 'tanggal', 'status']);
+
+            $existingCount = $existing->count();
+            $usedDates = $existing->pluck('tanggal')->all();
+
+            foreach ($existing as $index => $row) {
+                if ($index < $targetCount) {
+                    if ($row->status !== $statuses[$index]) {
+                        DB::table('absensi')
+                            ->where('id_absensi', $row->id_absensi)
+                            ->update([
+                                'status' => $statuses[$index],
+                                'id_user_pencatat' => $user->getKey(),
+                                'updated_at' => now(),
+                            ]);
+                    }
+                } else {
+                    DB::table('absensi')->where('id_absensi', $row->id_absensi)->delete();
+                }
+            }
+
+            if ($targetCount > $existingCount) {
+                $freeDates = array_values(array_diff($availableDates, $usedDates));
+                for ($i = $existingCount; $i < $targetCount; $i++) {
+                    $date = $freeDates[$i - $existingCount] ?? null;
+                    if ($date === null) {
+                        break;
+                    }
+                    DB::table('absensi')->insert([
+                        'id_rombel' => $roster->id_rombel,
+                        'tanggal' => $date,
+                        'status' => $statuses[$i],
+                        'id_user_pencatat' => $user->getKey(),
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+        });
+
+        return back()->with('status', 'Rekap kehadiran siswa berhasil disesuaikan.');
+    }
+
     private function calculateRosterDiscount(?int $discountId, float $nominal): float
     {
         if (! $discountId || ! Schema::hasTable('diskon')) {
