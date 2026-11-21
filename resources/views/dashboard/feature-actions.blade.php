@@ -1101,6 +1101,7 @@
         </form>
 
         <h3 class="database-subheading">Pengumpulan untuk dinilai</h3>
+        <p class="database-empty-note" style="margin: 0 0 10px;"><strong>Keterangan:</strong> BSB = Berkembang Sangat Baik · BSH = Berkembang Sesuai Harapan · MB = Mulai Berkembang · BB = Belum Berkembang</p>
         <div class="submission-card-list">
             @forelse ($actions['submissions'] ?? [] as $submission)
                 <form method="POST" action="{{ route('database.task.grade', ['submission' => $submission->id_pengumpulan]) }}" class="submission-card">
@@ -1121,8 +1122,8 @@
                         <label class="submission-grade-field">
                             <span>Nilai</span>
                             <select name="nilai" required aria-label="Nilai tugas">
-                                @foreach (['BB', 'MB', 'BSH', 'BSB'] as $grade)
-                                    <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }}</option>
+                                @foreach (['BB' => 'Belum Berkembang', 'MB' => 'Mulai Berkembang', 'BSH' => 'Berkembang Sesuai Harapan', 'BSB' => 'Berkembang Sangat Baik'] as $grade => $gradeLabel)
+                                    <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }} = {{ $gradeLabel }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -1202,7 +1203,7 @@
                 </select>
             </label>
             <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
-            <label>Capaian<select name="skala"><option>BB</option><option>MB</option><option value="BSH" selected>BSH</option><option>BSB</option></select></label>
+            <label>Capaian<select name="skala"><option value="BB">BB = Belum Berkembang</option><option value="MB">MB = Mulai Berkembang</option><option value="BSH" selected>BSH = Berkembang Sesuai Harapan</option><option value="BSB">BSB = Berkembang Sangat Baik</option></select></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Simpan nilai</button></div>
         </form>
     </section>
