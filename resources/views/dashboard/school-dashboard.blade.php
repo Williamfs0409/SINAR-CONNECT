@@ -359,7 +359,7 @@
                         </div>
                     @else
                         @php
-                            $showActionColumn = ($role === 'admin' && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'pembelajaran', 'tugas', 'perkembangan', 'kegiatan'], true))
+                            $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'pembelajaran', 'tugas', 'perkembangan', 'kegiatan'], true))
                                 || ($role === 'teacher' && in_array($section, ['pembelajaran', 'tugas', 'perkembangan', 'kegiatan'], true));
                         @endphp
                         <div class="database-table-wrap">

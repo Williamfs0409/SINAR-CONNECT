@@ -55,7 +55,7 @@
         </svg>
     </a>
 @endif
-@if ($role === 'admin' && $passwordResetAttentionCount > 0)
+@if (in_array($role, ['admin', 'principal'], true) && $passwordResetAttentionCount > 0)
     <a class="message-notifications-toggle"
        href="{{ route('admin.password-reset-requests.index') }}"
        aria-label="{{ $passwordResetAttentionCount }} permintaan reset kata sandi masih perlu ditindaklanjuti"

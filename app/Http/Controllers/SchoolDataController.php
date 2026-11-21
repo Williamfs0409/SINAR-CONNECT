@@ -26,7 +26,8 @@ class SchoolDataController extends Controller
             'siswa', 'pendaftaran', 'guru', 'kelas', 'absensi', 'pembelajaran',
             'tugas', 'nilai', 'perkembangan', 'rapor', 'kegiatan', 'tagihan', 'pembayaran',
             'tabungan', 'saldo-tabungan', 'tunggakan', 'rekap-pembayaran', 'rekap-pendaftar', 'tarif',
-            'diskon-siswa', 'kapasitas-kelas', 'kesiapan', 'kualitas',
+            'diskon-siswa', 'kapasitas-kelas', 'keluarga-tanpa-akun',
+            'keluarga', 'pengguna', 'kesiapan', 'kualitas', 'duplikat-siswa', 'audit',
         ],
         'teacher' => [
             'siswa', 'kelas', 'absensi', 'pembelajaran', 'tugas', 'nilai',
@@ -648,7 +649,7 @@ class SchoolDataController extends Controller
         $module = $section === 'ringkasan' ? null : $this->moduleDefinition($section, $role);
         $records = $module ? $this->recordsFor($section, $module, $scope, $role, $user) : null;
         $messageCenterReady = Schema::hasTable('messages');
-        $passwordResetAttentionCount = $role === 'admin' && Schema::hasTable('password_reset_requests')
+        $passwordResetAttentionCount = in_array($role, ['admin', 'principal'], true) && Schema::hasTable('password_reset_requests')
             ? DB::table('password_reset_requests')->whereIn('status', ['pending', 'approved'])->count()
             : 0;
 
@@ -699,7 +700,7 @@ class SchoolDataController extends Controller
         }
         $data['classes'] = $classes->get();
 
-        if (in_array($role, ['teacher', 'parent', 'admin'], true) && Schema::hasTable('rombel_siswa')) {
+        if (in_array($role, ['teacher', 'parent', 'admin', 'principal'], true) && Schema::hasTable('rombel_siswa')) {
             $students = DB::table('rombel_siswa as r')
                 ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
                 ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
@@ -723,8 +724,8 @@ class SchoolDataController extends Controller
             $data['rosters'] = $students->get();
         }
 
-        if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('rombel_siswa') && Schema::hasTable('absensi')) {
-            $allAttendanceClasses = $role === 'admin'
+        if ($section === 'absensi' && in_array($role, ['teacher', 'admin', 'principal'], true) && Schema::hasTable('rombel_siswa') && Schema::hasTable('absensi')) {
+            $allAttendanceClasses = in_array($role, ['admin', 'principal'], true)
                 ? $data['classes']->where('nama_kelas', '<>', 'Belum Ditentukan')->values()
                 : $data['classes'];
             $academicYears = $allAttendanceClasses
@@ -800,7 +801,7 @@ class SchoolDataController extends Controller
                 ]);
         }
 
-        if ($section === 'pendaftaran' && $role === 'admin') {
+        if ($section === 'pendaftaran' && in_array($role, ['admin', 'principal'], true)) {
             abort_unless(
                 Schema::hasTable('registration_settings'),
                 503,
@@ -938,7 +939,7 @@ class SchoolDataController extends Controller
             });
         }
 
-        if ($section === 'siswa' && $role === 'admin') {
+        if ($section === 'siswa' && in_array($role, ['admin', 'principal'], true)) {
             $studentColumns = [
                 'id_siswa',
                 'nama_lengkap',
@@ -1043,7 +1044,7 @@ class SchoolDataController extends Controller
             }
         }
 
-        if ($section === 'guru' && $role === 'admin' && Schema::hasTable('guru')) {
+        if ($section === 'guru' && in_array($role, ['admin', 'principal'], true) && Schema::hasTable('guru')) {
             $data['teachers'] = DB::table('guru')->orderBy('nama_lengkap')->get();
             $data['teacherUsers'] = Schema::hasTable('users')
                 ? DB::table('users')
@@ -1072,7 +1073,7 @@ class SchoolDataController extends Controller
                 : collect();
         }
 
-        if ($section === 'kelas' && $role === 'admin' && Schema::hasTable('kelas')) {
+        if ($section === 'kelas' && in_array($role, ['admin', 'principal'], true) && Schema::hasTable('kelas')) {
             $data['schoolYears'] = Schema::hasTable('tahun_ajaran')
                 ? DB::table('tahun_ajaran')->orderByDesc('tahun_mulai')->get()
                 : collect();
@@ -1112,7 +1113,7 @@ class SchoolDataController extends Controller
             $data['managedClasses'] = $managedClassesQuery->get();
         }
 
-        if ($section === 'duplikat-siswa' && $role === 'admin') {
+        if ($section === 'duplikat-siswa' && in_array($role, ['admin', 'principal'], true)) {
             $data['allStudents'] = Schema::hasTable('siswa')
                 ? DB::table('siswa')->orderBy('nama_lengkap')->get(['id_siswa', 'nama_lengkap', 'tanggal_lahir', 'id_keluarga'])
                 : collect();
@@ -1144,7 +1145,7 @@ class SchoolDataController extends Controller
         }
 
         if ($section === 'tugas') {
-            if (in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('pengumpulan_tugas')) {
+            if (in_array($role, ['teacher', 'admin', 'principal'], true) && Schema::hasTable('pengumpulan_tugas')) {
                 $baseSubmissionsQuery = DB::table('pengumpulan_tugas as pt')
                     ->join('tugas as t', 't.id_tugas', '=', 'pt.id_tugas')
                     ->join('rombel_siswa as r', 'r.id_rombel', '=', 'pt.id_rombel')
@@ -1209,7 +1210,7 @@ class SchoolDataController extends Controller
             }
         }
 
-        if ($section === 'nilai' && in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('indikator_iqro')) {
+        if ($section === 'nilai' && in_array($role, ['teacher', 'admin', 'principal'], true) && Schema::hasTable('indikator_iqro')) {
             $indicatorsQuery = DB::table('indikator_iqro')->orderBy('kelompok')->orderBy('urutan');
             if ($role === 'teacher') {
                 $teacherGroups = $data['classes']->pluck('kelompok')->unique()->values()->all();
@@ -1245,7 +1246,7 @@ class SchoolDataController extends Controller
                     $detailedReportsQuery->whereIn('id_rombel', $scope['rosterIds']);
                 }
                 $data['detailedReports'] = $detailedReportsQuery->get($reportColumns);
-                if (in_array($role, ['teacher', 'admin'], true) && Schema::hasTable('guru')) {
+                if (in_array($role, ['teacher', 'admin', 'principal'], true) && Schema::hasTable('guru')) {
                     $iqroCols = ['id_guru', 'nama_lengkap'];
                     if (Schema::hasColumn('guru', 'gelar_belakang')) {
                         $iqroCols[] = 'gelar_belakang';
@@ -1318,7 +1319,7 @@ class SchoolDataController extends Controller
             ]);
         }
 
-        if ($section === 'tagihan' && $role === 'admin') {
+        if ($section === 'tagihan' && in_array($role, ['admin', 'principal'], true)) {
             $schoolYear = DB::table('tahun_ajaran')->where('is_aktif', true)->first();
             $data['activeSchoolYear'] = $schoolYear;
             $data['billRosters'] = $schoolYear
@@ -1343,7 +1344,7 @@ class SchoolDataController extends Controller
                 : collect();
         }
 
-        if ($section === 'pembayaran' && $role === 'admin') {
+        if ($section === 'pembayaran' && in_array($role, ['admin', 'principal'], true)) {
             $data['pendingPayments'] = DB::table('v_pembayaran_detail as v')
                 ->join('pembayaran as p', 'p.id_pembayaran', '=', 'v.id_pembayaran')
                 ->where('v.status', 'Menunggu Verifikasi')
@@ -1384,7 +1385,7 @@ class SchoolDataController extends Controller
                 : collect();
         }
 
-        if ($section === 'kegiatan' && $role === 'admin') {
+        if ($section === 'kegiatan' && in_array($role, ['admin', 'principal'], true)) {
             $data['fieldTrips'] = DB::table('kegiatan as k')
                 ->where('k.jenis', 'Field Trip')
                 ->orderByDesc('k.tanggal')
@@ -1435,7 +1436,7 @@ class SchoolDataController extends Controller
             }
         }
 
-        if ($section === 'keluarga' && $role === 'admin') {
+        if ($section === 'keluarga' && in_array($role, ['admin', 'principal'], true)) {
             $data['unlinkedFamilies'] = DB::table('keluarga as f')
                 ->join('siswa as s', 's.id_keluarga', '=', 'f.id_keluarga')
                 ->whereNull('f.id_user')
@@ -1456,7 +1457,7 @@ class SchoolDataController extends Controller
                 ->get(['u.id_user', 'u.name', 'u.email']);
         }
 
-        if ($section === 'tarif' && $role === 'admin') {
+        if ($section === 'tarif' && in_array($role, ['admin', 'principal'], true)) {
             $data['schoolYears'] = DB::table('tahun_ajaran')
                 ->orderByDesc('tahun_mulai')
                 ->get(['id_tahun_ajaran', 'nama']);

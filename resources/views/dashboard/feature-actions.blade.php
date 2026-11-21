@@ -345,7 +345,7 @@
     </section>
 @endif
 
-@if ($section === 'siswa' && $role === 'admin')
+@if ($section === 'siswa' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div>
@@ -438,7 +438,7 @@
     </section>
 @endif
 
-@if ($section === 'guru' && $role === 'admin')
+@if ($section === 'guru' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div><h2>Tambah &amp; tugaskan guru</h2><p>Kelola data pendidik dan penugasan wali kelas/pendamping pada tahun ajaran aktif.</p></div>
@@ -548,7 +548,7 @@
     </section>
 @endif
 
-@if ($section === 'kelas' && $role === 'admin')
+@if ($section === 'kelas' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div><h2>Kelola ruang kelas &amp; tahun ajaran</h2><p>Atur tahun ajaran aktif, tambah ruang kelas baru, atau sesuaikan kapasitas dan wali kelas.</p></div>
@@ -634,7 +634,7 @@
     </section>
 @endif
 
-@if ($section === 'duplikat-siswa' && $role === 'admin')
+@if ($section === 'duplikat-siswa' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div><h2>Gabungkan data ganda (deduplikasi)</h2><p>Pindahkan seluruh riwayat rombel, pendaftaran, dan tabungan dari data duplikat ke data utama secara aman dalam satu transaksi.</p></div>
@@ -683,7 +683,7 @@
     </section>
 @endif
 
-@if ($section === 'pendaftaran' && $role === 'admin')
+@if ($section === 'pendaftaran' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div>
@@ -889,7 +889,7 @@
     @endif
 @endif
 
-@if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true))
+@if ($section === 'absensi' && in_array($role, ['teacher', 'admin', 'principal'], true))
     @php
         $selectableClasses = ($actions['attendanceClasses'] ?? $classOptions)->values();
         $academicYears = ($actions['attendanceAcademicYears'] ?? collect())->values();
@@ -1060,7 +1060,7 @@
     </section>
 @endif
 
-@if ($section === 'pembelajaran' && in_array($role, ['teacher', 'admin'], true))
+@if ($section === 'pembelajaran' && in_array($role, ['teacher', 'admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Buat rencana pembelajaran</h2><p>Simpan jenis rencana (RPPH/RPPM/Modul Ajar), tema, tujuan, kegiatan, serta alat dan bahan.</p></div></div>
         <form method="POST" action="{{ route('database.lesson-plan.store') }}" class="database-form-grid">
@@ -1080,7 +1080,7 @@
     </section>
 @endif
 
-@if ($section === 'tugas' && in_array($role, ['teacher', 'admin'], true))
+@if ($section === 'tugas' && in_array($role, ['teacher', 'admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Buat tugas kelas</h2><p>Buat tugas untuk kelas TK A atau TK B dan beri nilai beserta umpan balik atas pengumpulan siswa.</p></div></div>
         <form method="POST" action="{{ route('database.task.store') }}" enctype="multipart/form-data" class="database-form-grid">
@@ -1299,7 +1299,7 @@
     </section>
 @endif
 
-@if ($section === 'nilai' && in_array($role, ['teacher', 'admin'], true))
+@if ($section === 'nilai' && in_array($role, ['teacher', 'admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Catat perkembangan Iqro</h2><p>Indikator disesuaikan otomatis dengan kelompok kelas siswa (KB, TK A, atau TK B).</p></div></div>
         <form method="POST" action="{{ route('database.iqro.store') }}" class="database-form-grid">
@@ -1325,7 +1325,7 @@
     </section>
 @endif
 
-@if ($section === 'perkembangan' && in_array($role, ['teacher', 'admin'], true))
+@if ($section === 'perkembangan' && in_array($role, ['teacher', 'admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Tambah portofolio perkembangan</h2><p>Unggah foto dan catatan perkembangan siswa pada kelas yang diampu.</p></div></div>
         <form method="POST" action="{{ route('database.portfolio.store') }}" enctype="multipart/form-data" class="database-form-grid">
@@ -1339,7 +1339,7 @@
     </section>
 @endif
 
-@if ($section === 'rapor' && in_array($role, ['teacher', 'admin'], true))
+@if ($section === 'rapor' && in_array($role, ['teacher', 'admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Susun rapor</h2><p>Rapor final terkunci sesuai aturan database; semua 4 narasi perkembangan wajib terisi sebelum rapor difinalkan.</p></div></div>
         <form method="POST" action="{{ route('database.report.store') }}" class="database-form-grid">
@@ -1424,7 +1424,7 @@
     </section>
 @endif
 
-@if ($section === 'kegiatan' && in_array($role, ['teacher', 'admin'], true))
+@if ($section === 'kegiatan' && in_array($role, ['teacher', 'admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Unggah dokumentasi kegiatan</h2><p>Pilih kelas, buat kegiatan, lalu unggah foto dokumentasi. Orang tua yang terhubung dengan kelas tersebut dapat melihat dokumentasinya.</p></div></div>
         <form method="POST" action="{{ route('database.activity.store') }}" class="database-form-grid">
@@ -1453,7 +1453,7 @@
     </section>
 @endif
 
-@if ($section === 'kegiatan' && $role === 'admin')
+@if ($section === 'kegiatan' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Biaya dan tagihan Field Trip</h2><p>Tetapkan biaya sebelum menerbitkan tagihan. Jatuh tempo mengikuti tanggal kegiatan; biaya terkunci setelah tagihan pertama dibuat.</p></div></div>
         @forelse ($actions['fieldTrips'] ?? [] as $activity)
@@ -1502,9 +1502,9 @@
     </section>
 @endif
 
-@if (in_array($section, ['tagihan', 'pembayaran'], true) && in_array($role, ['admin', 'parent'], true))
+@if (in_array($section, ['tagihan', 'pembayaran'], true) && in_array($role, ['admin', 'principal', 'parent'], true))
     <section class="database-action-panel">
-        @if ($role === 'admin' && $section === 'tagihan')
+        @if (in_array($role, ['admin', 'principal'], true) && $section === 'tagihan')
             <div class="database-section-heading"><div><h2>Buat tagihan SPP bulanan</h2><p>Tagihan dibuat untuk siswa aktif pada tahun ajaran aktif sesuai tarif database dan potongan diskon siswa; tagihan yang sudah ada tidak digandakan.</p></div></div>
             <form method="POST" action="{{ route('database.bills.generate') }}" class="database-inline-form">
                 @csrf
@@ -1542,7 +1542,7 @@
             @endif
         @endif
 
-        @if ($role === 'admin' && $section === 'pembayaran')
+        @if (in_array($role, ['admin', 'principal'], true) && $section === 'pembayaran')
             <div class="database-section-heading"><div><h2>Rekening pembayaran</h2><p>Informasi ini ditampilkan kepada orang tua sebelum transfer.</p></div></div>
             <form method="POST" action="{{ route('database.payment-settings.update') }}" class="database-form-grid">
                 @csrf
@@ -1625,7 +1625,7 @@
         @endif
 
         @if ($section === 'pembayaran')
-            <div class="database-section-heading @if ($role === 'admin') database-subsection-heading @endif"><div><h2>{{ $role === 'parent' ? 'Kirim pembayaran' : 'Catat pembayaran tagihan' }}</h2><p>{{ $role === 'parent' ? 'Pilih jenis pembayaran (Tagihan atau Setor Tabungan) menggunakan metode Transfer dan unggah bukti transfer.' : 'Pembayaran transfer membutuhkan bukti; transaksi tunai oleh administrator langsung tercatat.' }}</p></div></div>
+            <div class="database-section-heading @if (in_array($role, ['admin', 'principal'], true)) database-subsection-heading @endif"><div><h2>{{ $role === 'parent' ? 'Kirim pembayaran' : 'Catat pembayaran tagihan' }}</h2><p>{{ $role === 'parent' ? 'Pilih jenis pembayaran (Tagihan atau Setor Tabungan) menggunakan metode Transfer dan unggah bukti transfer.' : 'Pembayaran transfer membutuhkan bukti; transaksi tunai oleh administrator langsung tercatat.' }}</p></div></div>
             @if ($role === 'parent')
                 @if ($actions['paymentSettings'] ?? null)
                     <div class="database-bank-details" role="note" aria-label="Informasi rekening pembayaran">
@@ -1756,7 +1756,7 @@
     </section>
 @endif
 
-@if ($section === 'keluarga' && $role === 'admin')
+@if ($section === 'keluarga' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading"><div><h2>Tambah data keluarga baru</h2><p>Tambahkan kartu keluarga, nama orang tua/wali, serta nomor kontak utama.</p></div></div>
         <details class="database-student-editor">
@@ -1824,7 +1824,7 @@
     </section>
 @endif
 
-@if ($section === 'tarif' && $role === 'admin')
+@if ($section === 'tarif' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div><h2>Kelola tarif biaya</h2><p>Tarif baru berlaku untuk tagihan yang dibuat setelah perubahan. Tagihan yang sudah terbit tidak ikut berubah.</p></div>
@@ -1856,7 +1856,7 @@
     </section>
 @endif
 
-@if ($section === 'pengguna' && $role === 'admin')
+@if ($section === 'pengguna' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
             <div><h2>Permintaan reset kata sandi</h2><p>Tinjau dan verifikasi permintaan orang tua tanpa mengirim tautan ke email.</p></div>

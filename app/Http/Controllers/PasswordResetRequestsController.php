@@ -116,7 +116,7 @@ class PasswordResetRequestsController extends Controller
     private function administrator(Request $request): User
     {
         $user = $request->user();
-        abort_unless($user instanceof User && $user->role === 'admin', 403);
+        abort_unless($user instanceof User && in_array($user->role, ['admin', 'principal'], true), 403);
 
         return $user;
     }

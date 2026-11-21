@@ -1842,7 +1842,7 @@ class SchoolFeatureController extends Controller
                 throw ValidationException::withMessages(['jumlah' => 'Jumlah pembayaran melebihi sisa tagihan.']);
             }
 
-            $isCashAdminEntry = $user->role === 'admin' && $data['metode'] === 'Tunai';
+            $isCashAdminEntry = \in_array($user->role, ['admin', 'principal'], true) && $data['metode'] === 'Tunai';
             $paymentId = DB::table('pembayaran')->insertGetId([
                 'metode' => $data['metode'],
                 'bukti_transfer' => $proofPath,
@@ -3291,6 +3291,9 @@ class SchoolFeatureController extends Controller
 
     private function userFor(array $roles): User
     {
+        if (\in_array('admin', $roles, true) && ! \in_array('principal', $roles, true)) {
+            $roles[] = 'principal';
+        }
         $user = auth()->user();
         abort_unless($user instanceof User && \in_array($user->role, $roles, true), 403);
 

@@ -325,6 +325,6 @@ class AdminDashboardController extends Controller
 
     private function authorizeAdministrator(): void
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'admin', 403);
+        abort_unless(auth()->check() && in_array(auth()->user()->role, ['admin', 'principal'], true), 403);
     }
 }
