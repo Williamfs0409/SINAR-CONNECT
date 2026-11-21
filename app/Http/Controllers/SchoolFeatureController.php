@@ -469,7 +469,28 @@ class SchoolFeatureController extends Controller
             'class_id' => ['nullable', 'integer'],
             'due_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:255'],
+            'documents' => ['nullable', 'array'],
+            'documents.*.status_verifikasi' => ['required', Rule::in(['Valid', 'Tidak Valid'])],
+            'documents.*.catatan' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if (! empty($data['documents'])) {
+            $applicationExists = DB::table('pendaftaran')
+                ->where('id_pendaftaran', $registrationId)
+                ->exists();
+            abort_unless($applicationExists, 404);
+
+            foreach ($data['documents'] as $documentId => $documentData) {
+                DB::table('dokumen_pendaftaran')
+                    ->where('id_dokumen', (int) $documentId)
+                    ->where('id_pendaftaran', $registrationId)
+                    ->update([
+                        'status_verifikasi' => $documentData['status_verifikasi'],
+                        'catatan' => $documentData['catatan'] ?? null,
+                        'updated_at' => now(),
+                    ]);
+            }
+        }
 
         DB::transaction(function () use ($data, $registrationId, $user): void {
             $application = DB::table('pendaftaran')

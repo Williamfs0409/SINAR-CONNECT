@@ -102,6 +102,56 @@ class RegistrationDocumentsTest extends TestCase
             ->assertStreamedContent($contents);
     }
 
+    public function test_admin_can_save_document_statuses_with_registration_decision(): void
+    {
+        $this->createRegistrationTables();
+        Schema::table('pendaftaran', function (Blueprint $table): void {
+            $table->string('catatan_verifikasi')->nullable();
+            $table->unsignedBigInteger('id_user_verifikator')->nullable();
+            $table->timestamp('tanggal_verifikasi')->nullable();
+        });
+
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $parent = User::factory()->create(['role' => 'parent']);
+        $this->createApplicationFor($parent, 1);
+
+        $documents = [];
+        foreach (config('registration.required_documents') as $index => $jenis) {
+            $id = DB::table('dokumen_pendaftaran')->insertGetId([
+                'id_pendaftaran' => 1,
+                'jenis' => $jenis,
+                'file_path' => "pendaftaran/doc-{$index}.pdf",
+                'status_verifikasi' => 'Menunggu',
+                'created_at' => now(),
+            ]);
+            $documents[$id] = [
+                'status_verifikasi' => 'Valid',
+                'catatan' => $index === 0 ? 'Jelas' : null,
+            ];
+        }
+
+        $this->actingAs($admin)
+            ->post(route('database.registration.review', ['registration' => 1]), [
+                'decision' => 'verify',
+                'note' => 'Lengkap',
+                'documents' => $documents,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('pendaftaran', [
+            'id_pendaftaran' => 1,
+            'status' => 'Diverifikasi',
+            'catatan_verifikasi' => 'Lengkap',
+        ]);
+        $this->assertDatabaseHas('dokumen_pendaftaran', [
+            'id_pendaftaran' => 1,
+            'jenis' => config('registration.required_documents')[0],
+            'status_verifikasi' => 'Valid',
+            'catatan' => 'Jelas',
+        ]);
+    }
+
     private function createRegistrationTables(): void
     {
         Schema::create('keluarga', function (Blueprint $table): void {

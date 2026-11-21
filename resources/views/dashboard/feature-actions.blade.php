@@ -451,15 +451,13 @@
                 </div>
                 <div class="database-action-buttons">
                     <a class="database-button database-button-secondary" href="{{ route('database.registration.document.file', ['document' => $document->id_dokumen]) }}" target="_blank" rel="noopener">Lihat dokumen</a>
-                    <form method="POST" action="{{ route('database.registration.document', ['document' => $document->id_dokumen]) }}" class="database-inline-form">
-                        @csrf
-                        <select name="status_verifikasi" aria-label="Status dokumen">
-                            <option value="Valid">Valid</option>
-                            <option value="Tidak Valid">Tidak valid</option>
+                    <div class="database-inline-form">
+                        <select name="documents[{{ $document->id_dokumen }}][status_verifikasi]" form="registration-review-{{ $document->id_pendaftaran }}" aria-label="Status dokumen">
+                            <option value="Valid" @selected($document->status_verifikasi === 'Valid')>Valid</option>
+                            <option value="Tidak Valid" @selected($document->status_verifikasi === 'Tidak Valid')>Tidak valid</option>
                         </select>
-                        <input name="catatan" placeholder="Catatan (opsional)" maxlength="255">
-                        <button class="database-button" type="submit">Simpan</button>
-                    </form>
+                        <input name="documents[{{ $document->id_dokumen }}][catatan]" form="registration-review-{{ $document->id_pendaftaran }}" value="{{ $document->catatan }}" placeholder="Catatan (opsional)" maxlength="255">
+                    </div>
                 </div>
             </div>
         @empty
@@ -467,7 +465,7 @@
         @endforelse
 
         @forelse ($actions['applications'] ?? [] as $application)
-            <form method="POST" action="{{ route('database.registration.review', ['registration' => $application->id_pendaftaran]) }}" class="database-action-form database-registration-review">
+            <form id="registration-review-{{ $application->id_pendaftaran }}" method="POST" action="{{ route('database.registration.review', ['registration' => $application->id_pendaftaran]) }}" class="database-action-form database-registration-review">
                 @csrf
                 <div>
                     <strong>{{ $application->nama_lengkap }}</strong>
