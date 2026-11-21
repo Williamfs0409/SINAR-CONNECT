@@ -1324,20 +1324,22 @@ class SchoolDataController extends Controller
         }
 
         if ($section === 'pembayaran' && $role === 'admin') {
-            $data['pendingPayments'] = DB::table('v_pembayaran_detail')
-                ->where('status', 'Menunggu Verifikasi')
-                ->orderByDesc('tanggal_bayar')
+            $data['pendingPayments'] = DB::table('v_pembayaran_detail as v')
+                ->join('pembayaran as p', 'p.id_pembayaran', '=', 'v.id_pembayaran')
+                ->where('v.status', 'Menunggu Verifikasi')
+                ->orderByDesc('v.tanggal_bayar')
                 ->get([
-                    'id_pembayaran', 'no_kuitansi', 'tanggal_bayar',
-                    'metode', 'total_bayar',
+                    'v.id_pembayaran', 'v.no_kuitansi', 'v.tanggal_bayar',
+                    'v.metode', 'v.total_bayar', 'p.catatan',
                 ]);
-            $data['cancellablePayments'] = DB::table('v_pembayaran_detail')
-                ->whereIn('status', ['Terverifikasi', 'Menunggu Verifikasi'])
-                ->orderByDesc('tanggal_bayar')
+            $data['cancellablePayments'] = DB::table('v_pembayaran_detail as v')
+                ->join('pembayaran as p', 'p.id_pembayaran', '=', 'v.id_pembayaran')
+                ->whereIn('v.status', ['Terverifikasi', 'Menunggu Verifikasi'])
+                ->orderByDesc('v.tanggal_bayar')
                 ->limit(30)
                 ->get([
-                    'id_pembayaran', 'no_kuitansi', 'tanggal_bayar',
-                    'metode', 'status', 'total_bayar',
+                    'v.id_pembayaran', 'v.no_kuitansi', 'v.tanggal_bayar',
+                    'v.metode', 'v.status', 'v.total_bayar', 'p.catatan',
                 ]);
         }
 
@@ -1589,6 +1591,7 @@ class SchoolDataController extends Controller
             'pembayaran' => ['title' => 'Pembayaran', 'description' => 'Kuitansi dan status verifikasi pembayaran.', 'columns' => [
                 'no_kuitansi' => 'Kuitansi', 'tanggal_bayar' => 'Tanggal', 'metode' => 'Metode',
                 'status' => 'Status', 'jumlah_tagihan' => 'Jumlah tagihan', 'total_bayar' => 'Total bayar',
+                'catatan' => 'Catatan',
             ]],
             'pengguna' => ['title' => 'Pengguna', 'description' => 'Akun yang terdaftar pada sistem.', 'columns' => [
                 'name' => 'Nama', 'email' => 'Email', 'role' => 'Peran', 'is_active' => 'Status akun',
@@ -1611,9 +1614,18 @@ class SchoolDataController extends Controller
             'kegiatan' => $this->activityQuery($scope, $role, $user->getKey()),
             'pembayaran' => $role === 'parent'
                 ? $this->parentPaymentsQuery($scope)
-                : DB::table('v_pembayaran_detail')
-                    ->select(array_keys($module['columns']))
-                    ->orderByDesc('tanggal_bayar'),
+                : DB::table('v_pembayaran_detail as v')
+                    ->join('pembayaran as p', 'p.id_pembayaran', '=', 'v.id_pembayaran')
+                    ->select([
+                        'v.no_kuitansi',
+                        'v.tanggal_bayar',
+                        'v.metode',
+                        'v.status',
+                        'v.jumlah_tagihan',
+                        'v.total_bayar',
+                        'p.catatan',
+                    ])
+                    ->orderByDesc('v.tanggal_bayar'),
             'tarif' => DB::table('tarif as tf')
                 ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'tf.id_tahun_ajaran')
                 ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 'tf.id_jenis_biaya')
@@ -1927,10 +1939,11 @@ class SchoolDataController extends Controller
                 'p.tanggal_bayar',
                 'p.metode',
                 'p.status',
+                'p.catatan',
             ])
             ->selectRaw('COUNT(DISTINCT t.id_tagihan) as jumlah_tagihan')
             ->selectRaw('SUM(a.jumlah) as total_bayar')
-            ->groupBy('p.id_pembayaran', 'p.tanggal_bayar', 'p.metode', 'p.status')
+            ->groupBy('p.id_pembayaran', 'p.tanggal_bayar', 'p.metode', 'p.status', 'p.catatan')
             ->orderByDesc('p.tanggal_bayar');
     }
 
