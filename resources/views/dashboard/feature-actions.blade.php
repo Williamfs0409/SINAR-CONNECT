@@ -510,9 +510,9 @@
                                                 data-doc-ext="{{ $docExt }}"
                                                 target="_blank"
                                                 rel="noopener"
-                                                title="Preview {{ $doc->jenis }} ({{ $doc->status_verifikasi }})"
+                                                title="{{ $doc->file_size_bytes === null ? 'File tidak ditemukan di server' : 'Preview '.$doc->jenis.' ('.$doc->status_verifikasi.')' }}"
                                             >
-                                                @if ($docIsImage)
+                                                @if ($docIsImage && $doc->file_size_bytes !== null)
                                                     <img class="reg-doc-thumb" src="{{ $docUrl }}" alt="" loading="lazy">
                                                 @else
                                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
