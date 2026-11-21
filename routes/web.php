@@ -131,6 +131,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.registration.settings.update');
     Route::post('/dashboard/pendaftaran/{registration}/dokumen', [SchoolFeatureController::class, 'uploadRegistrationDocuments'])
         ->name('database.registration.documents.upload');
+    Route::post('/dashboard/pendaftaran/{registration}/ajukan-ulang', [SchoolFeatureController::class, 'resubmitRegistration'])
+        ->name('database.registration.resubmit');
     Route::post('/dashboard/dokumen-pendaftaran/{document}/verifikasi', [SchoolFeatureController::class, 'verifyRegistrationDocument'])
         ->name('database.registration.document');
     Route::get('/dashboard/dokumen-pendaftaran/{document}/file', [SchoolFeatureController::class, 'registrationDocument'])
