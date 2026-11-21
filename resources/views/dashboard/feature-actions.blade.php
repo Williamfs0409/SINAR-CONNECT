@@ -1159,6 +1159,7 @@
                             <th>Nilai</th>
                             <th>Umpan balik guru</th>
                             <th>File</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1179,6 +1180,21 @@
                                     @else
                                         —
                                     @endif
+                                </td>
+                                <td>
+                                    <details class="database-student-editor" style="border-top: 0; padding: 0;">
+                                        <summary class="database-button database-button-secondary" style="display: inline-flex; list-style: none;">Edit nilai</summary>
+                                        <form method="POST" action="{{ route('database.task.grade', ['submission' => $submission->id_pengumpulan]) }}" class="database-inline-form" style="margin-top: 8px;">
+                                            @csrf @method('PATCH')
+                                            <select name="nilai" required aria-label="Edit nilai tugas">
+                                                @foreach ($gradeLabels as $grade => $gradeLabel)
+                                                    <option value="{{ $grade }}" @selected($submission->nilai === $grade)>{{ $grade }} = {{ $gradeLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                            <input name="umpan_balik" value="{{ $submission->umpan_balik }}" placeholder="Tulis umpan balik untuk siswa...">
+                                            <button class="database-button" type="submit">Simpan</button>
+                                        </form>
+                                    </details>
                                 </td>
                             </tr>
                         @endforeach
