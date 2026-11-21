@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -1910,11 +1911,21 @@ class SchoolFeatureController extends Controller
                 ]);
             }
 
+            $existingNote = trim((string) ($payment->catatan ?? ''));
+            $adminNote = trim((string) ($data['catatan'] ?? ''));
+            if ($adminNote === '') {
+                $finalNote = $existingNote !== '' ? $existingNote : null;
+            } elseif ($existingNote !== '') {
+                $finalNote = Str::limit("Orang tua: {$existingNote} | Admin: {$adminNote}", 255, '');
+            } else {
+                $finalNote = $adminNote;
+            }
+
             DB::table('pembayaran')->where('id_pembayaran', $paymentId)->update([
                 'status' => $data['decision'] === 'verify' ? 'Terverifikasi' : 'Ditolak',
                 'id_user_verifikator' => $user->getKey(),
                 'tanggal_verifikasi' => now(),
-                'catatan' => $data['catatan'] ?? null,
+                'catatan' => $finalNote,
                 'updated_at' => now(),
             ]);
         });
@@ -1941,9 +1952,15 @@ class SchoolFeatureController extends Controller
                 ]);
             }
 
+            $existingNote = trim((string) ($payment->catatan ?? ''));
+            $cancelNote = trim((string) $data['catatan']);
+            $finalNote = $existingNote !== ''
+                ? Str::limit("{$existingNote} | Dibatalkan: {$cancelNote}", 255, '')
+                : $cancelNote;
+
             DB::table('pembayaran')->where('id_pembayaran', $paymentId)->update([
                 'status' => 'Dibatalkan',
-                'catatan' => $data['catatan'],
+                'catatan' => $finalNote,
                 'id_user_verifikator' => $user->getKey(),
                 'tanggal_verifikasi' => now(),
                 'updated_at' => now(),
