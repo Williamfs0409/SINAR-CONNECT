@@ -895,13 +895,24 @@ class SchoolDataController extends Controller
         if ($section === 'pendaftaran' && $role === 'parent') {
             $applications = DB::table('pendaftaran as p')
                 ->join('siswa as s', 's.id_siswa', '=', 'p.id_siswa')
+                ->leftJoin('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'p.id_tahun_ajaran')
                 ->whereIn('p.id_siswa', $scope['studentIds'])
-                ->whereIn('p.status', ['Diajukan', 'Diverifikasi'])
+                ->whereIn('p.status', ['Diajukan', 'Diverifikasi', 'Ditolak'])
                 ->orderByDesc('p.created_at')
                 ->get([
                     'p.id_pendaftaran',
                     'p.status',
+                    'p.kelompok',
+                    'p.catatan_verifikasi',
+                    'p.tanggal_verifikasi',
+                    'ta.nama as tahun_ajaran',
+                    's.id_siswa',
                     's.nama_lengkap',
+                    's.nama_panggilan',
+                    's.jenis_kelamin',
+                    's.tempat_lahir',
+                    's.tanggal_lahir',
+                    's.alamat_domisili',
                 ]);
             $applicationIds = $applications->pluck('id_pendaftaran')->all();
             $documents = $applicationIds === []

@@ -547,9 +547,32 @@ class SchoolFeatureController extends Controller
                         throw ValidationException::withMessages(['decision' => 'Status pendaftaran ini tidak dapat ditolak.']);
                     }
 
+                    $rejectNote = isset($data['note']) && trim((string) $data['note']) !== ''
+                        ? trim((string) $data['note'])
+                        : null;
+
+                    DB::table('dokumen_pendaftaran')
+                        ->where('id_pendaftaran', $registrationId)
+                        ->update([
+                            'status_verifikasi' => 'Tidak Valid',
+                            'updated_at' => now(),
+                        ]);
+
+                    if ($rejectNote !== null) {
+                        DB::table('dokumen_pendaftaran')
+                            ->where('id_pendaftaran', $registrationId)
+                            ->where(function ($query): void {
+                                $query->whereNull('catatan')->orWhere('catatan', '');
+                            })
+                            ->update([
+                                'catatan' => $rejectNote,
+                                'updated_at' => now(),
+                            ]);
+                    }
+
                     DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
                         'status' => 'Ditolak',
-                        'catatan_verifikasi' => $data['note'] ?? null,
+                        'catatan_verifikasi' => $rejectNote,
                         'id_user_verifikator' => $user->getKey(),
                         'tanggal_verifikasi' => now(),
                     ]);
@@ -777,6 +800,168 @@ class SchoolFeatureController extends Controller
         }
 
         return back()->with('status', 'Dokumen pendaftaran berhasil diunggah dan menunggu pemeriksaan admin.');
+    }
+
+    public function resubmitRegistration(Request $request, int $registrationId): RedirectResponse
+    {
+        $user = $this->userFor(['parent']);
+        $requiredDocuments = config('registration.required_documents');
+        $rules = [
+            'student_name' => ['required', 'string', 'max:100'],
+            'student_nickname' => ['nullable', 'string', 'max:100'],
+            'student_gender' => ['required', Rule::in(['Laki-Laki', 'Perempuan'])],
+            'student_birthplace' => ['nullable', 'string', 'max:100'],
+            'student_birthdate' => ['required', 'date', 'before_or_equal:today'],
+            'group' => ['required', Rule::in(['KB', 'TK A', 'TK B'])],
+            'family_address' => ['required', 'string', 'max:2000'],
+            'documents' => ['nullable', 'array:'.implode(',', array_keys($requiredDocuments))],
+        ];
+        $messages = [
+            'student_birthdate.before_or_equal' => 'Tanggal lahir tidak boleh di masa depan.',
+        ];
+
+        foreach ($requiredDocuments as $key => $label) {
+            $rules["documents.{$key}"] = ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'];
+            $messages["documents.{$key}.mimes"] = "Berkas {$label} harus berformat PDF, JPG, atau PNG.";
+            $messages["documents.{$key}.max"] = "Ukuran berkas {$label} maksimal 5 MB.";
+        }
+
+        $data = $request->validate($rules, $messages);
+        $familyId = $this->familyId($user);
+        $storedPaths = [];
+
+        try {
+            $previousPaths = DB::transaction(function () use ($data, $familyId, $registrationId, $requiredDocuments, &$storedPaths): array {
+                $application = DB::table('pendaftaran as p')
+                    ->join('siswa as s', 's.id_siswa', '=', 'p.id_siswa')
+                    ->where('p.id_pendaftaran', $registrationId)
+                    ->where('s.id_keluarga', $familyId)
+                    ->lockForUpdate()
+                    ->first(['p.id_pendaftaran', 'p.id_siswa', 'p.status']);
+                abort_unless($application !== null, 404);
+
+                if ($application->status !== 'Ditolak') {
+                    throw ValidationException::withMessages([
+                        'registration' => 'Hanya pendaftaran yang ditolak yang dapat diajukan ulang.',
+                    ]);
+                }
+
+                $existingDocuments = DB::table('dokumen_pendaftaran')
+                    ->where('id_pendaftaran', $registrationId)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('jenis');
+
+                $uploadedFiles = $data['documents'] ?? [];
+                $missingErrors = [];
+                foreach ($requiredDocuments as $key => $label) {
+                    $existing = $existingDocuments->get($label);
+                    $hasNewFile = isset($uploadedFiles[$key]) && $uploadedFiles[$key] !== null;
+
+                    if (! $hasNewFile && ! $existing) {
+                        $missingErrors["documents.{$key}"] = "Berkas {$label} wajib diunggah sebelum mengajukan pendaftaran kembali.";
+                    }
+                }
+
+                if ($missingErrors !== []) {
+                    throw ValidationException::withMessages($missingErrors);
+                }
+
+                DB::table('siswa')
+                    ->where('id_siswa', $application->id_siswa)
+                    ->update([
+                        'nama_lengkap' => $data['student_name'],
+                        'nama_panggilan' => $data['student_nickname'] ?? null,
+                        'tempat_lahir' => $data['student_birthplace'] ?? null,
+                        'tanggal_lahir' => $data['student_birthdate'],
+                        'jenis_kelamin' => $data['student_gender'],
+                        'alamat_domisili' => $data['family_address'],
+                        'updated_at' => now(),
+                    ]);
+
+                DB::table('keluarga')
+                    ->where('id_keluarga', $familyId)
+                    ->update([
+                        'alamat' => $data['family_address'],
+                        'updated_at' => now(),
+                    ]);
+
+                $previousPaths = [];
+                $replacedLabels = [];
+                foreach ($uploadedFiles as $key => $file) {
+                    if ($file === null) {
+                        continue;
+                    }
+
+                    $label = $requiredDocuments[$key];
+                    $replacedLabels[] = $label;
+                    $existing = $existingDocuments->get($label);
+                    $path = $this->imageUploads->store($file, 'pendaftaran', "documents.{$key}");
+                    $storedPaths[] = $path;
+
+                    if ($existing) {
+                        $previousPaths[] = $existing->file_path;
+                        DB::table('dokumen_pendaftaran')
+                            ->where('id_dokumen', $existing->id_dokumen)
+                            ->update([
+                                'file_path' => $path,
+                                'status_verifikasi' => 'Menunggu',
+                                'catatan' => null,
+                                'updated_at' => now(),
+                            ]);
+                    } else {
+                        DB::table('dokumen_pendaftaran')->insert([
+                            'id_pendaftaran' => $registrationId,
+                            'jenis' => $label,
+                            'file_path' => $path,
+                            'status_verifikasi' => 'Menunggu',
+                            'created_at' => now(),
+                        ]);
+                    }
+                }
+
+                $keptQuery = DB::table('dokumen_pendaftaran')
+                    ->where('id_pendaftaran', $registrationId)
+                    ->where('status_verifikasi', 'Tidak Valid');
+                if ($replacedLabels !== []) {
+                    $keptQuery->whereNotIn('jenis', $replacedLabels);
+                }
+                $keptQuery->update([
+                    'status_verifikasi' => 'Menunggu',
+                    'catatan' => null,
+                    'updated_at' => now(),
+                ]);
+
+                DB::table('pendaftaran')
+                    ->where('id_pendaftaran', $registrationId)
+                    ->update([
+                        'kelompok' => $data['group'],
+                        'status' => 'Diajukan',
+                        'catatan_verifikasi' => null,
+                        'id_user_verifikator' => null,
+                        'tanggal_verifikasi' => null,
+                        'updated_at' => now(),
+                    ]);
+
+                return $previousPaths;
+            });
+        } catch (Throwable $exception) {
+            foreach ($storedPaths as $path) {
+                if (! Storage::disk('local')->delete($path)) {
+                    report(new RuntimeException('Failed to clean up a registration document after resubmission failed.'));
+                }
+            }
+
+            throw $exception;
+        }
+
+        foreach ($previousPaths as $path) {
+            if (Storage::disk('local')->exists($path) && ! Storage::disk('local')->delete($path)) {
+                report(new RuntimeException('Failed to remove a superseded registration document after resubmission.'));
+            }
+        }
+
+        return back()->with('status', 'Pendaftaran berhasil diajukan ulang dan sedang menunggu verifikasi admin.');
     }
 
     public function verifyRegistrationDocument(Request $request, int $documentId): RedirectResponse

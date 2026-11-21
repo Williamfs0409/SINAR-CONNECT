@@ -13,12 +13,13 @@
         </div>
         @forelse ($actions['parentApplications'] ?? [] as $application)
             @php
+                $isAppRejected = $application->status === 'Ditolak';
                 $totalDocs = $application->requiredDocuments->count();
                 $uploadedDocs = $application->requiredDocuments->filter(fn ($item) => (bool) $item['document'])->count();
-                $validDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && $item['document']->status_verifikasi === 'Valid')->count();
-                $rejectedDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && $item['document']->status_verifikasi === 'Tidak Valid')->count();
-                $documentsToUpload = $application->requiredDocuments->filter(function ($item) {
-                    return ! $item['document'] || $item['document']->status_verifikasi === 'Tidak Valid';
+                $validDocs = $application->requiredDocuments->filter(fn ($item) => ! $isAppRejected && $item['document'] && $item['document']->status_verifikasi === 'Valid')->count();
+                $rejectedDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && ($isAppRejected || $item['document']->status_verifikasi === 'Tidak Valid'))->count();
+                $documentsToUpload = $application->requiredDocuments->filter(function ($item) use ($isAppRejected) {
+                    return ! $item['document'] || $isAppRejected || $item['document']->status_verifikasi === 'Tidak Valid';
                 });
                 $appStatusClass = match ($application->status) {
                     'Diverifikasi', 'Diterima' => 'is-valid',
@@ -40,7 +41,7 @@
                                     · {{ $validDocs }} valid
                                 @endif
                                 @if ($rejectedDocs > 0)
-                                    · {{ $rejectedDocs }} perlu diperbaiki
+                                    · {{ $rejectedDocs }} ditolak
                                 @endif
                             </span>
                         </div>
@@ -55,8 +56,28 @@
                 </header>
 
                 <div class="parent-reg-progress-track" role="progressbar" aria-valuenow="{{ $progressPercent }}" aria-valuemin="0" aria-valuemax="100" aria-label="Kelengkapan berkas {{ $application->nama_lengkap }}">
-                    <span class="parent-reg-progress-fill @if ($documentsToUpload->isEmpty()) is-complete @endif" style="width: {{ $progressPercent }}%"></span>
+                    <span class="parent-reg-progress-fill @if ($application->status === 'Ditolak') is-rejected @elseif ($documentsToUpload->isEmpty()) is-complete @endif" style="width: {{ $progressPercent }}%"></span>
                 </div>
+
+                @if ($application->status === 'Ditolak')
+                    <div class="parent-reg-rejected-banner" role="alert">
+                        <span class="parent-reg-rejected-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                        </span>
+                        <div class="parent-reg-rejected-body">
+                            <strong>Pendaftaran ditolak oleh administrator</strong>
+                            @if (! empty($application->catatan_verifikasi))
+                                <p>Catatan admin: {{ $application->catatan_verifikasi }}</p>
+                            @else
+                                <p>Anda dapat memperbaiki data calon siswa atau mengganti dokumen di bawah ini, lalu ajukan ulang pendaftaran.</p>
+                            @endif
+                        </div>
+                    </div>
+                @endif
 
                 <div class="parent-reg-doc-table" role="list">
                     <div class="parent-reg-doc-head" aria-hidden="true">
@@ -67,11 +88,16 @@
                     @foreach ($application->requiredDocuments as $requiredDocument)
                         @php
                             $document = $requiredDocument['document'];
-                            $docStatusLabel = $document ? $document->status_verifikasi : 'Belum diunggah';
+                            $isDocRejected = $document && ($isAppRejected || $document->status_verifikasi === 'Tidak Valid');
+                            $docStatusLabel = match (true) {
+                                ! $document => 'Belum diunggah',
+                                $isDocRejected => 'Ditolak',
+                                default => $document->status_verifikasi,
+                            };
                             $docStateClass = match (true) {
                                 ! $document => 'is-missing',
+                                $isDocRejected => 'is-invalid',
                                 $document->status_verifikasi === 'Valid' => 'is-valid',
-                                $document->status_verifikasi === 'Tidak Valid' => 'is-invalid',
                                 default => 'is-pending',
                             };
                             $docExt = $document ? strtolower(pathinfo((string) ($document->file_path ?? ''), PATHINFO_EXTENSION)) : '';
@@ -142,7 +168,135 @@
                     @endforeach
                 </div>
 
-                @if ($documentsToUpload->isNotEmpty())
+                @if ($application->status === 'Ditolak')
+                    <div class="parent-reg-resubmit-box">
+                        <div class="parent-reg-upload-heading">
+                            <strong>Ajukan ulang pendaftaran</strong>
+                            <span>Periksa dan perbaiki data calon siswa atau ganti berkas yang diperlukan, lalu kirim kembali untuk diverifikasi admin.</span>
+                        </div>
+                        <form method="POST" action="{{ route('database.registration.resubmit', ['registration' => $application->id_pendaftaran]) }}" enctype="multipart/form-data" class="database-form-grid">
+                            @csrf
+                            <label>Nama lengkap calon siswa
+                                <input name="student_name" value="{{ old('student_name', $application->nama_lengkap) }}" maxlength="100" required>
+                            </label>
+                            <label>Nama panggilan
+                                <input name="student_nickname" value="{{ old('student_nickname', $application->nama_panggilan ?? '') }}" maxlength="100">
+                            </label>
+                            <label>Jenis kelamin
+                                <select name="student_gender" required>
+                                    <option value="Laki-Laki" @selected(old('student_gender', $application->jenis_kelamin ?? '') === 'Laki-Laki')>Laki-laki</option>
+                                    <option value="Perempuan" @selected(old('student_gender', $application->jenis_kelamin ?? '') === 'Perempuan')>Perempuan</option>
+                                </select>
+                            </label>
+                            <label>Kelompok tujuan
+                                <select name="group" required>
+                                    <option value="KB" @selected(old('group', $application->kelompok ?? '') === 'KB')>KB</option>
+                                    <option value="TK A" @selected(old('group', $application->kelompok ?? '') === 'TK A')>TK A</option>
+                                    <option value="TK B" @selected(old('group', $application->kelompok ?? '') === 'TK B')>TK B</option>
+                                </select>
+                            </label>
+                            <label>Tempat lahir
+                                <input name="student_birthplace" value="{{ old('student_birthplace', $application->tempat_lahir ?? '') }}" maxlength="100">
+                            </label>
+                            <label>Tanggal lahir
+                                <input type="date" name="student_birthdate" value="{{ old('student_birthdate', $application->tanggal_lahir ?? '') }}" max="{{ now()->toDateString() }}" required>
+                            </label>
+                            <label class="database-form-wide">Alamat domisili
+                                <textarea name="family_address" rows="2" maxlength="2000" required>{{ old('family_address', $application->alamat_domisili ?? '') }}</textarea>
+                            </label>
+
+                            <p class="parent-reg-resubmit-section-title">Perbarui berkas pendaftaran (PDF/JPG/PNG, maks. 5 MB)</p>
+                            @foreach ($application->requiredDocuments as $requiredDocument)
+                                @php
+                                    $documentKey = $requiredDocument['key'];
+                                    $document = $requiredDocument['document'];
+                                    $mustReupload = ! $document;
+                                    $documentError = $errors->first('documents.'.$documentKey);
+                                    $prevExt = $document ? strtolower(pathinfo((string) ($document->file_path ?? ''), PATHINFO_EXTENSION)) : '';
+                                    $prevIsImage = in_array($prevExt, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
+                                    $prevUrl = $document ? route('database.registration.document.file', ['document' => $document->id_dokumen]) : null;
+                                @endphp
+                                <div class="parent-reg-doc-upload-card">
+                                    <label>
+                                        <span>
+                                            {{ $requiredDocument['label'] }}
+                                            <span class="parent-reg-resubmit-doc-hint @if ($mustReupload) is-required @endif">
+                                                ({{ $mustReupload ? 'Wajib diunggah' : 'Opsional — ganti jika perlu' }})
+                                            </span>
+                                        </span>
+                                        <input
+                                            type="file"
+                                            name="documents[{{ $documentKey }}]"
+                                            accept=".pdf,.jpg,.jpeg,.png"
+                                            data-max-bytes="5242880"
+                                            @required($mustReupload)
+                                        >
+                                        @if ($documentError)
+                                            <small class="registration-upload-feedback is-error">{{ $documentError }}</small>
+                                        @endif
+                                    </label>
+                                    @if ($document && $prevUrl)
+                                        <div class="parent-reg-prev-file">
+                                            <div class="parent-reg-prev-file-left">
+                                                @if ($prevIsImage)
+                                                    <a
+                                                        class="parent-reg-prev-thumb-link"
+                                                        href="{{ $prevUrl }}"
+                                                        data-doc-preview
+                                                        data-doc-name="{{ $application->nama_lengkap }} · {{ $requiredDocument['label'] }} (Sebelumnya)"
+                                                        data-doc-ext="{{ $prevExt }}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        title="Pratinjau {{ $requiredDocument['label'] }} sebelumnya"
+                                                    >
+                                                        <img class="parent-reg-prev-thumb" src="{{ $prevUrl }}" alt="Pratinjau {{ $requiredDocument['label'] }}" loading="lazy">
+                                                    </a>
+                                                @else
+                                                    <a
+                                                        class="parent-reg-prev-pdf"
+                                                        href="{{ $prevUrl }}"
+                                                        data-doc-preview
+                                                        data-doc-name="{{ $application->nama_lengkap }} · {{ $requiredDocument['label'] }} (Sebelumnya)"
+                                                        data-doc-ext="{{ $prevExt }}"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        title="Pratinjau {{ $requiredDocument['label'] }} sebelumnya"
+                                                    >
+                                                        {{ strtoupper($prevExt ?: 'FILE') }}
+                                                    </a>
+                                                @endif
+                                                <div class="parent-reg-prev-meta">
+                                                    <span class="parent-reg-prev-title">Berkas sebelumnya ({{ strtoupper($prevExt ?: 'FILE') }})</span>
+                                                    <span class="parent-reg-prev-sub">Status: Ditolak · klik pratinjau untuk melihat</span>
+                                                </div>
+                                            </div>
+                                            <a
+                                                class="parent-reg-prev-btn"
+                                                href="{{ $prevUrl }}"
+                                                data-doc-preview
+                                                data-doc-name="{{ $application->nama_lengkap }} · {{ $requiredDocument['label'] }} (Sebelumnya)"
+                                                data-doc-ext="{{ $prevExt }}"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                                                    <circle cx="12" cy="12" r="3"/>
+                                                </svg>
+                                                <span>Pratinjau</span>
+                                            </a>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+
+                            <div class="database-form-wide parent-reg-upload-footer">
+                                <small>Status pendaftaran akan kembali menjadi <strong>Diajukan</strong> untuk diperiksa ulang oleh admin.</small>
+                                <button class="database-button" type="submit">Ajukan ulang pendaftaran</button>
+                            </div>
+                        </form>
+                    </div>
+                @elseif ($documentsToUpload->isNotEmpty())
                     <div class="parent-reg-upload-box">
                         <div class="parent-reg-upload-heading">
                             <strong>Unggah atau perbaiki dokumen</strong>
