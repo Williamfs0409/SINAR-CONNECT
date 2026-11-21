@@ -360,7 +360,7 @@
                     @else
                         @php
                             $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'absensi', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true))
-                                || ($role === 'teacher' && in_array($section, ['absensi', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true));
+                                || ($role === 'teacher' && in_array($section, ['pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true));
                         @endphp
                         <div class="database-table-wrap">
                             <table class="database-table">

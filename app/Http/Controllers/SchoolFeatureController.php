@@ -3208,7 +3208,7 @@ class SchoolFeatureController extends Controller
 
     public function updateAttendanceRecap(Request $request): RedirectResponse
     {
-        $user = $this->userFor(['teacher', 'admin']);
+        $user = $this->userFor(['admin']);
         $data = $request->validate([
             'id_siswa' => ['required', 'integer'],
             'id_kelas' => ['required', 'integer'],
