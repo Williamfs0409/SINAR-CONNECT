@@ -1847,19 +1847,25 @@ class SchoolDataController extends Controller
             'k.nama_kelas',
             'k.kelompok',
             'ta.nama as tahun_ajaran',
-            'g.nama_lengkap as wali_kelas',
         ];
         if (Schema::hasColumn('kelas', 'kapasitas')) {
             $select[] = 'k.kapasitas';
         }
 
+        $teacherConcatExpr = DB::connection()->getDriverName() === 'sqlite'
+            ? "GROUP_CONCAT(g.nama_lengkap, ' & ')"
+            : "GROUP_CONCAT(g.nama_lengkap ORDER BY FIELD(gk.peran, 'Wali Kelas', 'Pendamping'), g.nama_lengkap SEPARATOR ' & ')";
+
         $query = DB::table('kelas as k')
             ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'k.id_tahun_ajaran')
-            ->leftJoin('guru_kelas as gk', function ($join): void {
-                $join->on('gk.id_kelas', '=', 'k.id_kelas')->where('gk.peran', '=', 'Wali Kelas');
-            })
-            ->leftJoin('guru as g', 'g.id_guru', '=', 'gk.id_guru')
             ->select($select)
+            ->selectSub(
+                DB::table('guru_kelas as gk')
+                    ->join('guru as g', 'g.id_guru', '=', 'gk.id_guru')
+                    ->whereColumn('gk.id_kelas', 'k.id_kelas')
+                    ->selectRaw($teacherConcatExpr),
+                'wali_kelas'
+            )
             ->selectSub(
                 DB::table('rombel_siswa as r')
                     ->selectRaw('COUNT(*)')
