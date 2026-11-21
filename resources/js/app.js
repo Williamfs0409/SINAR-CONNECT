@@ -49,6 +49,63 @@ document.querySelectorAll('[data-live-clock]').forEach((clock) => {
 const databaseNavigation = document.querySelector('.database-navigation');
 const activeDatabaseLink = databaseNavigation?.querySelector('[aria-current="page"]');
 
+const portalShell = document.querySelector('.database-dashboard-portal');
+const portalHeader = document.querySelector('.portal-dashboard-header');
+const portalMain = portalShell?.querySelector('.database-main');
+const mobileDrawerToggle = document.querySelector('[data-mobile-drawer-toggle]');
+const mobileDrawerBackdrop = document.querySelector('[data-mobile-drawer-backdrop]');
+const mobileDrawerClose = document.querySelector('[data-mobile-drawer-close]');
+
+if (portalShell && mobileDrawerToggle) {
+    const syncHeaderHeight = () => {
+        if (portalHeader) {
+            portalShell.style.setProperty('--mobile-header-height', `${portalHeader.offsetHeight}px`);
+        }
+    };
+
+    const setDrawerOpen = (open) => {
+        syncHeaderHeight();
+        portalShell.classList.toggle('is-mobile-drawer-open', open);
+        mobileDrawerToggle.setAttribute('aria-expanded', String(open));
+        if (mobileDrawerBackdrop) {
+            mobileDrawerBackdrop.hidden = !open;
+        }
+    };
+
+    syncHeaderHeight();
+    window.addEventListener('resize', syncHeaderHeight);
+
+    mobileDrawerToggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setDrawerOpen(!portalShell.classList.contains('is-mobile-drawer-open'));
+    });
+
+    portalMain?.addEventListener('click', (event) => {
+        if (window.innerWidth <= 768
+            && portalShell.classList.contains('is-mobile-drawer-open')
+            && !event.target.closest('[data-mobile-drawer-toggle]')) {
+            setDrawerOpen(false);
+        }
+    });
+
+    mobileDrawerBackdrop?.addEventListener('click', () => setDrawerOpen(false));
+    mobileDrawerClose?.addEventListener('click', () => setDrawerOpen(false));
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && portalShell.classList.contains('is-mobile-drawer-open')) {
+            setDrawerOpen(false);
+        }
+    });
+
+    databaseNavigation?.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                setDrawerOpen(false);
+            }
+        });
+    });
+}
+
 if (databaseNavigation && activeDatabaseLink) {
     if (getComputedStyle(databaseNavigation).flexDirection === 'row') {
         const navBounds = databaseNavigation.getBoundingClientRect();

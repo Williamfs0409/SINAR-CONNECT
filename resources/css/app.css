@@ -4589,3 +4589,576 @@ input[type="file"].is-invalid {
 .message-delete-button:hover {
     background: rgba(220, 53, 69, .85);
 }
+
+/* ==========================================================================
+   Perbaikan Responsif Menyeluruh (Tablet & Mobile <= 900px / 768px / 480px)
+   ========================================================================== */
+html,
+body {
+    max-width: 100%;
+    overflow-x: clip;
+}
+
+.database-table-wrap,
+.database-main,
+.database-action-panel,
+.database-list-section {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.database-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-drawer-toggle,
+.mobile-drawer-bar,
+.mobile-drawer-head,
+.mobile-drawer-backdrop {
+    display: none;
+}
+
+@media (max-width: 960px) {
+    .portal-dashboard-header {
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) auto;
+        gap: 10px;
+        padding: 10px 16px;
+    }
+
+    .portal-dashboard-term {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .database-dashboard-portal {
+        display: block;
+        width: 100%;
+        padding-top: var(--mobile-header-height, 106px);
+        overflow-x: clip;
+    }
+
+    /* Header 2 baris rapi dan selalu menempel di atas (fixed) */
+    .portal-dashboard-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        z-index: 95;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px 12px;
+        min-height: auto;
+        padding: 10px 12px 12px;
+    }
+
+    .portal-dashboard-brand {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .portal-dashboard-brand-mark {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+    }
+
+    .portal-dashboard-brand > span:last-child {
+        min-width: 0;
+    }
+
+    .portal-dashboard-brand strong {
+        font-size: 13px;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-dashboard-brand small {
+        font-size: 9px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-dashboard-account {
+        flex: 0 0 auto;
+        gap: 8px;
+    }
+
+    .portal-dashboard-header .portal-profile-trigger {
+        min-width: 0;
+        max-width: 150px;
+        padding: 4px 8px 4px 5px;
+        gap: 6px;
+    }
+
+    .portal-profile-copy {
+        min-width: 0;
+    }
+
+    .portal-profile-copy strong {
+        max-width: 78px;
+        font-size: 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-profile-copy small {
+        font-size: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .portal-dashboard-search {
+        order: 3;
+        flex: 1 0 100%;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        min-height: 38px;
+        padding: 0 12px;
+    }
+
+    .portal-dashboard-search input {
+        font-size: 12px;
+    }
+
+    .portal-global-search-results {
+        left: 0;
+        right: 0;
+        width: 100%;
+        min-width: 0;
+        max-height: 60vh;
+    }
+
+    .portal-profile-dropdown,
+    [data-role-notification-panel],
+    [data-message-notification-panel] {
+        max-width: calc(100vw - 24px);
+    }
+
+    /* Navigasi mobile model push-drawer di bawah header (seperti referensi) */
+    .database-dashboard-portal .database-sidebar {
+        position: fixed;
+        top: var(--mobile-header-height, 106px);
+        left: 0;
+        bottom: 0;
+        z-index: 85;
+        width: 248px;
+        height: calc(100dvh - var(--mobile-header-height, 106px));
+        padding: 14px 12px 24px;
+        border-right: 1px solid #203f60;
+        border-bottom: 0;
+        overflow-y: auto;
+        transform: translateX(-100%);
+        transition: transform .24s ease;
+    }
+
+    .database-dashboard-portal.is-mobile-drawer-open .database-sidebar {
+        transform: translateX(0);
+        box-shadow: 6px 0 24px rgba(10, 28, 48, .2);
+    }
+
+    .database-dashboard-portal .database-main {
+        transition: transform .24s ease;
+    }
+
+    .database-dashboard-portal.is-mobile-drawer-open .database-main {
+        transform: translateX(248px);
+    }
+
+    .mobile-drawer-backdrop {
+        display: none !important;
+    }
+
+    .mobile-drawer-head {
+        display: none;
+    }
+
+    .mobile-drawer-toggle {
+        position: fixed;
+        left: 0;
+        top: calc(var(--mobile-header-height, 106px) + 10px);
+        z-index: 88;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 40px;
+        padding: 0;
+        border: 0;
+        border-radius: 0 10px 10px 0;
+        background: #1b4d7e;
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(27, 77, 126, .25);
+        cursor: pointer;
+        transition: transform .24s ease;
+    }
+
+    .database-dashboard-portal.is-mobile-drawer-open .mobile-drawer-toggle {
+        transform: translateX(248px);
+    }
+
+    .mobile-drawer-toggle svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .database-dashboard-portal .database-navigation {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        overflow: visible;
+        padding: 0;
+    }
+
+    .database-dashboard-portal .database-navigation-group {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 6px !important;
+    }
+
+    .database-dashboard-portal .database-navigation-heading {
+        display: block;
+    }
+
+    .database-dashboard-portal .database-navigation a {
+        min-height: 40px;
+        margin-inline: 2px;
+        padding: 0 12px;
+        gap: 10px;
+        flex: 0 0 auto;
+        white-space: normal;
+        font-size: 12px;
+        border-radius: 9px;
+    }
+
+    .database-dashboard-portal .database-navigation a > span {
+        width: 22px;
+        height: 22px;
+        flex-basis: 22px;
+    }
+
+    body.has-mobile-drawer-open {
+        overflow: hidden;
+    }
+
+    /* Konten utama, kartu, heading, pencarian, dan form */
+    .database-dashboard-portal .database-main {
+        padding: 58px 12px 28px;
+    }
+
+    .database-stat-grid,
+    .database-quick-action-grid,
+    .database-module-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .database-section-heading {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .database-list-controls,
+    .database-record-search-form {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .database-record-search {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .database-record-search input {
+        width: 100%;
+    }
+
+    .database-form-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .database-action-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .panel-inline-search {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    /* Daftar absensi mobile-friendly */
+    .database-attendance-header {
+        display: none;
+    }
+
+    .database-attendance-row {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .attendance-status-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    /* Preview file upload mobile-friendly */
+    .file-picker-preview {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .file-picker-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    /* Halaman Pesan (WhatsApp-style) pada layar kecil */
+    .message-center-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .message-center-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    /* Halaman Pendaftaran */
+    .registration-main {
+        width: calc(100% - 20px);
+        margin: 14px auto 28px;
+        padding: 16px 14px;
+    }
+
+    .registration-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .registration-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px 14px;
+    }
+
+    /* Paginasi, aksi tabel, kartu inline, dan jadwal mengajar */
+    .database-pagination {
+        justify-content: center;
+    }
+
+    .database-pagination nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .database-inline-actions,
+    .database-record-edit-summary,
+    .database-schedule-header,
+    .database-schedule-controls,
+    .submission-card-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .database-schedule-days {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(46px, 1fr));
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 6px;
+    }
+
+    .database-student-editor > summary {
+        flex-wrap: wrap;
+        gap: 6px;
+        line-height: 1.35;
+    }
+
+    .database-activity-gallery,
+    .database-portfolio-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .database-dashboard-portal .database-intro.database-welcome,
+    .database-dashboard .database-intro.database-welcome,
+    .database-welcome {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 16px;
+    }
+
+    .database-welcome h2 {
+        font-size: 18px;
+        line-height: 1.25;
+        word-break: break-word;
+    }
+
+    .database-welcome-mark {
+        display: none;
+    }
+
+    /* Modal preview file di layar kecil */
+    .file-preview-modal {
+        padding: 10px;
+    }
+
+    .file-preview-modal-dialog {
+        width: 100%;
+        max-height: 92vh;
+    }
+
+    .file-preview-modal-head {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+    }
+
+    /* Halaman Profil & Auth */
+    .profile-settings-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px 14px;
+    }
+
+    .profile-photo-card {
+        grid-template-columns: 1fr;
+        justify-items: start;
+    }
+
+    .auth-card,
+    .login-card,
+    .registration-success-card {
+        width: calc(100% - 24px);
+        max-width: 100%;
+        padding: 20px 16px;
+    }
+}
+
+@media (max-width: 420px) {
+    .portal-dashboard-brand small {
+        display: none;
+    }
+
+    .portal-profile-copy small {
+        display: none;
+    }
+
+    .portal-profile-copy strong {
+        max-width: 68px;
+    }
+}
+
+.reg-doc-table td {
+    vertical-align: top;
+}
+
+.reg-student-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 210px;
+}
+
+.reg-student-cell small {
+    color: #516a82;
+    font-size: 11px;
+}
+
+.reg-doc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 220px;
+}
+
+.reg-doc-chip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 9px;
+    border-radius: 7px;
+    border: 1px solid #c6daec;
+    background: #f5f9fd;
+    color: #1b4d7e;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.reg-doc-chip-btn:hover {
+    background: #e3effa;
+    border-color: #1b4d7e;
+}
+
+.reg-doc-chip-btn svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+.reg-doc-chip-btn.is-valid {
+    border-color: #b7e2c7;
+    background: #eef9f2;
+    color: #1e6e3e;
+}
+
+.reg-doc-chip-btn.is-invalid {
+    border-color: #f3c4c4;
+    background: #fff3f3;
+    color: #b42318;
+}
+
+.reg-verify-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 175px;
+}
+
+.reg-verify-form input {
+    min-height: 34px;
+    padding: 6px 9px;
+    border: 1px solid #c6daec;
+    border-radius: 7px;
+    font-size: 11.5px;
+}
+
+.reg-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.database-button-danger {
+    background: #c62828 !important;
+    border-color: #c62828 !important;
+    color: #fff !important;
+}
+
+.database-button-danger:hover {
+    background: #a51d1d !important;
+}

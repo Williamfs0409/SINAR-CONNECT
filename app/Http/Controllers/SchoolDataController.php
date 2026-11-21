@@ -883,6 +883,13 @@ class SchoolDataController extends Controller
 
                     return $document;
                 });
+            $data['documentsByRegistration'] = $data['registrationDocuments']->groupBy('id_pendaftaran');
+            $data['teachers'] = Schema::hasTable('guru')
+                ? DB::table('guru')
+                    ->where('status', 'Aktif')
+                    ->orderBy('nama_lengkap')
+                    ->get(['id_guru', 'nama_lengkap', 'gelar_belakang'])
+                : collect();
         }
 
         if ($section === 'pendaftaran' && $role === 'parent') {
