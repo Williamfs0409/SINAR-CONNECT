@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\ImageUploadService;
 use App\Support\PasswordPolicy;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -467,6 +468,7 @@ class SchoolFeatureController extends Controller
         $data = $request->validate([
             'decision' => ['required', Rule::in(['verify', 'accept', 'reject'])],
             'class_id' => ['nullable', 'integer'],
+            'teacher_id' => ['nullable', 'integer'],
             'due_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:255'],
             'documents' => ['nullable', 'array'],
@@ -492,103 +494,190 @@ class SchoolFeatureController extends Controller
             }
         }
 
-        DB::transaction(function () use ($data, $registrationId, $user): void {
-            $application = DB::table('pendaftaran')
-                ->where('id_pendaftaran', $registrationId)
-                ->lockForUpdate()
-                ->first();
-            abort_unless($application !== null, 404);
+        try {
+            DB::transaction(function () use ($data, $registrationId, $user): void {
+                $application = DB::table('pendaftaran')
+                    ->where('id_pendaftaran', $registrationId)
+                    ->lockForUpdate()
+                    ->first();
+                abort_unless($application !== null, 404);
 
-            if ($data['decision'] === 'verify') {
-                if ($application->status !== 'Diajukan') {
-                    throw ValidationException::withMessages(['decision' => 'Hanya pendaftaran yang diajukan dapat diverifikasi.']);
+                if ($data['decision'] === 'verify') {
+                    if ($application->status !== 'Diajukan') {
+                        throw ValidationException::withMessages(['decision' => 'Hanya pendaftaran yang diajukan dapat diverifikasi.']);
+                    }
+
+                    // 1-klik Verifikasi: otomatis validkan berkas 'Menunggu' jika seluruh berkas wajib sudah diunggah dan tidak ada yang 'Tidak Valid'
+                    if (Schema::hasTable('dokumen_pendaftaran')) {
+                        $requiredDocs = array_values(config('registration.required_documents'));
+                        $uploadedTypes = DB::table('dokumen_pendaftaran')
+                            ->where('id_pendaftaran', $registrationId)
+                            ->pluck('jenis')
+                            ->all();
+                        $hasInvalid = DB::table('dokumen_pendaftaran')
+                            ->where('id_pendaftaran', $registrationId)
+                            ->where('status_verifikasi', 'Tidak Valid')
+                            ->exists();
+
+                        if (! $hasInvalid && array_diff($requiredDocs, $uploadedTypes) === []) {
+                            DB::table('dokumen_pendaftaran')
+                                ->where('id_pendaftaran', $registrationId)
+                                ->where('status_verifikasi', 'Menunggu')
+                                ->update([
+                                    'status_verifikasi' => 'Valid',
+                                    'updated_at' => now(),
+                                ]);
+                        }
+                    }
+
+                    $this->assertRegistrationDocumentsValid($registrationId);
+
+                    DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
+                        'status' => 'Diverifikasi',
+                        'catatan_verifikasi' => $data['note'] ?? null,
+                        'id_user_verifikator' => $user->getKey(),
+                        'tanggal_verifikasi' => now(),
+                    ]);
+
+                    return;
                 }
 
+                if ($data['decision'] === 'reject') {
+                    if (! \in_array($application->status, ['Diajukan', 'Diverifikasi'], true)) {
+                        throw ValidationException::withMessages(['decision' => 'Status pendaftaran ini tidak dapat ditolak.']);
+                    }
+
+                    DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
+                        'status' => 'Ditolak',
+                        'catatan_verifikasi' => $data['note'] ?? null,
+                        'id_user_verifikator' => $user->getKey(),
+                        'tanggal_verifikasi' => now(),
+                    ]);
+
+                    return;
+                }
+
+                if ($application->status !== 'Diverifikasi') {
+                    throw ValidationException::withMessages(['decision' => 'Pendaftaran harus diverifikasi sebelum diterima.']);
+                }
                 $this->assertRegistrationDocumentsValid($registrationId);
 
-                DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
-                    'status' => 'Diverifikasi',
-                    'catatan_verifikasi' => $data['note'] ?? null,
-                    'id_user_verifikator' => $user->getKey(),
-                    'tanggal_verifikasi' => now(),
-                ]);
-
-                return;
-            }
-
-            if ($data['decision'] === 'reject') {
-                if (! \in_array($application->status, ['Diajukan', 'Diverifikasi'], true)) {
-                    throw ValidationException::withMessages(['decision' => 'Status pendaftaran ini tidak dapat ditolak.']);
+                $class = DB::table('kelas')
+                    ->where('id_kelas', $data['class_id'] ?? 0)
+                    ->where('id_tahun_ajaran', $application->id_tahun_ajaran)
+                    ->where('kelompok', $application->kelompok)
+                    ->where('nama_kelas', '<>', 'Belum Ditentukan')
+                    ->first();
+                if (! $class) {
+                    throw ValidationException::withMessages(['class_id' => 'Pilih kelas definitif yang sesuai dengan tahun ajaran dan kelompok pendaftar.']);
                 }
 
-                DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
-                    'status' => 'Ditolak',
-                    'catatan_verifikasi' => $data['note'] ?? null,
-                    'id_user_verifikator' => $user->getKey(),
-                    'tanggal_verifikasi' => now(),
-                ]);
+                $existingRoster = DB::table('rombel_siswa as r')
+                    ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                    ->where('r.id_siswa', $application->id_siswa)
+                    ->where('k.id_tahun_ajaran', $application->id_tahun_ajaran)
+                    ->where('r.status', 'Aktif')
+                    ->select(['r.id_rombel', 'r.id_kelas'])
+                    ->first();
 
-                return;
-            }
-
-            if ($application->status !== 'Diverifikasi') {
-                throw ValidationException::withMessages(['decision' => 'Pendaftaran harus diverifikasi sebelum diterima.']);
-            }
-            $this->assertRegistrationDocumentsValid($registrationId);
-
-            $class = DB::table('kelas')
-                ->where('id_kelas', $data['class_id'] ?? 0)
-                ->where('id_tahun_ajaran', $application->id_tahun_ajaran)
-                ->where('kelompok', $application->kelompok)
-                ->where('nama_kelas', '<>', 'Belum Ditentukan')
-                ->first();
-            if (! $class) {
-                throw ValidationException::withMessages(['class_id' => 'Pilih kelas definitif yang sesuai dengan tahun ajaran dan kelompok pendaftar.']);
-            }
-
-            DB::table('rombel_siswa')->insert([
-                'id_siswa' => $application->id_siswa,
-                'id_kelas' => $class->id_kelas,
-                'status' => 'Aktif',
-                'tanggal_masuk' => now()->toDateString(),
-                'created_at' => now(),
-            ]);
-
-            if (! empty($data['due_date'])) {
-                $registrationFees = DB::table('tarif as tf')
-                    ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 'tf.id_jenis_biaya')
-                    ->where('tf.id_tahun_ajaran', $application->id_tahun_ajaran)
-                    ->where('tf.kelompok', $application->kelompok)
-                    ->where('jb.kategori', 'Pendaftaran')
-                    ->get(['tf.id_jenis_biaya', 'tf.nominal']);
-
-                $rosterId = DB::table('rombel_siswa')
-                    ->where('id_siswa', $application->id_siswa)
-                    ->where('id_kelas', $class->id_kelas)
-                    ->where('status', 'Aktif')
-                    ->value('id_rombel');
-
-                foreach ($registrationFees as $fee) {
-                    DB::table('tagihan')->insert([
-                        'id_rombel' => $rosterId,
-                        'id_jenis_biaya' => $fee->id_jenis_biaya,
-                        'nominal' => $fee->nominal,
-                        'diskon' => 0,
-                        'jatuh_tempo' => $data['due_date'],
+                if ($existingRoster) {
+                    if ((int) $existingRoster->id_kelas !== (int) $class->id_kelas) {
+                        DB::table('rombel_siswa')
+                            ->where('id_rombel', $existingRoster->id_rombel)
+                            ->update([
+                                'id_kelas' => $class->id_kelas,
+                                'tanggal_masuk' => now()->toDateString(),
+                                'updated_at' => now(),
+                            ]);
+                    }
+                    $rosterId = $existingRoster->id_rombel;
+                } else {
+                    $rosterId = DB::table('rombel_siswa')->insertGetId([
+                        'id_siswa' => $application->id_siswa,
+                        'id_kelas' => $class->id_kelas,
+                        'status' => 'Aktif',
+                        'tanggal_masuk' => now()->toDateString(),
                         'created_at' => now(),
                     ]);
                 }
+
+                if (! empty($data['teacher_id']) && Schema::hasTable('guru_kelas') && Schema::hasTable('guru')) {
+                    $teacherExists = DB::table('guru')
+                        ->where('id_guru', (int) $data['teacher_id'])
+                        ->where('status', 'Aktif')
+                        ->exists();
+                    if ($teacherExists) {
+                        $existingAssignment = DB::table('guru_kelas')
+                            ->where('id_kelas', $class->id_kelas)
+                            ->where('peran', 'Wali Kelas')
+                            ->first();
+                        if ($existingAssignment) {
+                            DB::table('guru_kelas')
+                                ->where('id_guru_kelas', $existingAssignment->id_guru_kelas)
+                                ->update(['id_guru' => (int) $data['teacher_id']]);
+                        } else {
+                            DB::table('guru_kelas')->insert([
+                                'id_guru' => (int) $data['teacher_id'],
+                                'id_kelas' => $class->id_kelas,
+                                'peran' => 'Wali Kelas',
+                            ]);
+                        }
+                    }
+                }
+
+                if (! empty($data['due_date']) && $rosterId) {
+                    $registrationFees = DB::table('tarif as tf')
+                        ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 'tf.id_jenis_biaya')
+                        ->where('tf.id_tahun_ajaran', $application->id_tahun_ajaran)
+                        ->where('tf.kelompok', $application->kelompok)
+                        ->where('jb.kategori', 'Pendaftaran')
+                        ->get(['tf.id_jenis_biaya', 'tf.nominal']);
+
+                    foreach ($registrationFees as $fee) {
+                        $existsBill = DB::table('tagihan')
+                            ->where('id_rombel', $rosterId)
+                            ->where('id_jenis_biaya', $fee->id_jenis_biaya)
+                            ->whereNull('periode')
+                            ->whereNull('id_kegiatan')
+                            ->exists();
+
+                        if (! $existsBill) {
+                            DB::table('tagihan')->insert([
+                                'id_rombel' => $rosterId,
+                                'id_jenis_biaya' => $fee->id_jenis_biaya,
+                                'nominal' => $fee->nominal,
+                                'diskon' => 0,
+                                'jatuh_tempo' => $data['due_date'],
+                                'created_at' => now(),
+                            ]);
+                        }
+                    }
+                }
+
+                DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
+                    'status' => 'Diterima',
+                    'catatan_verifikasi' => $data['note'] ?? null,
+                    'id_user_verifikator' => $user->getKey(),
+                    'tanggal_verifikasi' => now(),
+                ]);
+            });
+        } catch (QueryException $exception) {
+            $sqlState = $exception->errorInfo[0] ?? '';
+            $message = $exception->errorInfo[2] ?? $exception->getMessage();
+            if ($sqlState === '45000' || str_contains($message, '1644')) {
+                $cleanMessage = preg_replace('/^.*1644\s*/', '', (string) $message);
+                throw ValidationException::withMessages(['decision' => $cleanMessage ?: 'Keputusan pendaftaran tidak dapat diproses.']);
             }
+            throw $exception;
+        }
 
-            DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->update([
-                'status' => 'Diterima',
-                'catatan_verifikasi' => $data['note'] ?? null,
-                'id_user_verifikator' => $user->getKey(),
-                'tanggal_verifikasi' => now(),
-            ]);
-        });
+        $statusMessage = match ($data['decision']) {
+            'verify' => 'Berkas pendaftaran berhasil diverifikasi. Silakan pilih kelas dan guru pada form penetapan di bawah.',
+            'accept' => 'Calon siswa berhasil ditetapkan dan diterima ke kelas.',
+            'reject' => 'Pendaftaran telah ditolak.',
+        };
 
-        return back()->with('status', 'Status pendaftaran berhasil diperbarui.');
+        return back()->with('status', $statusMessage);
     }
 
     public function uploadRegistrationDocuments(Request $request, int $registrationId): RedirectResponse

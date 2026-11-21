@@ -5019,3 +5019,95 @@ body {
         max-width: 68px;
     }
 }
+
+.reg-doc-table td {
+    vertical-align: top;
+}
+
+.reg-student-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 210px;
+}
+
+.reg-student-cell small {
+    color: #516a82;
+    font-size: 11px;
+}
+
+.reg-doc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 220px;
+}
+
+.reg-doc-chip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 9px;
+    border-radius: 7px;
+    border: 1px solid #c6daec;
+    background: #f5f9fd;
+    color: #1b4d7e;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.reg-doc-chip-btn:hover {
+    background: #e3effa;
+    border-color: #1b4d7e;
+}
+
+.reg-doc-chip-btn svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+.reg-doc-chip-btn.is-valid {
+    border-color: #b7e2c7;
+    background: #eef9f2;
+    color: #1e6e3e;
+}
+
+.reg-doc-chip-btn.is-invalid {
+    border-color: #f3c4c4;
+    background: #fff3f3;
+    color: #b42318;
+}
+
+.reg-verify-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 175px;
+}
+
+.reg-verify-form input {
+    min-height: 34px;
+    padding: 6px 9px;
+    border: 1px solid #c6daec;
+    border-radius: 7px;
+    font-size: 11.5px;
+}
+
+.reg-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.database-button-danger {
+    background: #c62828 !important;
+    border-color: #c62828 !important;
+    color: #fff !important;
+}
+
+.database-button-danger:hover {
+    background: #a51d1d !important;
+}

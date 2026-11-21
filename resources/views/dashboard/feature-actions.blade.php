@@ -429,92 +429,182 @@
         </form>
     </section>
 
+    @php
+        $allApplications = collect($actions['applications'] ?? []);
+        $pendingApplications = $allApplications->where('status', 'Diajukan')->values();
+        $verifiedApplications = $allApplications->where('status', 'Diverifikasi')->values();
+        $documentsByRegistration = $actions['documentsByRegistration'] ?? collect();
+        $activeTeachers = collect($actions['teachers'] ?? []);
+    @endphp
+
     <section class="database-action-panel">
         <div class="database-section-heading">
-            <div><h2>Proses pendaftaran</h2><p>Periksa dokumen, verifikasi calon siswa, lalu tentukan kelas saat menerima.</p></div>
-        </div>
-        @forelse ($actions['registrationDocuments'] ?? [] as $document)
-            <div class="database-action-row">
-                <div>
-                    <strong>{{ $document->nama_lengkap }} · {{ $document->jenis }}</strong>
-                    <small>
-                        Ukuran file:
-                        @if ($document->file_size_bytes === null)
-                            File tidak ditemukan
-                        @elseif ($document->file_size_bytes < 1048576)
-                            {{ number_format($document->file_size_bytes / 1024, 1, ',', '.') }} KB
-                        @else
-                            {{ number_format($document->file_size_bytes / 1048576, 2, ',', '.') }} MB
-                        @endif
-                    </small>
-                    <small>Status dokumen: {{ $document->status_verifikasi }}{{ $document->catatan ? ' — '.$document->catatan : '' }}</small>
-                </div>
-                <div class="database-action-buttons">
-                    <a class="database-button database-button-secondary" href="{{ route('database.registration.document.file', ['document' => $document->id_dokumen]) }}" target="_blank" rel="noopener">Lihat dokumen</a>
-                    <div class="database-inline-form">
-                        <select name="documents[{{ $document->id_dokumen }}][status_verifikasi]" form="registration-review-{{ $document->id_pendaftaran }}" aria-label="Status dokumen">
-                            <option value="Valid" @selected($document->status_verifikasi === 'Valid')>Valid</option>
-                            <option value="Tidak Valid" @selected($document->status_verifikasi === 'Tidak Valid')>Tidak valid</option>
-                        </select>
-                        <input name="documents[{{ $document->id_dokumen }}][catatan]" form="registration-review-{{ $document->id_pendaftaran }}" value="{{ $document->catatan }}" placeholder="Catatan (opsional)" maxlength="255">
-                    </div>
-                </div>
+            <div>
+                <h2>Verifikasi Berkas Pendaftaran</h2>
+                <p>Klik ikon dokumen untuk melihat berkas calon siswa, lalu klik <strong>Verifikasi</strong> atau <strong>Tolak</strong> langsung.</p>
             </div>
-        @empty
-            <p class="database-empty-note">Belum ada dokumen pendaftaran yang perlu diperiksa.</p>
-        @endforelse
+            <span class="database-result-count">{{ $pendingApplications->count() }} menunggu verifikasi</span>
+        </div>
 
-        @forelse ($actions['applications'] ?? [] as $application)
-            <form id="registration-review-{{ $application->id_pendaftaran }}" method="POST" action="{{ route('database.registration.review', ['registration' => $application->id_pendaftaran]) }}" class="database-action-form database-registration-review">
-                @csrf
-                <div>
-                    <strong>{{ $application->nama_lengkap }}</strong>
-                    <small>{{ $application->no_pendaftaran }} · {{ $application->kelompok }} · {{ $application->tahun_ajaran }} · {{ $application->dokumen_valid }}/{{ count(config('registration.required_documents')) }} dokumen wajib valid ({{ $application->dokumen_diunggah }} diunggah)</small>
-                    <details class="database-registration-details">
-                        <summary>Lihat data calon siswa dan wali</summary>
-                        <dl>
-                            <div><dt>Nama panggilan</dt><dd>{{ $application->nama_panggilan ?: '—' }}</dd></div>
-                            <div><dt>Jenis kelamin</dt><dd>{{ $application->jenis_kelamin ?: '—' }}</dd></div>
-                            <div><dt>Tempat, tanggal lahir</dt><dd>{{ $application->tempat_lahir ?: '—' }}, {{ $application->tanggal_lahir ?: '—' }}</dd></div>
-                            <div><dt>Nomor KK</dt><dd>{{ $application->no_kk ? 'Sudah diisi' : 'Belum diisi' }}</dd></div>
-                            <div><dt>Orang tua/wali</dt><dd>{{ $application->nama_wali ?: '—' }}{{ $application->hubungan_wali ? ' · '.$application->hubungan_wali : '' }}</dd></div>
-                            <div><dt>Nomor kontak</dt><dd>{{ $application->nomor_wali ?: '—' }}</dd></div>
-                            <div><dt>Email akun orang tua</dt><dd>{{ $application->email ?: '—' }}</dd></div>
-                            <div class="database-registration-address"><dt>Alamat keluarga</dt><dd>{{ $application->alamat ?: '—' }}</dd></div>
-                        </dl>
-                    </details>
-                </div>
-                <div class="database-registration-controls">
-                    @php
-                        $eligibleClasses = $classOptions->filter(fn ($class) => $class->kelompok === $application->kelompok
-                            && $class->tahun_ajaran === $application->tahun_ajaran
-                            && $class->nama_kelas !== 'Belum Ditentukan');
-                    @endphp
-                    <select name="decision" required aria-label="Keputusan pendaftaran">
-                        <option value="verify" @selected($application->status === 'Diajukan')>Verifikasi</option>
-                        <option value="accept" @selected($application->status === 'Diverifikasi')>Terima</option>
-                        <option value="reject">Tolak</option>
-                    </select>
-                    <select name="class_id" aria-label="Kelas penerimaan">
-                        <option value="">Pilih kelas jika menerima</option>
-                        @foreach ($eligibleClasses as $class)
-                            <option value="{{ $class->id_kelas }}">
-                                {{ $class->nama_kelas }}
-                            </option>
+        @if ($pendingApplications->isNotEmpty())
+            <div class="database-table-wrap">
+                <table class="database-table reg-doc-table">
+                    <thead>
+                        <tr>
+                            <th>Calon Siswa</th>
+                            <th>Berkas-berkas (Klik Logo untuk Lihat Dokumen)</th>
+                            <th>Verifikasi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($pendingApplications as $application)
+                            @php
+                                $appDocs = $documentsByRegistration->get($application->id_pendaftaran, collect());
+                            @endphp
+                            <tr>
+                                <td>
+                                    <div class="reg-student-cell">
+                                        <strong>{{ $application->nama_lengkap }}</strong>
+                                        <small>{{ $application->no_pendaftaran }} · {{ $application->kelompok }} · {{ $application->tahun_ajaran }}</small>
+                                        <details class="database-registration-details">
+                                            <summary>Lihat data calon siswa dan wali</summary>
+                                            <dl>
+                                                <div><dt>Nama panggilan</dt><dd>{{ $application->nama_panggilan ?: '—' }}</dd></div>
+                                                <div><dt>Jenis kelamin</dt><dd>{{ $application->jenis_kelamin ?: '—' }}</dd></div>
+                                                <div><dt>Tempat, tanggal lahir</dt><dd>{{ $application->tempat_lahir ?: '—' }}, {{ $application->tanggal_lahir ?: '—' }}</dd></div>
+                                                <div><dt>Nomor KK</dt><dd>{{ $application->no_kk ? 'Sudah diisi' : 'Belum diisi' }}</dd></div>
+                                                <div><dt>Orang tua/wali</dt><dd>{{ $application->nama_wali ?: '—' }}{{ $application->hubungan_wali ? ' · '.$application->hubungan_wali : '' }}</dd></div>
+                                                <div><dt>Nomor kontak</dt><dd>{{ $application->nomor_wali ?: '—' }}</dd></div>
+                                                <div><dt>Email akun orang tua</dt><dd>{{ $application->email ?: '—' }}</dd></div>
+                                                <div class="database-registration-address"><dt>Alamat keluarga</dt><dd>{{ $application->alamat ?: '—' }}</dd></div>
+                                            </dl>
+                                        </details>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="reg-doc-chips">
+                                        @forelse ($appDocs as $doc)
+                                            @php
+                                                $shortDoc = match ($doc->jenis) {
+                                                    'Formulir Pendaftaran' => 'Formulir',
+                                                    'Akta Kelahiran' => 'Akta',
+                                                    'Kartu Keluarga' => 'KK',
+                                                    'KTP Ibu' => 'KTP Ibu',
+                                                    'KTP Bapak' => 'KTP Bapak',
+                                                    default => $doc->jenis,
+                                                };
+                                                $docStateClass = match ($doc->status_verifikasi) {
+                                                    'Valid' => 'is-valid',
+                                                    'Tidak Valid' => 'is-invalid',
+                                                    default => 'is-pending',
+                                                };
+                                            @endphp
+                                            <a
+                                                class="reg-doc-chip-btn {{ $docStateClass }}"
+                                                href="{{ route('database.registration.document.file', ['document' => $doc->id_dokumen]) }}"
+                                                target="_blank"
+                                                rel="noopener"
+                                                title="Lihat {{ $doc->jenis }} ({{ $doc->status_verifikasi }})"
+                                            >
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                    <polyline points="14 2 14 8 20 8"/>
+                                                    <line x1="9" y1="15" x2="15" y2="15"/>
+                                                </svg>
+                                                <span>{{ $shortDoc }}</span>
+                                            </a>
+                                        @empty
+                                            <span class="database-empty-note">Belum ada berkas.</span>
+                                        @endforelse
+                                    </div>
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ route('database.registration.review', ['registration' => $application->id_pendaftaran]) }}" class="reg-verify-form">
+                                        @csrf
+                                        <input name="note" maxlength="255" placeholder="Catatan (opsional)" aria-label="Catatan verifikasi">
+                                        <div class="reg-action-buttons">
+                                            <button class="database-button" type="submit" name="decision" value="verify">Verifikasi</button>
+                                            <button class="database-button database-button-danger" type="submit" name="decision" value="reject">Tolak</button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
                         @endforeach
-                    </select>
-                    @if ($eligibleClasses->isEmpty())
-                        <small>Belum ada kelas definitif untuk {{ $application->kelompok }} tahun ajaran {{ $application->tahun_ajaran }}.</small>
-                    @endif
-                    <input type="date" name="due_date" aria-label="Jatuh tempo biaya pendaftaran">
-                    <input name="note" maxlength="255" placeholder="Catatan verifikasi">
-                    <button class="database-button" type="submit">Simpan keputusan</button>
-                </div>
-            </form>
-        @empty
-            <p class="database-empty-note">Tidak ada pendaftaran yang menunggu proses.</p>
-        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        @else
+            <p class="database-empty-note">Tidak ada berkas pendaftaran baru yang menunggu verifikasi.</p>
+        @endif
     </section>
+
+    @if ($verifiedApplications->isNotEmpty())
+        <section class="database-action-panel">
+            <div class="database-section-heading">
+                <div>
+                    <h2>Penetapan Kelas &amp; Guru</h2>
+                    <p>Calon siswa yang sudah diverifikasi siap ditetapkan ke kelas dan wali kelasnya.</p>
+                </div>
+                <span class="database-result-count">{{ $verifiedApplications->count() }} siap ditetapkan</span>
+            </div>
+
+            @foreach ($verifiedApplications as $application)
+                @php
+                    $eligibleClasses = $classOptions->filter(fn ($class) => $class->kelompok === $application->kelompok
+                        && $class->tahun_ajaran === $application->tahun_ajaran
+                        && $class->nama_kelas !== 'Belum Ditentukan');
+                @endphp
+                <form method="POST" action="{{ route('database.registration.review', ['registration' => $application->id_pendaftaran]) }}" class="database-action-form database-registration-review reg-placement-card">
+                    @csrf
+                    <div>
+                        <strong>{{ $application->nama_lengkap }}</strong>
+                        <small>{{ $application->no_pendaftaran }} · {{ $application->kelompok }} · {{ $application->tahun_ajaran }} · Berkas Terverifikasi</small>
+                        <details class="database-registration-details">
+                            <summary>Lihat data calon siswa dan wali</summary>
+                            <dl>
+                                <div><dt>Nama panggilan</dt><dd>{{ $application->nama_panggilan ?: '—' }}</dd></div>
+                                <div><dt>Jenis kelamin</dt><dd>{{ $application->jenis_kelamin ?: '—' }}</dd></div>
+                                <div><dt>Tempat, tanggal lahir</dt><dd>{{ $application->tempat_lahir ?: '—' }}, {{ $application->tanggal_lahir ?: '—' }}</dd></div>
+                                <div><dt>Nomor KK</dt><dd>{{ $application->no_kk ? 'Sudah diisi' : 'Belum diisi' }}</dd></div>
+                                <div><dt>Orang tua/wali</dt><dd>{{ $application->nama_wali ?: '—' }}{{ $application->hubungan_wali ? ' · '.$application->hubungan_wali : '' }}</dd></div>
+                                <div><dt>Nomor kontak</dt><dd>{{ $application->nomor_wali ?: '—' }}</dd></div>
+                                <div><dt>Email akun orang tua</dt><dd>{{ $application->email ?: '—' }}</dd></div>
+                                <div class="database-registration-address"><dt>Alamat keluarga</dt><dd>{{ $application->alamat ?: '—' }}</dd></div>
+                            </dl>
+                        </details>
+                    </div>
+                    <div class="database-registration-controls">
+                        <label>Pilih Kelas
+                            <select name="class_id" aria-label="Pilih kelas">
+                                <option value="">— Pilih kelas —</option>
+                                @foreach ($eligibleClasses as $class)
+                                    <option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label>Pilih Guru (Wali Kelas)
+                            <select name="teacher_id" aria-label="Pilih guru">
+                                <option value="">— Gunakan wali kelas saat ini —</option>
+                                @foreach ($activeTeachers as $teacher)
+                                    <option value="{{ $teacher->id_guru }}">{{ $teacher->nama_lengkap }}{{ $teacher->gelar_belakang ? ', '.$teacher->gelar_belakang : '' }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label>Jatuh tempo biaya (opsional)
+                            <input type="date" name="due_date" aria-label="Jatuh tempo biaya pendaftaran">
+                        </label>
+                        <label>Catatan (opsional)
+                            <input name="note" maxlength="255" placeholder="Catatan penetapan">
+                        </label>
+                        <div class="reg-action-buttons database-form-wide">
+                            <button class="database-button" type="submit" name="decision" value="accept">Tetapkan</button>
+                            <button class="database-button database-button-danger" type="submit" name="decision" value="reject">Tidak Tetapkan</button>
+                        </div>
+                    </div>
+                </form>
+            @endforeach
+        </section>
+    @endif
 @endif
 
 @if ($section === 'absensi' && in_array($role, ['teacher', 'admin'], true))
