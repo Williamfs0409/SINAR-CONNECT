@@ -352,7 +352,228 @@ document.querySelectorAll('[data-open-editor]').forEach((button) => {
 
 const uploadValidatorsByForm = new Map();
 
+const ensureFilePreviewModal = () => {
+    let modal = document.getElementById('sinar-file-preview-modal');
+    if (modal) {
+        return modal;
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'sinar-file-preview-modal';
+    modal.className = 'file-preview-modal';
+    modal.hidden = true;
+    modal.innerHTML = `
+        <div class="file-preview-modal-backdrop" data-close-preview></div>
+        <div class="file-preview-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="sinar-file-preview-title">
+            <div class="file-preview-modal-head">
+                <strong id="sinar-file-preview-title">Preview File</strong>
+                <div class="file-preview-modal-actions">
+                    <a class="file-preview-open-tab" href="#" target="_blank" rel="noopener">Buka di tab baru</a>
+                    <button type="button" class="file-preview-close" data-close-preview aria-label="Tutup preview">✕</button>
+                </div>
+            </div>
+            <div class="file-preview-modal-body"></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (event) => {
+        if (event.target.closest('[data-close-preview]')) {
+            modal.hidden = true;
+            modal.querySelector('.file-preview-modal-body').innerHTML = '';
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !modal.hidden) {
+            modal.hidden = true;
+            modal.querySelector('.file-preview-modal-body').innerHTML = '';
+        }
+    });
+
+    return modal;
+};
+
+const openFilePreviewModal = (file, objectUrl) => {
+    const modal = ensureFilePreviewModal();
+    const title = modal.querySelector('#sinar-file-preview-title');
+    const openTab = modal.querySelector('.file-preview-open-tab');
+    const body = modal.querySelector('.file-preview-modal-body');
+
+    title.textContent = file.name;
+    openTab.href = objectUrl;
+    body.innerHTML = '';
+
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+    if (isImage) {
+        const img = document.createElement('img');
+        img.src = objectUrl;
+        img.alt = file.name;
+        img.className = 'file-preview-modal-image';
+        body.appendChild(img);
+    } else if (isPdf) {
+        const frame = document.createElement('iframe');
+        frame.src = objectUrl;
+        frame.title = file.name;
+        frame.className = 'file-preview-modal-pdf';
+        body.appendChild(frame);
+    } else {
+        const fallback = document.createElement('p');
+        fallback.className = 'file-preview-modal-fallback';
+        fallback.textContent = 'Pratinjau langsung tidak tersedia untuk format ini. Klik "Buka di tab baru" di atas.';
+        body.appendChild(fallback);
+    }
+
+    modal.hidden = false;
+};
+
+const formatPickerBytes = (bytes) => {
+    const megabytes = bytes / (1024 * 1024);
+    const formatter = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: megabytes >= 1 ? 2 : 0,
+        maximumFractionDigits: megabytes >= 1 ? 2 : 1,
+    });
+
+    return megabytes >= 1
+        ? `${formatter.format(megabytes)} MB`
+        : `${formatter.format(bytes / 1024)} KB`;
+};
+
+const initSingleFilePicker = (fileInput) => {
+    if (!fileInput || fileInput.multiple || fileInput.dataset.pickerInitialized === '1') {
+        return;
+    }
+    fileInput.dataset.pickerInitialized = '1';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'file-picker';
+    fileInput.parentNode.insertBefore(wrapper, fileInput);
+    wrapper.appendChild(fileInput);
+    fileInput.classList.add('file-picker-native');
+
+    const trigger = document.createElement('div');
+    trigger.className = 'file-picker-trigger';
+    trigger.innerHTML = `
+        <button type="button" class="file-picker-btn">Pilih File</button>
+        <span class="file-picker-placeholder">Belum ada file dipilih</span>
+    `;
+    wrapper.appendChild(trigger);
+
+    const preview = document.createElement('div');
+    preview.className = 'file-picker-preview';
+    preview.hidden = true;
+    preview.innerHTML = `
+        <div class="file-picker-thumb" role="button" tabindex="0" title="Klik untuk melihat preview"></div>
+        <div class="file-picker-meta">
+            <strong class="file-picker-name"></strong>
+            <span class="file-picker-size"></span>
+        </div>
+        <div class="file-picker-actions">
+            <button type="button" class="file-picker-action is-view">Lihat</button>
+            <button type="button" class="file-picker-action is-change">Ganti</button>
+            <button type="button" class="file-picker-action is-remove" aria-label="Hapus file">Hapus</button>
+        </div>
+    `;
+    wrapper.appendChild(preview);
+
+    const thumbEl = preview.querySelector('.file-picker-thumb');
+    const nameEl = preview.querySelector('.file-picker-name');
+    const sizeEl = preview.querySelector('.file-picker-size');
+    const viewBtn = preview.querySelector('.file-picker-action.is-view');
+    const changeBtn = preview.querySelector('.file-picker-action.is-change');
+    const removeBtn = preview.querySelector('.file-picker-action.is-remove');
+    const pickBtn = trigger.querySelector('.file-picker-btn');
+
+    let currentObjectUrl = null;
+    let currentFile = null;
+
+    const revokeCurrentUrl = () => {
+        if (currentObjectUrl) {
+            URL.revokeObjectURL(currentObjectUrl);
+            currentObjectUrl = null;
+        }
+    };
+
+    const openChooser = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        fileInput.click();
+    };
+
+    const renderPickerState = () => {
+        revokeCurrentUrl();
+        const file = fileInput.files?.[0] ?? null;
+        currentFile = file;
+
+        if (!file) {
+            trigger.hidden = false;
+            preview.hidden = true;
+            thumbEl.innerHTML = '';
+            nameEl.textContent = '';
+            sizeEl.textContent = '';
+            return;
+        }
+
+        trigger.hidden = true;
+        preview.hidden = false;
+        currentObjectUrl = URL.createObjectURL(file);
+
+        const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(file.name);
+        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+        thumbEl.innerHTML = '';
+        if (isImage) {
+            const img = document.createElement('img');
+            img.src = currentObjectUrl;
+            img.alt = file.name;
+            thumbEl.appendChild(img);
+        } else {
+            const badge = document.createElement('span');
+            badge.className = `file-picker-badge ${isPdf ? 'is-pdf' : 'is-doc'}`;
+            badge.textContent = isPdf ? 'PDF' : 'FILE';
+            thumbEl.appendChild(badge);
+        }
+
+        nameEl.textContent = file.name;
+        nameEl.title = file.name;
+        sizeEl.textContent = formatPickerBytes(file.size);
+    };
+
+    pickBtn.addEventListener('click', openChooser);
+    trigger.addEventListener('click', openChooser);
+    changeBtn.addEventListener('click', openChooser);
+
+    const handlePreviewOpen = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (currentFile && currentObjectUrl) {
+            openFilePreviewModal(currentFile, currentObjectUrl);
+        }
+    };
+    viewBtn.addEventListener('click', handlePreviewOpen);
+    thumbEl.addEventListener('click', handlePreviewOpen);
+    thumbEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            handlePreviewOpen(event);
+        }
+    });
+
+    removeBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        fileInput.value = '';
+        renderPickerState();
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    fileInput.addEventListener('change', renderPickerState);
+    renderPickerState();
+};
+
 document.querySelectorAll('[data-max-bytes]').forEach((fileInput) => {
+    initSingleFilePicker(fileInput);
     const feedback = document.getElementById(fileInput.getAttribute('aria-describedby'));
     const form = fileInput.form;
 
@@ -740,6 +961,7 @@ const acceptedExtensions = (input) => (input.getAttribute('accept') ?? '')
 
 document.querySelectorAll('input[type="file"][data-max-mb], input[type="file"][data-max-bytes]:not([aria-describedby])')
     .forEach((input) => {
+        initSingleFilePicker(input);
         const maxBytes = input.dataset.maxMb
             ? Number(input.dataset.maxMb) * 1024 * 1024
             : Number(input.dataset.maxBytes);
