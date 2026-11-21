@@ -4,69 +4,187 @@
 @endphp
 
 @if ($section === 'pendaftaran' && $role === 'parent')
-    <section class="database-action-panel">
+    <section class="database-action-panel parent-reg-panel">
         <div class="database-section-heading">
-            <div><h2>Kelengkapan dokumen pendaftaran</h2><p>Unggah dokumen yang belum ada atau ganti dokumen yang ditolak admin. Berkas yang sedang diperiksa tidak perlu diunggah ulang.</p></div>
+            <div>
+                <h2>Kelengkapan dokumen pendaftaran</h2>
+                <p>Unggah dokumen yang belum ada atau ganti dokumen yang ditolak admin. Berkas yang sedang diperiksa tidak perlu diunggah ulang.</p>
+            </div>
         </div>
         @forelse ($actions['parentApplications'] ?? [] as $application)
-            <div class="database-action-row">
-                <div>
-                    <strong>{{ $application->nama_lengkap }}</strong>
-                    <small>Status pendaftaran: {{ $application->status }}</small>
-                    <ul>
-                        @foreach ($application->requiredDocuments as $requiredDocument)
-                            @php
-                                $document = $requiredDocument['document'];
-                            @endphp
-                            <li>
-                                {{ $requiredDocument['label'] }}:
-                                @if (! $document)
-                                    Belum diunggah
-                                @else
-                                    {{ $document->status_verifikasi }}
-                                    @if ($document->catatan)
-                                        — {{ $document->catatan }}
-                                    @endif
-                                    · <a href="{{ route('database.registration.document.file', ['document' => $document->id_dokumen]) }}" target="_blank" rel="noopener">Lihat berkas</a>
+            @php
+                $totalDocs = $application->requiredDocuments->count();
+                $uploadedDocs = $application->requiredDocuments->filter(fn ($item) => (bool) $item['document'])->count();
+                $validDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && $item['document']->status_verifikasi === 'Valid')->count();
+                $rejectedDocs = $application->requiredDocuments->filter(fn ($item) => $item['document'] && $item['document']->status_verifikasi === 'Tidak Valid')->count();
+                $documentsToUpload = $application->requiredDocuments->filter(function ($item) {
+                    return ! $item['document'] || $item['document']->status_verifikasi === 'Tidak Valid';
+                });
+                $appStatusClass = match ($application->status) {
+                    'Diverifikasi', 'Diterima' => 'is-valid',
+                    'Ditolak' => 'is-invalid',
+                    default => 'is-pending',
+                };
+                $progressPercent = $totalDocs > 0 ? (int) round(($uploadedDocs / $totalDocs) * 100) : 0;
+                $studentInitial = mb_strtoupper(mb_substr(trim((string) $application->nama_lengkap), 0, 1)) ?: 'S';
+            @endphp
+            <article class="parent-reg-card">
+                <header class="parent-reg-card-header">
+                    <div class="parent-reg-student">
+                        <span class="parent-reg-avatar" aria-hidden="true">{{ $studentInitial }}</span>
+                        <div class="parent-reg-student-meta">
+                            <strong>{{ $application->nama_lengkap }}</strong>
+                            <span class="parent-reg-progress-text">
+                                {{ $uploadedDocs }}/{{ $totalDocs }} berkas terunggah
+                                @if ($validDocs > 0)
+                                    · {{ $validDocs }} valid
                                 @endif
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-                @php
-                    $documentsToUpload = $application->requiredDocuments->filter(function ($item) {
-                        return ! $item['document'] || $item['document']->status_verifikasi === 'Tidak Valid';
-                    });
-                @endphp
-                @if ($documentsToUpload->isNotEmpty())
-                    <form method="POST" action="{{ route('database.registration.documents.upload', ['registration' => $application->id_pendaftaran]) }}" enctype="multipart/form-data" class="database-form-grid">
-                        @csrf
-                        @foreach ($documentsToUpload as $requiredDocument)
-                            @php
-                                $documentKey = $requiredDocument['key'];
-                                $documentError = $errors->first('documents.'.$documentKey);
-                            @endphp
-                            <label>{{ $requiredDocument['label'] }} (PDF/JPG/PNG, maks. 5 MB)
-                                <input
-                                    type="file"
-                                    name="documents[{{ $documentKey }}]"
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    data-max-bytes="5242880"
-                                >
-                                @if ($documentError)
-                                    <small class="registration-upload-feedback is-error">{{ $documentError }}</small>
+                                @if ($rejectedDocs > 0)
+                                    · {{ $rejectedDocs }} perlu diperbaiki
                                 @endif
-                            </label>
-                        @endforeach
-                        <div class="database-form-wide">
-                            <small>Pilih minimal satu dokumen untuk diunggah atau diperbaiki.</small>
-                            <button class="database-button" type="submit">Unggah dokumen</button>
+                            </span>
                         </div>
-                    </form>
+                    </div>
+                    <div class="parent-reg-status-wrap">
+                        <span class="parent-reg-status-label">Status pendaftaran</span>
+                        <span class="parent-reg-status-badge {{ $appStatusClass }}">
+                            <span class="parent-reg-status-dot" aria-hidden="true"></span>
+                            {{ $application->status }}
+                        </span>
+                    </div>
+                </header>
+
+                <div class="parent-reg-progress-track" role="progressbar" aria-valuenow="{{ $progressPercent }}" aria-valuemin="0" aria-valuemax="100" aria-label="Kelengkapan berkas {{ $application->nama_lengkap }}">
+                    <span class="parent-reg-progress-fill @if ($documentsToUpload->isEmpty()) is-complete @endif" style="width: {{ $progressPercent }}%"></span>
+                </div>
+
+                <div class="parent-reg-doc-table" role="list">
+                    <div class="parent-reg-doc-head" aria-hidden="true">
+                        <span>Nama Berkas</span>
+                        <span>Status Berkas</span>
+                        <span>Aksi</span>
+                    </div>
+                    @foreach ($application->requiredDocuments as $requiredDocument)
+                        @php
+                            $document = $requiredDocument['document'];
+                            $docStatusLabel = $document ? $document->status_verifikasi : 'Belum diunggah';
+                            $docStateClass = match (true) {
+                                ! $document => 'is-missing',
+                                $document->status_verifikasi === 'Valid' => 'is-valid',
+                                $document->status_verifikasi === 'Tidak Valid' => 'is-invalid',
+                                default => 'is-pending',
+                            };
+                            $docExt = $document ? strtolower(pathinfo((string) ($document->file_path ?? ''), PATHINFO_EXTENSION)) : '';
+                            $docUrl = $document ? route('database.registration.document.file', ['document' => $document->id_dokumen]) : null;
+                        @endphp
+                        <div class="parent-reg-doc-row {{ $docStateClass }}" role="listitem">
+                            <div class="parent-reg-doc-info">
+                                <span class="parent-reg-doc-icon {{ $docStateClass }}" aria-hidden="true">
+                                    @if ($docStateClass === 'is-valid')
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                            <polyline points="14 2 14 8 20 8"/>
+                                            <polyline points="9 15 11 17 15 13"/>
+                                        </svg>
+                                    @elseif ($docStateClass === 'is-invalid')
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                            <polyline points="14 2 14 8 20 8"/>
+                                            <line x1="9.5" y1="12.5" x2="14.5" y2="17.5"/>
+                                            <line x1="14.5" y1="12.5" x2="9.5" y2="17.5"/>
+                                        </svg>
+                                    @else
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                            <polyline points="14 2 14 8 20 8"/>
+                                            <line x1="9" y1="13" x2="15" y2="13"/>
+                                            <line x1="9" y1="17" x2="13" y2="17"/>
+                                        </svg>
+                                    @endif
+                                </span>
+                                <div class="parent-reg-doc-text">
+                                    <span class="parent-reg-doc-name">{{ $requiredDocument['label'] }}</span>
+                                    @if ($document && $document->catatan)
+                                        <span class="parent-reg-doc-note">Catatan: {{ $document->catatan }}</span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="parent-reg-doc-status-col">
+                                <span class="parent-reg-doc-badge {{ $docStateClass }}">
+                                    <span class="parent-reg-status-dot" aria-hidden="true"></span>
+                                    {{ $docStatusLabel }}
+                                </span>
+                            </div>
+
+                            <div class="parent-reg-doc-action-col">
+                                @if ($document && $docUrl)
+                                    <a
+                                        class="parent-reg-doc-view-btn"
+                                        href="{{ $docUrl }}"
+                                        data-doc-preview
+                                        data-doc-name="{{ $application->nama_lengkap }} · {{ $requiredDocument['label'] }}"
+                                        data-doc-ext="{{ $docExt }}"
+                                        target="_blank"
+                                        rel="noopener"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                        <span>Lihat berkas</span>
+                                    </a>
+                                @else
+                                    <span class="parent-reg-doc-empty-action">Perlu diunggah</span>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                @if ($documentsToUpload->isNotEmpty())
+                    <div class="parent-reg-upload-box">
+                        <div class="parent-reg-upload-heading">
+                            <strong>Unggah atau perbaiki dokumen</strong>
+                            <span>Format yang didukung: PDF, JPG, atau PNG (maks. 5 MB per berkas).</span>
+                        </div>
+                        <form method="POST" action="{{ route('database.registration.documents.upload', ['registration' => $application->id_pendaftaran]) }}" enctype="multipart/form-data" class="database-form-grid">
+                            @csrf
+                            @foreach ($documentsToUpload as $requiredDocument)
+                                @php
+                                    $documentKey = $requiredDocument['key'];
+                                    $documentError = $errors->first('documents.'.$documentKey);
+                                @endphp
+                                <label>{{ $requiredDocument['label'] }} (PDF/JPG/PNG, maks. 5 MB)
+                                    <input
+                                        type="file"
+                                        name="documents[{{ $documentKey }}]"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        data-max-bytes="5242880"
+                                    >
+                                    @if ($documentError)
+                                        <small class="registration-upload-feedback is-error">{{ $documentError }}</small>
+                                    @endif
+                                </label>
+                            @endforeach
+                            <div class="database-form-wide parent-reg-upload-footer">
+                                <small>Pilih minimal satu dokumen untuk diunggah atau diperbaiki.</small>
+                                <button class="database-button" type="submit">Unggah dokumen</button>
+                            </div>
+                        </form>
+                    </div>
                 @else
-                    <small>Semua dokumen yang perlu diunggah sudah tersedia dan sedang menunggu pemeriksaan atau telah valid.</small>
+                    <div class="parent-reg-complete-banner">
+                        <span class="parent-reg-complete-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                        </span>
+                        <p>Semua dokumen yang perlu diunggah sudah tersedia dan sedang menunggu pemeriksaan atau telah valid.</p>
+                    </div>
                 @endif
-            </div>
+            </article>
         @empty
             <p class="database-empty-note">Tidak ada pendaftaran aktif yang memerlukan dokumen tambahan.</p>
         @endforelse
