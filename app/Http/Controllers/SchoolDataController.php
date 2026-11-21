@@ -1174,7 +1174,7 @@ class SchoolDataController extends Controller
                     ->orderByDesc('pt.dikumpulkan_pada')
                     ->get($submissionColumns);
             } elseif ($role === 'parent') {
-                $data['parentTasks'] = DB::table('tugas as t')
+                $baseParentTasksQuery = DB::table('tugas as t')
                     ->join('rombel_siswa as r', 'r.id_kelas', '=', 't.id_kelas')
                     ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
                     ->leftJoin('pengumpulan_tugas as pt', function ($join): void {
@@ -1182,19 +1182,30 @@ class SchoolDataController extends Controller
                             ->on('pt.id_rombel', '=', 'r.id_rombel');
                     })
                     ->whereIn('r.id_siswa', $scope['studentIds'])
-                    ->where('r.status', 'Aktif')
+                    ->where('r.status', 'Aktif');
+                $parentTaskColumns = [
+                    't.id_tugas',
+                    'r.id_siswa',
+                    't.judul',
+                    't.lampiran as has_attachment',
+                    's.nama_lengkap',
+                    't.tenggat',
+                    'pt.id_pengumpulan',
+                    'pt.dikumpulkan_pada',
+                    'pt.dinilai_pada',
+                    'pt.nilai',
+                    'pt.umpan_balik',
+                    'pt.file_path as submission_file',
+                ];
+                $data['parentTasks'] = (clone $baseParentTasksQuery)
+                    ->whereNull('pt.nilai')
                     ->orderByDesc('t.tenggat')
-                    ->get([
-                        't.id_tugas',
-                        'r.id_siswa',
-                        't.judul',
-                        't.lampiran as has_attachment',
-                        's.nama_lengkap',
-                        't.tenggat',
-                        'pt.id_pengumpulan',
-                        'pt.dikumpulkan_pada',
-                        'pt.file_path as submission_file',
-                    ]);
+                    ->get($parentTaskColumns);
+                $data['parentGradedTasks'] = (clone $baseParentTasksQuery)
+                    ->whereNotNull('pt.nilai')
+                    ->orderByDesc('pt.dinilai_pada')
+                    ->orderByDesc('t.tenggat')
+                    ->get($parentTaskColumns);
             }
         }
 
