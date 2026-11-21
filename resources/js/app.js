@@ -419,23 +419,17 @@ if (dashboardSearch) {
     });
 }
 
-const RECORD_SEARCH_FOCUS_KEY = 'sinar:record-search-focus';
 document.querySelectorAll('[data-record-search]').forEach((input) => {
     const section = input.closest('.database-list-section');
     const form = input.closest('form');
-    const rows = Array.from(section?.querySelectorAll('[data-record-row]') ?? []);
-    const emptyState = section?.querySelector('[data-record-search-empty]');
-    let submitTimer = null;
+    const heading = section?.querySelector('.database-section-heading');
+    const countBadge = section?.querySelector('.database-result-count');
+    let fetchTimer = null;
+    let fetchController = null;
 
-    if (window.sessionStorage.getItem(RECORD_SEARCH_FOCUS_KEY) === window.location.pathname) {
-        window.sessionStorage.removeItem(RECORD_SEARCH_FOCUS_KEY);
-        input.focus();
-        const len = input.value.length;
-        input.setSelectionRange(len, len);
-    }
-
-    input.addEventListener('input', () => {
-        const query = input.value.trim().toLocaleLowerCase();
+    const filterCurrentRows = (query) => {
+        const rows = Array.from(section?.querySelectorAll('[data-record-row]') ?? []);
+        const emptyState = section?.querySelector('[data-record-search-empty]');
         let visibleRows = 0;
 
         rows.forEach((row) => {
@@ -447,14 +441,95 @@ document.querySelectorAll('[data-record-search]').forEach((input) => {
         if (emptyState) {
             emptyState.hidden = visibleRows !== 0;
         }
+    };
+
+    const syncLiveResults = async (rawQuery) => {
+        if (!form || !section || !heading) {
+            return;
+        }
+
+        if (fetchController) {
+            fetchController.abort();
+        }
+        fetchController = new AbortController();
+
+        const targetUrl = new URL(form.action || window.location.href, window.location.origin);
+        if (rawQuery !== '') {
+            targetUrl.searchParams.set('q', rawQuery);
+        } else {
+            targetUrl.searchParams.delete('q');
+        }
+        targetUrl.searchParams.delete('page');
+
+        try {
+            const response = await fetch(targetUrl.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: fetchController.signal,
+            });
+            if (!response.ok) {
+                return;
+            }
+
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const freshSection = doc.querySelector('.database-list-section');
+            if (!freshSection) {
+                return;
+            }
+
+            const freshCount = freshSection.querySelector('.database-result-count');
+            if (countBadge && freshCount) {
+                countBadge.textContent = freshCount.textContent;
+            }
+
+            while (heading.nextSibling) {
+                heading.nextSibling.remove();
+            }
+
+            const freshHeading = freshSection.querySelector('.database-section-heading');
+            let node = freshHeading?.nextSibling ?? null;
+            while (node) {
+                const next = node.nextSibling;
+                section.appendChild(document.importNode(node, true));
+                node = next;
+            }
+
+            window.history.replaceState({}, '', targetUrl.toString());
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                // Keep client-side filter state if network fails
+            }
+        }
+    };
+
+    input.addEventListener('input', () => {
+        const rawQuery = input.value.trim();
+        filterCurrentRows(rawQuery.toLocaleLowerCase());
 
         if (form) {
-            window.clearTimeout(submitTimer);
-            submitTimer = window.setTimeout(() => {
-                window.sessionStorage.setItem(RECORD_SEARCH_FOCUS_KEY, window.location.pathname);
-                form.requestSubmit ? form.requestSubmit() : form.submit();
-            }, 420);
+            window.clearTimeout(fetchTimer);
+            fetchTimer = window.setTimeout(() => {
+                syncLiveResults(rawQuery);
+            }, 220);
         }
+    });
+
+    form?.addEventListener('submit', (event) => {
+        event.preventDefault();
+        window.clearTimeout(fetchTimer);
+        syncLiveResults(input.value.trim());
+    });
+
+    section?.addEventListener('click', (event) => {
+        const resetLink = event.target.closest('.database-record-search-form a');
+        if (!resetLink) {
+            return;
+        }
+        event.preventDefault();
+        input.value = '';
+        window.clearTimeout(fetchTimer);
+        syncLiveResults('');
+        input.focus();
     });
 });
 
