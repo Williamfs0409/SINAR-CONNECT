@@ -6,6 +6,8 @@ use App\Models\Message;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -413,6 +415,224 @@ class SchoolDataController extends Controller
         ],
     ];
 
+    public function globalSearch(Request $request): JsonResponse
+    {
+        $user = auth()->user();
+        abort_unless($user instanceof User, 403);
+
+        $role = $user->role;
+        abort_unless(array_key_exists($role, self::ROLE_MODULES), 403);
+
+        $query = trim((string) $request->query('q', ''));
+        if (mb_strlen($query) < 2) {
+            return response()->json(['items' => []]);
+        }
+
+        $allowedModules = self::ROLE_MODULES[$role] ?? [];
+        $scope = $this->scopeFor($user, $role);
+        $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query).'%';
+        $items = [];
+
+        if (in_array('siswa', $allowedModules, true) && Schema::hasTable('siswa')) {
+            $students = DB::table('siswa as s')
+                ->when(in_array($role, ['teacher', 'parent'], true), fn (Builder $q) => $q->whereIn('s.id_siswa', $scope['studentIds']))
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('s.nama_lengkap', 'like', $like)
+                        ->orWhere('s.nama_panggilan', 'like', $like);
+                    if (Schema::hasColumn('siswa', 'nik')) {
+                        $w->orWhere('s.nik', 'like', $like)
+                            ->orWhere('s.nisn', 'like', $like)
+                            ->orWhere('s.no_induk', 'like', $like);
+                    }
+                })
+                ->orderBy('s.nama_lengkap')
+                ->limit(5)
+                ->get(['s.nama_lengkap', 's.nama_panggilan', 's.jenis_kelamin']);
+
+            foreach ($students as $student) {
+                $items[] = [
+                    'category' => 'Data Siswa',
+                    'label' => $student->nama_lengkap,
+                    'meta' => trim(($student->nama_panggilan ?: '').' · '.$student->jenis_kelamin, ' ·'),
+                    'url' => route('dashboard.feature', ['section' => 'siswa', 'q' => $student->nama_lengkap]),
+                ];
+            }
+        }
+
+        if (in_array('guru', $allowedModules, true) && Schema::hasTable('guru')) {
+            $teachers = DB::table('guru')
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('nama_lengkap', 'like', $like)
+                        ->orWhere('nuptk', 'like', $like)
+                        ->orWhere('jabatan', 'like', $like);
+                })
+                ->orderBy('nama_lengkap')
+                ->limit(5)
+                ->get(['nama_lengkap', 'jabatan']);
+
+            foreach ($teachers as $teacher) {
+                $items[] = [
+                    'category' => 'Data Guru',
+                    'label' => $teacher->nama_lengkap,
+                    'meta' => $teacher->jabatan ?: 'Guru',
+                    'url' => route('dashboard.feature', ['section' => 'guru', 'q' => $teacher->nama_lengkap]),
+                ];
+            }
+        }
+
+        if (in_array('kelas', $allowedModules, true) && Schema::hasTable('kelas')) {
+            $classes = DB::table('kelas')
+                ->when($role === 'teacher', fn (Builder $q) => $q->whereIn('id_kelas', $scope['classIds']))
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('nama_kelas', 'like', $like)
+                        ->orWhere('kelompok', 'like', $like);
+                })
+                ->orderBy('nama_kelas')
+                ->limit(4)
+                ->get(['nama_kelas', 'kelompok']);
+
+            foreach ($classes as $class) {
+                $items[] = [
+                    'category' => 'Data Kelas',
+                    'label' => $class->nama_kelas,
+                    'meta' => 'Kelompok '.$class->kelompok,
+                    'url' => route('dashboard.feature', ['section' => 'kelas', 'q' => $class->nama_kelas]),
+                ];
+            }
+        }
+
+        if (in_array('keluarga', $allowedModules, true) && Schema::hasTable('v_keluarga_lengkap')) {
+            $families = DB::table('v_keluarga_lengkap')
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('nama_ayah', 'like', $like)
+                        ->orWhere('nama_ibu', 'like', $like)
+                        ->orWhere('no_kk', 'like', $like)
+                        ->orWhere('no_hp_utama', 'like', $like);
+                })
+                ->limit(5)
+                ->get(['nama_ayah', 'nama_ibu', 'no_hp_utama']);
+
+            foreach ($families as $family) {
+                $label = trim(implode(' / ', array_filter([$family->nama_ayah, $family->nama_ibu]))) ?: 'Keluarga';
+                $keyword = $family->nama_ayah ?: ($family->nama_ibu ?: ($family->no_hp_utama ?: $query));
+                $items[] = [
+                    'category' => 'Data Keluarga',
+                    'label' => $label,
+                    'meta' => $family->no_hp_utama ?: 'Kontak belum ada',
+                    'url' => route('dashboard.feature', ['section' => 'keluarga', 'q' => $keyword]),
+                ];
+            }
+        }
+
+        if (in_array('pengguna', $allowedModules, true) && Schema::hasTable('users')) {
+            $users = DB::table('users')
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('name', 'like', $like)
+                        ->orWhere('email', 'like', $like)
+                        ->orWhere('role', 'like', $like);
+                })
+                ->orderBy('name')
+                ->limit(5)
+                ->get(['name', 'email', 'role']);
+
+            foreach ($users as $account) {
+                $items[] = [
+                    'category' => 'Pengguna',
+                    'label' => $account->name,
+                    'meta' => trim(($account->email ?: '').' · '.$account->role, ' ·'),
+                    'url' => route('dashboard.feature', ['section' => 'pengguna', 'q' => $account->name]),
+                ];
+            }
+        }
+
+        if (in_array('pendaftaran', $allowedModules, true) && Schema::hasTable('pendaftaran')) {
+            $registrations = DB::table('pendaftaran')
+                ->when($role === 'parent', fn (Builder $q) => $q->where('id_keluarga', $scope['familyId'] ?? -1))
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('nama_calon', 'like', $like)
+                        ->orWhere('no_pendaftaran', 'like', $like)
+                        ->orWhere('status', 'like', $like);
+                })
+                ->orderByDesc('tanggal_daftar')
+                ->limit(4)
+                ->get(['nama_calon', 'no_pendaftaran', 'status']);
+
+            foreach ($registrations as $registration) {
+                $items[] = [
+                    'category' => 'Pendaftaran',
+                    'label' => $registration->nama_calon,
+                    'meta' => trim(($registration->no_pendaftaran ?: '').' · '.$registration->status, ' ·'),
+                    'url' => route('dashboard.feature', ['section' => 'pendaftaran', 'q' => $registration->nama_calon]),
+                ];
+            }
+        }
+
+        if (in_array('tagihan', $allowedModules, true) && Schema::hasTable('v_tagihan_detail')) {
+            $invoices = DB::table('v_tagihan_detail')
+                ->when($role === 'parent', fn (Builder $q) => $q->whereIn('id_siswa', $scope['studentIds']))
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('nama_lengkap', 'like', $like)
+                        ->orWhere('jenis_biaya', 'like', $like)
+                        ->orWhere('periode', 'like', $like);
+                })
+                ->limit(4)
+                ->get(['nama_lengkap', 'jenis_biaya', 'periode', 'status_bayar']);
+
+            foreach ($invoices as $invoice) {
+                $items[] = [
+                    'category' => 'Tagihan',
+                    'label' => $invoice->nama_lengkap.' — '.$invoice->jenis_biaya,
+                    'meta' => trim(($invoice->periode ?: '').' · '.$invoice->status_bayar, ' ·'),
+                    'url' => route('dashboard.feature', ['section' => 'tagihan', 'q' => $invoice->nama_lengkap]),
+                ];
+            }
+        }
+
+        if (in_array('tugas', $allowedModules, true) && Schema::hasTable('tugas')) {
+            $tasks = DB::table('tugas')
+                ->when(in_array($role, ['teacher', 'parent'], true), fn (Builder $q) => $q->whereIn('id_kelas', $scope['classIds']))
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('judul', 'like', $like)
+                        ->orWhere('kategori', 'like', $like);
+                })
+                ->orderByDesc('tenggat')
+                ->limit(4)
+                ->get(['judul', 'kategori', 'tenggat']);
+
+            foreach ($tasks as $task) {
+                $items[] = [
+                    'category' => 'Tugas',
+                    'label' => $task->judul,
+                    'meta' => trim(($task->kategori ?: '').' · Tenggat '.$task->tenggat, ' ·'),
+                    'url' => route('dashboard.feature', ['section' => 'tugas', 'q' => $task->judul]),
+                ];
+            }
+        }
+
+        if (in_array('kegiatan', $allowedModules, true) && Schema::hasTable('kegiatan')) {
+            $activities = DB::table('kegiatan')
+                ->where(function (Builder $w) use ($like): void {
+                    $w->where('nama_kegiatan', 'like', $like)
+                        ->orWhere('jenis', 'like', $like)
+                        ->orWhere('lokasi', 'like', $like);
+                })
+                ->orderByDesc('tanggal')
+                ->limit(4)
+                ->get(['nama_kegiatan', 'jenis', 'tanggal']);
+
+            foreach ($activities as $activity) {
+                $items[] = [
+                    'category' => 'Kegiatan',
+                    'label' => $activity->nama_kegiatan,
+                    'meta' => trim(($activity->jenis ?: '').' · '.$activity->tanggal, ' ·'),
+                    'url' => route('dashboard.feature', ['section' => 'kegiatan', 'q' => $activity->nama_kegiatan]),
+                ];
+            }
+        }
+
+        return response()->json(['items' => array_slice($items, 0, 20)]);
+    }
+
     public function show(?string $section = null): View
     {
         $user = auth()->user();
@@ -692,8 +912,23 @@ class SchoolDataController extends Controller
                 ]);
             }
 
-            $data['studentProfiles'] = DB::table('siswa')
-                ->orderBy('nama_lengkap')
+            $studentProfileQuery = DB::table('siswa')->orderBy('nama_lengkap');
+            $studentSearch = trim((string) request()->query('q', ''));
+            if ($studentSearch !== '') {
+                $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $studentSearch).'%';
+                $studentProfileQuery->where(function (Builder $where) use ($like): void {
+                    $where->where('nama_lengkap', 'like', $like)
+                        ->orWhere('nama_panggilan', 'like', $like)
+                        ->orWhere('alamat_domisili', 'like', $like);
+                    if (Schema::hasColumn('siswa', 'nik')) {
+                        $where->orWhere('no_induk', 'like', $like)
+                            ->orWhere('nik', 'like', $like)
+                            ->orWhere('nisn', 'like', $like);
+                    }
+                });
+            }
+
+            $data['studentProfiles'] = $studentProfileQuery
                 ->paginate(30, $studentColumns, 'profile_page')
                 ->withQueryString();
 

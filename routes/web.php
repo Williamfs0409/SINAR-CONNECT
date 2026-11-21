@@ -8,6 +8,7 @@ use App\Http\Controllers\PasswordResetRequestsController;
 use App\Http\Controllers\PasswordSecurityController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\SchoolDataController;
 use App\Http\Controllers\SchoolFeatureController;
 use App\Http\Middleware\EnsurePasswordChange;
 use App\Http\Middleware\SetAuditUserContext;
@@ -57,6 +58,9 @@ Route::middleware('auth')->group(function () {
 Route::get('/dashboard', [DashboardController::class, 'show'])
     ->middleware(EnsurePasswordChange::class)
     ->name('dashboard');
+Route::get('/dashboard/cari-global', [SchoolDataController::class, 'globalSearch'])
+    ->middleware(['auth', EnsurePasswordChange::class])
+    ->name('dashboard.global-search');
 Route::get('/dashboard/{section}', [DashboardController::class, 'show'])
     ->where('section', '[a-z-]+')
     ->middleware(EnsurePasswordChange::class)

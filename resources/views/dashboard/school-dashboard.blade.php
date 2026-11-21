@@ -53,7 +53,8 @@
             </a>
             <label class="portal-dashboard-search">
                 <span aria-hidden="true">⌕</span>
-                <input type="search" data-dashboard-search placeholder="Cari menu..." aria-label="Cari menu">
+                <input type="search" data-dashboard-search data-global-search-url="{{ route('dashboard.global-search') }}" placeholder="Cari menu atau data..." aria-label="Cari menu atau data" autocomplete="off">
+                <div class="portal-global-search-results" data-global-search-results hidden></div>
             </label>
             <div class="portal-dashboard-term">
                 <span>Semester {{ $currentAcademicDate->month >= 7 ? 'Ganjil' : 'Genap' }} · T.A. {{ $academicStartYear }}/{{ $academicStartYear + 1 }}</span>
@@ -314,7 +315,7 @@
                             <form method="GET" action="{{ url()->current() }}" class="database-record-search-form">
                                 <label class="database-record-search">
                                     <span>Cari data</span>
-                                    <input type="search" name="q" value="{{ request()->query('q') }}" data-record-search placeholder="Ketik &amp; tekan Enter..." aria-label="Cari data">
+                                    <input type="search" name="q" value="{{ request()->query('q') }}" data-record-search placeholder="Cari di semua halaman..." aria-label="Cari data">
                                 </label>
                                 <button class="database-button database-button-secondary" type="submit">Cari</button>
                                 @if (filled(request()->query('q')))

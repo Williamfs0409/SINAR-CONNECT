@@ -240,9 +240,65 @@ if (dashboardSearch) {
     const navigationLinks = searchableNavigation?.querySelectorAll('[data-dashboard-searchable]') ?? [];
     const navigationLinkSet = new Set(navigationLinks);
     const navigationSearchEmpty = document.querySelector('[data-dashboard-search-empty]');
+    const globalSearchUrl = dashboardSearch.dataset.globalSearchUrl;
+    const globalSearchResults = document.querySelector('[data-global-search-results]');
+    let globalSearchTimer = null;
+    let globalSearchController = null;
+
+    const renderGlobalResults = (items, query) => {
+        if (!globalSearchResults) {
+            return;
+        }
+        if (query.length < 2) {
+            globalSearchResults.hidden = true;
+            globalSearchResults.innerHTML = '';
+            return;
+        }
+
+        globalSearchResults.innerHTML = '';
+        if (!items || items.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'portal-global-search-empty';
+            empty.textContent = `Tidak ada data yang cocok untuk "${query}".`;
+            globalSearchResults.appendChild(empty);
+            globalSearchResults.hidden = false;
+            return;
+        }
+
+        items.forEach((item) => {
+            const link = document.createElement('a');
+            link.className = 'portal-global-search-item';
+            link.href = item.url;
+
+            const badge = document.createElement('span');
+            badge.className = 'portal-global-search-category';
+            badge.textContent = item.category;
+
+            const body = document.createElement('span');
+            body.className = 'portal-global-search-body';
+
+            const title = document.createElement('strong');
+            title.textContent = item.label;
+
+            const meta = document.createElement('small');
+            meta.textContent = item.meta || '';
+
+            body.appendChild(title);
+            if (item.meta) {
+                body.appendChild(meta);
+            }
+
+            link.appendChild(badge);
+            link.appendChild(body);
+            globalSearchResults.appendChild(link);
+        });
+
+        globalSearchResults.hidden = false;
+    };
 
     dashboardSearch.addEventListener('input', () => {
-        const query = dashboardSearch.value.trim().toLocaleLowerCase();
+        const rawQuery = dashboardSearch.value.trim();
+        const query = rawQuery.toLocaleLowerCase();
         let navigationMatches = 0;
 
         searchableLinks.forEach((link) => {
@@ -261,13 +317,65 @@ if (dashboardSearch) {
         });
 
         navigationSearchEmpty?.classList.toggle('is-visible', query !== '' && navigationMatches === 0);
+
+        if (globalSearchUrl && globalSearchResults) {
+            window.clearTimeout(globalSearchTimer);
+            if (globalSearchController) {
+                globalSearchController.abort();
+            }
+            if (rawQuery.length < 2) {
+                renderGlobalResults([], rawQuery);
+                return;
+            }
+
+            globalSearchTimer = window.setTimeout(async () => {
+                globalSearchController = new AbortController();
+                try {
+                    const response = await fetch(`${globalSearchUrl}?q=${encodeURIComponent(rawQuery)}`, {
+                        headers: { Accept: 'application/json' },
+                        signal: globalSearchController.signal,
+                    });
+                    if (!response.ok) {
+                        return;
+                    }
+                    const payload = await response.json();
+                    renderGlobalResults(payload.items ?? [], rawQuery);
+                } catch (error) {
+                    if (error?.name !== 'AbortError') {
+                        globalSearchResults.hidden = true;
+                    }
+                }
+            }, 220);
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (globalSearchResults && !event.target.closest('.portal-dashboard-search')) {
+            globalSearchResults.hidden = true;
+        }
+    });
+
+    dashboardSearch.addEventListener('focus', () => {
+        if (globalSearchResults && dashboardSearch.value.trim().length >= 2 && globalSearchResults.children.length > 0) {
+            globalSearchResults.hidden = false;
+        }
     });
 }
 
+const RECORD_SEARCH_FOCUS_KEY = 'sinar:record-search-focus';
 document.querySelectorAll('[data-record-search]').forEach((input) => {
     const section = input.closest('.database-list-section');
+    const form = input.closest('form');
     const rows = Array.from(section?.querySelectorAll('[data-record-row]') ?? []);
     const emptyState = section?.querySelector('[data-record-search-empty]');
+    let submitTimer = null;
+
+    if (window.sessionStorage.getItem(RECORD_SEARCH_FOCUS_KEY) === window.location.pathname) {
+        window.sessionStorage.removeItem(RECORD_SEARCH_FOCUS_KEY);
+        input.focus();
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
+    }
 
     input.addEventListener('input', () => {
         const query = input.value.trim().toLocaleLowerCase();
@@ -282,7 +390,174 @@ document.querySelectorAll('[data-record-search]').forEach((input) => {
         if (emptyState) {
             emptyState.hidden = visibleRows !== 0;
         }
+
+        if (form) {
+            window.clearTimeout(submitTimer);
+            submitTimer = window.setTimeout(() => {
+                window.sessionStorage.setItem(RECORD_SEARCH_FOCUS_KEY, window.location.pathname);
+                form.requestSubmit ? form.requestSubmit() : form.submit();
+            }, 420);
+        }
     });
+});
+
+/* Pencarian otomatis untuk semua <select> panjang (>= 5 opsi) */
+document.querySelectorAll('.database-action-panel select, .registration-form select').forEach((select) => {
+    if (select.dataset.searchableInitialized === '1' || select.multiple || select.options.length < 5) {
+        return;
+    }
+    select.dataset.searchableInitialized = '1';
+
+    const originalOptions = Array.from(select.options).map((option) => ({
+        value: option.value,
+        text: option.textContent ?? '',
+        disabled: option.disabled,
+        dataset: { ...option.dataset },
+    }));
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'searchable-select-wrap';
+    select.parentNode.insertBefore(wrapper, select);
+
+    const searchRow = document.createElement('div');
+    searchRow.className = 'searchable-select-bar';
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'search';
+    searchInput.className = 'searchable-select-input';
+    searchInput.placeholder = 'Ketik untuk mencari pilihan...';
+    searchInput.setAttribute('aria-label', 'Cari pilihan');
+
+    const countBadge = document.createElement('span');
+    countBadge.className = 'searchable-select-count';
+    countBadge.textContent = `${originalOptions.filter((opt) => opt.value !== '').length} opsi`;
+
+    searchRow.appendChild(searchInput);
+    searchRow.appendChild(countBadge);
+    wrapper.appendChild(searchRow);
+    wrapper.appendChild(select);
+
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.trim().toLocaleLowerCase();
+        const previousValue = select.value;
+
+        const filtered = originalOptions.filter((opt) => {
+            if (opt.value === '') {
+                return true;
+            }
+            return query === '' || opt.text.toLocaleLowerCase().includes(query);
+        });
+
+        select.innerHTML = '';
+        filtered.forEach((opt) => {
+            const optionEl = document.createElement('option');
+            optionEl.value = opt.value;
+            optionEl.textContent = opt.text;
+            optionEl.disabled = opt.disabled;
+            Object.entries(opt.dataset).forEach(([k, v]) => {
+                optionEl.dataset[k] = v;
+            });
+            select.appendChild(optionEl);
+        });
+
+        const selectableMatches = filtered.filter((opt) => opt.value !== '' && !opt.disabled);
+        countBadge.textContent = query === ''
+            ? `${originalOptions.filter((opt) => opt.value !== '').length} opsi`
+            : `${selectableMatches.length} cocok`;
+
+        if (filtered.some((opt) => opt.value === previousValue)) {
+            select.value = previousValue;
+        } else if (selectableMatches.length > 0) {
+            select.value = selectableMatches[0].value;
+        } else {
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = 'Tidak ada pilihan yang cocok';
+            emptyOpt.disabled = true;
+            select.appendChild(emptyOpt);
+        }
+
+        if (select.value !== previousValue) {
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+});
+
+/* Pencarian instan pada daftar kartu/editor/absensi di semua panel aksi */
+const attachInlineListSearch = (container, items, insertBeforeNode, placeholder = 'Cari di daftar ini...') => {
+    if (items.length < 4) {
+        return;
+    }
+
+    const searchBar = document.createElement('div');
+    searchBar.className = 'panel-inline-search';
+
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.placeholder = placeholder;
+    input.setAttribute('aria-label', placeholder);
+
+    const count = document.createElement('span');
+    count.className = 'panel-inline-search-count';
+    count.textContent = `${items.length} data`;
+
+    const empty = document.createElement('p');
+    empty.className = 'database-filter-empty';
+    empty.hidden = true;
+    empty.textContent = 'Tidak ada data pada daftar ini yang cocok.';
+
+    searchBar.appendChild(input);
+    searchBar.appendChild(count);
+
+    container.insertBefore(searchBar, insertBeforeNode);
+    container.insertBefore(empty, insertBeforeNode);
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim().toLocaleLowerCase();
+        let visible = 0;
+
+        items.forEach((item) => {
+            const matches = query === '' || item.textContent.toLocaleLowerCase().includes(query);
+            item.hidden = !matches;
+            visible += Number(matches);
+        });
+
+        count.textContent = query === '' ? `${items.length} data` : `${visible} / ${items.length} cocok`;
+        empty.hidden = visible !== 0;
+    });
+};
+
+const ACTION_ITEM_SELECTOR = '.database-student-editor, .database-action-details, .database-action-row, .database-inline-card, .submission-card';
+
+document.querySelectorAll('.database-action-panel').forEach((panel) => {
+    let currentGroup = [];
+
+    const flushGroup = () => {
+        if (currentGroup.length >= 4) {
+            attachInlineListSearch(panel, currentGroup, currentGroup[0]);
+        }
+        currentGroup = [];
+    };
+
+    Array.from(panel.children).forEach((child) => {
+        if (child.matches(ACTION_ITEM_SELECTOR)) {
+            currentGroup.push(child);
+        } else {
+            flushGroup();
+        }
+    });
+    flushGroup();
+});
+
+document.querySelectorAll('.database-attendance-list').forEach((list) => {
+    const rows = Array.from(list.querySelectorAll(':scope > .database-attendance-row'));
+    const form = list.closest('form');
+    const header = form?.querySelector('.database-attendance-header');
+    if (form && header) {
+        attachInlineListSearch(form, rows, header, 'Cari nama siswa di daftar absensi...');
+    } else {
+        attachInlineListSearch(list, rows, rows[0], 'Cari nama siswa di daftar absensi...');
+    }
 });
 
 document.querySelectorAll('.password-toggle').forEach((passwordToggle) => {
