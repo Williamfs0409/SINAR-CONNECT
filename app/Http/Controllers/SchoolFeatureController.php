@@ -494,19 +494,20 @@ class SchoolFeatureController extends Controller
         $family = DB::table('keluarga')->where('id_keluarga', $familyId)->first();
         abort_unless($family !== null, 404);
 
-        if ($family->id_user !== null) {
-            throw ValidationException::withMessages([
-                'delete' => 'Data keluarga masih terhubung ke akun orang tua. Lepaskan hubungan akun terlebih dahulu.',
-            ]);
-        }
-
         $this->assertNoDeleteDependencies($familyId, [
             ['siswa', 'id_keluarga', 'data siswa'],
-            ['kontak_keluarga', 'id_keluarga', 'kontak keluarga'],
-            ['wali', 'id_keluarga', 'data wali'],
         ], 'keluarga');
 
-        DB::table('keluarga')->where('id_keluarga', $familyId)->delete();
+        DB::transaction(function () use ($familyId): void {
+            if (Schema::hasTable('kontak_keluarga')) {
+                DB::table('kontak_keluarga')->where('id_keluarga', $familyId)->delete();
+            }
+            if (Schema::hasTable('wali')) {
+                DB::table('wali')->where('id_keluarga', $familyId)->delete();
+            }
+
+            DB::table('keluarga')->where('id_keluarga', $familyId)->delete();
+        });
 
         return back()->with('status', 'Data keluarga berhasil dihapus.');
     }
@@ -531,8 +532,6 @@ class SchoolFeatureController extends Controller
         }
 
         $this->assertNoDeleteDependencies($userId, [
-            ['keluarga', 'id_user', 'data keluarga'],
-            ['guru', 'id_user', 'data guru'],
             ['absensi', 'id_user_pencatat', 'catatan absensi'],
             ['dokumentasi_kegiatan', 'id_user_upload', 'dokumentasi kegiatan'],
             ['kegiatan', 'id_user_pembuat', 'kegiatan'],
@@ -541,10 +540,35 @@ class SchoolFeatureController extends Controller
             ['pendaftaran', 'id_user_verifikator', 'verifikasi pendaftaran'],
             ['transaksi_tabungan', 'id_user_pencatat', 'catatan transaksi tabungan'],
             ['audit_log', 'app_user_id', 'riwayat perubahan'],
-            ['sessions', 'user_id', 'sesi login'],
         ], 'akun pengguna');
 
-        DB::table('users')->where('id_user', $userId)->delete();
+        DB::transaction(function () use ($userId): void {
+            if (Schema::hasTable('keluarga') && Schema::hasColumn('keluarga', 'id_user')) {
+                DB::table('keluarga')->where('id_user', $userId)->update(['id_user' => null]);
+            }
+            if (Schema::hasTable('guru') && Schema::hasColumn('guru', 'id_user')) {
+                DB::table('guru')->where('id_user', $userId)->update(['id_user' => null]);
+            }
+            if (Schema::hasTable('sessions') && Schema::hasColumn('sessions', 'user_id')) {
+                DB::table('sessions')->where('user_id', $userId)->delete();
+            }
+            if (Schema::hasTable('password_reset_requests')) {
+                if (Schema::hasColumn('password_reset_requests', 'user_id')) {
+                    DB::table('password_reset_requests')->where('user_id', $userId)->delete();
+                }
+                if (Schema::hasColumn('password_reset_requests', 'reviewed_by')) {
+                    DB::table('password_reset_requests')->where('reviewed_by', $userId)->update(['reviewed_by' => null]);
+                }
+            }
+            if (Schema::hasTable('messages')) {
+                DB::table('messages')
+                    ->where('sender_id', $userId)
+                    ->orWhere('recipient_id', $userId)
+                    ->delete();
+            }
+
+            DB::table('users')->where('id_user', $userId)->delete();
+        });
 
         return back()->with('status', 'Akun pengguna berhasil dihapus.');
     }

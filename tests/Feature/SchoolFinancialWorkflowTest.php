@@ -347,6 +347,51 @@ class SchoolFinancialWorkflowTest extends TestCase
         $this->assertDatabaseHas('users', ['id_user' => $admin->id_user]);
     }
 
+    public function test_admin_can_delete_empty_linked_family_and_linked_parent_user(): void
+    {
+        Schema::create('keluarga', function (Blueprint $table): void {
+            $table->increments('id_keluarga');
+            $table->unsignedBigInteger('id_user')->nullable()->unique();
+        });
+        Schema::create('siswa', function (Blueprint $table): void {
+            $table->increments('id_siswa');
+            $table->unsignedInteger('id_keluarga');
+            $table->string('nama_lengkap');
+        });
+        Schema::create('wali', function (Blueprint $table): void {
+            $table->increments('id_wali');
+            $table->unsignedInteger('id_keluarga');
+            $table->string('nama_lengkap');
+        });
+        Schema::create('kontak_keluarga', function (Blueprint $table): void {
+            $table->increments('id_kontak');
+            $table->unsignedInteger('id_keluarga');
+            $table->string('nomor');
+        });
+
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $parentA = User::factory()->create(['role' => 'parent', 'is_active' => true]);
+        $parentB = User::factory()->create(['role' => 'parent', 'is_active' => true]);
+
+        DB::table('keluarga')->insert([
+            ['id_keluarga' => 10, 'id_user' => $parentA->id_user],
+            ['id_keluarga' => 11, 'id_user' => $parentB->id_user],
+        ]);
+        DB::table('wali')->insert(['id_keluarga' => 10, 'nama_lengkap' => 'Naufal Dzaki']);
+        DB::table('kontak_keluarga')->insert(['id_keluarga' => 10, 'nomor' => '089267676969']);
+
+        $this->actingAs($admin)
+            ->delete(route('database.family.destroy', ['family' => 10]))
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('keluarga', ['id_keluarga' => 10]);
+
+        $this->actingAs($admin)
+            ->delete(route('database.user.destroy', ['user' => $parentB->id_user]))
+            ->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('users', ['id_user' => $parentB->id_user]);
+        $this->assertDatabaseHas('keluarga', ['id_keluarga' => 11, 'id_user' => null]);
+    }
+
     public function test_admin_can_update_family_contact_details(): void
     {
         Schema::create('keluarga', function (Blueprint $table): void {
