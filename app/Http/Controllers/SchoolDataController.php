@@ -405,6 +405,7 @@ class SchoolDataController extends Controller
             'columns' => [
                 'id_keluarga' => 'ID keluarga',
                 'jumlah_siswa' => 'Jumlah siswa',
+                'daftar_anak' => 'Nama anak',
                 'akun_orangtua' => 'Akun orang tua',
                 'nama_ayah' => 'Ayah',
                 'nama_ibu' => 'Ibu',
@@ -664,7 +665,7 @@ class SchoolDataController extends Controller
             'records' => $records,
             'actions' => $this->actionDataFor($section, $user, $role, $scope),
             'hasLinkedStudents' => $role !== 'parent' || $scope['studentIds'] !== [],
-            'cards' => $section === 'ringkasan' ? $this->summaryFor($role, $scope) : [],
+            'cards' => $section === 'ringkasan' ? $this->summaryFor($role, $scope, $user) : [],
             'messageCenterReady' => $messageCenterReady,
             'passwordResetAttentionCount' => $passwordResetAttentionCount,
             'unreadMessageCount' => $messageCenterReady ? Message::query()
@@ -1471,6 +1472,24 @@ class SchoolDataController extends Controller
             $data['portfolioRosters'] = $data['rosters'] ?? collect();
         }
 
+        if ($section === 'rekap-pembayaran' && in_array($role, ['admin', 'principal'], true) && DB::connection()->getDriverName() === 'mysql') {
+            $monthStart = now('Asia/Jakarta')->startOfMonth()->toDateString();
+            $monthEnd = now('Asia/Jakarta')->endOfMonth()->toDateString();
+            $reportSets = $this->callReadProcedure('CALL sp_laporan_keuangan(?, ?)', [$monthStart, $monthEnd]);
+            $data['financialReportBreakdown'] = collect($reportSets[0] ?? []);
+            $data['financialReportSummary'] = $reportSets[1][0] ?? null;
+        }
+
+        if ($section === 'absensi' && DB::connection()->getDriverName() === 'mysql') {
+            $recapClassId = (int) request()->query('kelas', (int) (($data['classes'][0]->id_kelas ?? null) ?: ($scope['classIds'][0] ?? 0)));
+            $recapMonth = (int) request()->query('bulan', (int) now('Asia/Jakarta')->month);
+            $recapYear = (int) request()->query('tahun', (int) now('Asia/Jakarta')->year);
+            if ($recapClassId > 0) {
+                $recapSets = $this->callReadProcedure('CALL sp_rekap_kehadiran(?, ?, ?)', [$recapClassId, $recapMonth, $recapYear]);
+                $data['attendanceProcedureRecap'] = collect($recapSets[0] ?? []);
+            }
+        }
+
         return $data;
     }
 
@@ -1778,6 +1797,10 @@ class SchoolDataController extends Controller
 
     private function familyQuery(): Builder
     {
+        $childrenConcatExpr = DB::connection()->getDriverName() === 'sqlite'
+            ? "GROUP_CONCAT(s.nama_lengkap, ', ')"
+            : "GROUP_CONCAT(s.nama_lengkap ORDER BY s.nama_lengkap SEPARATOR ', ')";
+
         return DB::table('keluarga as f')
             ->leftJoin('v_keluarga_lengkap as vf', 'vf.id_keluarga', '=', 'f.id_keluarga')
             ->leftJoin('users as u', 'u.id_user', '=', 'f.id_user')
@@ -1795,6 +1818,12 @@ class SchoolDataController extends Controller
                     ->whereColumn('s.id_keluarga', 'f.id_keluarga')
                     ->selectRaw('COUNT(*)'),
                 'jumlah_siswa'
+            )
+            ->selectSub(
+                DB::table('siswa as s')
+                    ->whereColumn('s.id_keluarga', 'f.id_keluarga')
+                    ->selectRaw($childrenConcatExpr),
+                'daftar_anak'
             )
             ->selectSub(
                 DB::table('wali as w')
@@ -2060,7 +2089,7 @@ class SchoolDataController extends Controller
         return $query->orderByDesc('tt.tanggal');
     }
 
-    private function summaryFor(string $role, array $scope): array
+    private function summaryFor(string $role, array $scope, ?User $user = null): array
     {
         if (in_array($role, ['admin', 'principal'], true)) {
             $overview = DB::table('v_dashboard_kepala_sekolah')->first();
@@ -2096,6 +2125,21 @@ class SchoolDataController extends Controller
             ];
         }
 
+        if ($user instanceof User && DB::connection()->getDriverName() === 'mysql') {
+            $sets = $this->callReadProcedure('CALL sp_portal_ringkasan_anak(?)', [(int) $user->getKey()]);
+            $children = collect($sets[0] ?? []);
+            $unpaid = DB::table('v_tagihan_detail')
+                ->whereIn('id_siswa', $scope['studentIds'])
+                ->where('sisa', '>', 0)
+                ->sum('sisa');
+
+            return [
+                ['label' => 'Anak terhubung', 'value' => $children->isNotEmpty() ? $children->count() : count($scope['studentIds'])],
+                ['label' => 'Tagihan belum lunas', 'value' => $this->rupiah($unpaid)],
+                ['label' => 'Saldo tabungan', 'value' => $this->rupiah($children->sum('saldo_tabungan'))],
+            ];
+        }
+
         $unpaid = DB::table('v_tagihan_detail')
             ->whereIn('id_siswa', $scope['studentIds'])
             ->where('sisa', '>', 0)
@@ -2108,6 +2152,28 @@ class SchoolDataController extends Controller
                 DB::table('v_saldo_tabungan')->whereIn('id_siswa', $scope['studentIds'])->sum('saldo')
             )],
         ];
+    }
+
+    /**
+     * Execute a read-only MySQL stored procedure and drain all result sets cleanly.
+     *
+     * @param  array<int, mixed>  $bindings
+     * @return array<int, array<int, object>>
+     */
+    private function callReadProcedure(string $sql, array $bindings): array
+    {
+        $pdo = DB::connection()->getPdo();
+        $statement = $pdo->prepare($sql);
+        $statement->execute($bindings);
+        $resultSets = [];
+        do {
+            if ($statement->columnCount() > 0) {
+                $resultSets[] = $statement->fetchAll(\PDO::FETCH_OBJ);
+            }
+        } while ($statement->nextRowset());
+        $statement->closeCursor();
+
+        return $resultSets;
     }
 
     private function roleName(string $role): string

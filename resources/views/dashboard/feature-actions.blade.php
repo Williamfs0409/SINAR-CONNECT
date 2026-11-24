@@ -1074,7 +1074,7 @@
             <label class="database-form-wide">Tujuan<textarea name="tujuan" rows="2"></textarea></label>
             <label class="database-form-wide">Kegiatan<textarea name="kegiatan" rows="3"></textarea></label>
             <label class="database-form-wide">Alat dan bahan<textarea name="alat_bahan" rows="2"></textarea></label>
-            <label>Status<select name="status"><option>Draft</option><option>Final</option></select></label>
+            <label>Status<select name="status" required><option>Draft</option><option>Final</option></select></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Simpan rencana</button></div>
         </form>
     </section>
@@ -1318,8 +1318,8 @@
                     @endforeach
                 </select>
             </label>
-            <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
-            <label>Capaian<select name="skala"><option value="BB">BB = Belum Berkembang</option><option value="MB">MB = Mulai Berkembang</option><option value="BSH" selected>BSH = Berkembang Sesuai Harapan</option><option value="BSB">BSB = Berkembang Sangat Baik</option></select></label>
+            <label>Semester<select name="semester" required><option>Ganjil</option><option>Genap</option></select></label>
+            <label>Capaian<select name="skala" required><option value="BB">BB = Belum Berkembang</option><option value="MB">MB = Mulai Berkembang</option><option value="BSH" selected>BSH = Berkembang Sesuai Harapan</option><option value="BSB">BSB = Berkembang Sangat Baik</option></select></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Simpan nilai</button></div>
         </form>
     </section>
@@ -1345,9 +1345,9 @@
         <form method="POST" action="{{ route('database.report.store') }}" class="database-form-grid">
             @csrf
             <label>Siswa / kelas<select name="id_rombel" required>@foreach ($rosterOptions as $roster)<option value="{{ $roster->id_rombel }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }}</option>@endforeach</select></label>
-            <label>Semester<select name="semester"><option>Ganjil</option><option>Genap</option></select></label>
+            <label>Semester<select name="semester" required><option>Ganjil</option><option>Genap</option></select></label>
             <label>Tanggal rapor<input type="date" name="tanggal_rapor" value="{{ now()->toDateString() }}"></label>
-            <label>Status<select name="status"><option value="Final" selected>Final</option></select></label>
+            <label>Status<select name="status" required><option value="Final" selected>Final</option></select></label>
             <label>Tinggi badan (cm)<input type="number" step="0.1" name="tinggi_badan" min="30" max="180"></label>
             <label>Berat badan (kg)<input type="number" step="0.1" name="berat_badan" min="5" max="120"></label>
             @if (($actions['iqroTeachers'] ?? collect())->isNotEmpty())
@@ -1452,7 +1452,7 @@
             @csrf
             <label>Kelas<select name="id_kelas" required>@foreach ($classOptions as $class)<option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>@endforeach</select></label>
             <label>Nama kegiatan<input name="nama_kegiatan" maxlength="150" required></label>
-            <label>Jenis<select name="jenis"><option>Dalam Kelas</option><option>Luar Kelas</option><option>Field Trip</option></select></label>
+            <label>Jenis<select name="jenis" required><option>Dalam Kelas</option><option>Luar Kelas</option><option>Field Trip</option></select></label>
             <label>Tanggal<input type="date" name="tanggal" required></label>
             <label>Lokasi<input name="lokasi" maxlength="150"></label>
             <label class="database-form-wide">Keterangan<textarea name="deskripsi" rows="3"></textarea></label>
@@ -1463,7 +1463,7 @@
             <form method="POST" action="{{ route('database.activity.photo.store', ['activity' => $activity->id_kegiatan]) }}" enctype="multipart/form-data" class="database-inline-form">
                 @csrf
                 <strong>{{ $activity->nama_kegiatan }} · {{ $activity->tanggal }}</strong>
-                <select name="tahap"><option>Selama</option><option>Sebelum</option><option>Sesudah</option></select>
+                <select name="tahap" required><option>Selama</option><option>Sebelum</option><option>Sesudah</option></select>
                 <input type="file" name="foto[]" aria-label="Pilih foto dokumentasi" accept="image/jpeg,image/png,image/webp" multiple required data-activity-photo-input data-max-files="10" data-max-mb="5">
                 <input name="keterangan" maxlength="255" placeholder="Keterangan foto">
                 <button class="database-button" type="submit">Upload foto</button>
@@ -1637,9 +1637,9 @@
             <form method="POST" action="{{ route('database.savings.store') }}" class="database-form-grid">
                 @csrf
                 <label>Siswa<select name="id_siswa" required>@foreach ($actions['activeStudents'] ?? [] as $student)<option value="{{ $student->id_siswa }}">{{ $student->nama_lengkap }}</option>@endforeach</select></label>
-                <label>Jenis<select name="jenis"><option>Setor</option><option>Tarik</option></select></label>
+                <label>Jenis<select name="jenis" required><option>Setor</option><option>Tarik</option></select></label>
                 <label>Jumlah<input type="number" name="jumlah" min="1" step="0.01" required></label>
-                <label>Metode<select name="metode"><option>Tunai</option><option>Transfer</option></select></label>
+                <label>Metode<select name="metode" required><option>Tunai</option><option>Transfer</option></select></label>
                 <label class="database-form-wide">Keterangan<input name="keterangan" maxlength="255"></label>
                 <div class="database-form-wide"><button class="database-button" type="submit">Catat transaksi tabungan</button></div>
             </form>
@@ -1767,7 +1767,7 @@
                         <label>Metode<select name="metode" required>
                             <option value="Tunai">Tunai</option><option value="Transfer">Transfer</option>
                         </select></label>
-                        <label>Bukti transfer (JPG/PNG/PDF, maks. 5 MB)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" data-max-mb="5"></label>
+                        <label>Bukti transfer (JPG/PNG/PDF, maks. 5 MB)<input type="file" name="bukti_transfer" accept=".jpg,.jpeg,.png,.pdf" data-max-mb="5" data-required-when-method="Transfer"></label>
                         <label class="database-form-wide">Catatan<input name="catatan" maxlength="255"></label>
                         <div class="database-form-wide"><button class="database-button" type="submit">Simpan pembayaran</button></div>
                     </form>
@@ -1890,7 +1890,7 @@
             @csrf
             <label>Nama<input name="name" maxlength="100" required></label>
             <label>Email<input type="email" name="email" maxlength="150" required></label>
-            <label>Peran<select name="role"><option value="teacher">Guru</option><option value="principal">Kepala sekolah</option><option value="parent">Orang tua</option><option value="admin">Administrator</option></select></label>
+            <label>Peran<select name="role" required><option value="teacher">Guru</option><option value="principal">Kepala sekolah</option><option value="parent">Orang tua</option><option value="admin">Administrator</option></select></label>
             <label>Kata sandi
                 <span class="registration-password-wrap">
                     <input id="database-user-password" type="password" name="password" minlength="8" autocomplete="new-password" required>

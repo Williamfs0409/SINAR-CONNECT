@@ -175,6 +175,34 @@ class SchoolFeatureController extends Controller
             'id_diskon' => ['nullable', 'integer'],
         ]);
 
+        if ($this->isMysql()) {
+            $activeRombel = DB::table('rombel_siswa as r')
+                ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                ->where('r.id_siswa', $data['id_siswa'])
+                ->where('r.status', 'Aktif')
+                ->first(['r.id_rombel', 'k.id_tahun_ajaran']);
+            $targetYearId = DB::table('kelas')->where('id_kelas', $data['id_kelas'])->value('id_tahun_ajaran');
+
+            if ($activeRombel && (int) $activeRombel->id_tahun_ajaran === (int) $targetYearId) {
+                $this->callProcedure(
+                    'CALL sp_tempatkan_siswa(?, ?)',
+                    [(int) $activeRombel->id_rombel, (int) $data['id_kelas']],
+                    'id_kelas'
+                );
+
+                if (Schema::hasColumn('rombel_siswa', 'id_diskon')) {
+                    DB::table('rombel_siswa')
+                        ->where('id_rombel', $activeRombel->id_rombel)
+                        ->update([
+                            'id_diskon' => ($data['id_diskon'] ?? null) ?: null,
+                            'updated_at' => now(),
+                        ]);
+                }
+
+                return back()->with('status', 'Penempatan kelas dan kategori diskon siswa berhasil diperbarui.');
+            }
+        }
+
         DB::transaction(function () use ($data): void {
             $this->assertClassHasCapacity((int) $data['id_kelas'], (int) $data['id_siswa']);
 
@@ -550,6 +578,128 @@ class SchoolFeatureController extends Controller
                         'catatan' => $documentData['catatan'] ?? null,
                         'updated_at' => now(),
                     ]);
+            }
+        }
+
+        if ($this->isMysql()) {
+            $application = DB::table('pendaftaran')->where('id_pendaftaran', $registrationId)->first();
+            abort_unless($application !== null, 404);
+
+            if ($data['decision'] === 'verify') {
+                if (Schema::hasTable('dokumen_pendaftaran')) {
+                    $requiredDocs = array_values(config('registration.required_documents'));
+                    $uploadedTypes = DB::table('dokumen_pendaftaran')
+                        ->where('id_pendaftaran', $registrationId)
+                        ->pluck('jenis')
+                        ->all();
+                    $hasInvalid = DB::table('dokumen_pendaftaran')
+                        ->where('id_pendaftaran', $registrationId)
+                        ->where('status_verifikasi', 'Tidak Valid')
+                        ->exists();
+
+                    if (! $hasInvalid && array_diff($requiredDocs, $uploadedTypes) === []) {
+                        DB::table('dokumen_pendaftaran')
+                            ->where('id_pendaftaran', $registrationId)
+                            ->where('status_verifikasi', 'Menunggu')
+                            ->update([
+                                'status_verifikasi' => 'Valid',
+                                'updated_at' => now(),
+                            ]);
+                    }
+                }
+
+                $this->callProcedure(
+                    'CALL sp_verifikasi_pendaftaran(?, ?, ?, ?)',
+                    [$registrationId, 1, (int) $user->getKey(), $data['note'] ?? null],
+                    'decision'
+                );
+
+                return back()->with('status', 'Berkas pendaftaran berhasil diverifikasi. Silakan pilih kelas dan guru pada form penetapan di bawah.');
+            }
+
+            if ($data['decision'] === 'reject' && $application->status === 'Diajukan') {
+                $rejectNote = isset($data['note']) && trim((string) $data['note']) !== ''
+                    ? trim((string) $data['note'])
+                    : null;
+
+                DB::table('dokumen_pendaftaran')
+                    ->where('id_pendaftaran', $registrationId)
+                    ->update([
+                        'status_verifikasi' => 'Tidak Valid',
+                        'updated_at' => now(),
+                    ]);
+
+                if ($rejectNote !== null) {
+                    DB::table('dokumen_pendaftaran')
+                        ->where('id_pendaftaran', $registrationId)
+                        ->where(function ($query): void {
+                            $query->whereNull('catatan')->orWhere('catatan', '');
+                        })
+                        ->update([
+                            'catatan' => $rejectNote,
+                            'updated_at' => now(),
+                        ]);
+                }
+
+                $this->callProcedure(
+                    'CALL sp_verifikasi_pendaftaran(?, ?, ?, ?)',
+                    [$registrationId, 0, (int) $user->getKey(), $rejectNote],
+                    'decision'
+                );
+
+                return back()->with('status', 'Pendaftaran telah ditolak.');
+            }
+
+            if ($data['decision'] === 'accept') {
+                $existingRoster = DB::table('rombel_siswa as r')
+                    ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                    ->where('r.id_siswa', $application->id_siswa)
+                    ->where('k.id_tahun_ajaran', $application->id_tahun_ajaran)
+                    ->first(['r.id_rombel']);
+
+                if (! $existingRoster) {
+                    $this->assertRegistrationDocumentsValid($registrationId);
+                    $classId = (int) ($data['class_id'] ?? 0);
+                    $this->callProcedure(
+                        'CALL sp_terima_pendaftaran(?, ?, ?, ?)',
+                        [$registrationId, $classId, (int) $user->getKey(), $data['due_date'] ?? null],
+                        'class_id'
+                    );
+
+                    if (! empty($data['note'])) {
+                        DB::table('pendaftaran')
+                            ->where('id_pendaftaran', $registrationId)
+                            ->update(['catatan_verifikasi' => $data['note']]);
+                    }
+
+                    if (! empty($data['teacher_id']) && Schema::hasTable('guru_kelas') && Schema::hasTable('guru')) {
+                        $teacherId = (int) $data['teacher_id'];
+                        if (DB::table('guru')->where('id_guru', $teacherId)->where('status', 'Aktif')->exists()) {
+                            $samePairExists = DB::table('guru_kelas')
+                                ->where('id_kelas', $classId)
+                                ->where('id_guru', $teacherId)
+                                ->exists();
+                            if ($samePairExists) {
+                                DB::table('guru_kelas')
+                                    ->where('id_kelas', $classId)
+                                    ->where('id_guru', $teacherId)
+                                    ->update(['peran' => 'Wali Kelas']);
+                            } else {
+                                DB::table('guru_kelas')
+                                    ->where('id_kelas', $classId)
+                                    ->where('peran', 'Wali Kelas')
+                                    ->delete();
+                                DB::table('guru_kelas')->insert([
+                                    'id_guru' => $teacherId,
+                                    'id_kelas' => $classId,
+                                    'peran' => 'Wali Kelas',
+                                ]);
+                            }
+                        }
+                    }
+
+                    return back()->with('status', 'Calon siswa berhasil ditetapkan dan diterima ke kelas.');
+                }
             }
         }
 
@@ -1066,6 +1216,17 @@ class SchoolFeatureController extends Controller
         if ($user->role === 'teacher') {
             $teacherId = $this->teacherId($user);
             $this->assertTeacherClass($teacherId, (int) $data['id_kelas']);
+        }
+
+        if ($this->isMysql()) {
+            $resultSets = $this->callProcedure(
+                'CALL sp_inisialisasi_absensi(?, ?, ?)',
+                [(int) $data['id_kelas'], $data['tanggal'], (int) $user->getKey()],
+                'tanggal'
+            );
+            $inserted = (int) ($resultSets[0][0]->baris_dibuat ?? 0);
+
+            return back()->with('status', $inserted.' siswa berhasil diinisialisasi hadir untuk tanggal '.$data['tanggal'].'.');
         }
 
         $inserted = DB::transaction(function () use ($data, $user): int {
@@ -1588,6 +1749,19 @@ class SchoolFeatureController extends Controller
             ]);
         }
 
+        if ($this->isMysql()) {
+            $resultSets = $this->callProcedure(
+                'CALL sp_buat_tagihan_kegiatan(?)',
+                [$activityId],
+                'activity'
+            );
+            if (! isset($resultSets[0][0]->tagihan_dibuat)) {
+                throw new RuntimeException('Prosedur tagihan Field Trip tidak mengembalikan jumlah tagihan.');
+            }
+
+            return back()->with('status', (int) $resultSets[0][0]->tagihan_dibuat.' tagihan Field Trip berhasil diterbitkan.');
+        }
+
         $result = DB::select('CALL sp_buat_tagihan_kegiatan(?)', [$activityId]);
         if (! isset($result[0]->tagihan_dibuat)) {
             throw new RuntimeException('Prosedur tagihan Field Trip tidak mengembalikan jumlah tagihan.');
@@ -1814,6 +1988,39 @@ class SchoolFeatureController extends Controller
             ? $this->imageUploads->store($request->file('bukti_transfer'), 'bukti-pembayaran', 'bukti_transfer')
             : null;
 
+        if ($this->isMysql()) {
+            $bill = DB::table('tagihan as t')
+                ->join('rombel_siswa as r', 'r.id_rombel', '=', 't.id_rombel')
+                ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                ->where('t.id_tagihan', $data['id_tagihan'])
+                ->first(['t.id_tagihan', 's.id_keluarga']);
+            abort_unless($bill !== null, 404);
+            if ($familyId !== null && (int) $bill->id_keluarga !== $familyId) {
+                abort(403);
+            }
+
+            $resultSets = $this->callProcedure(
+                'CALL sp_bayar_tagihan(?, ?, ?, ?, ?)',
+                [(int) $bill->id_tagihan, $data['jumlah'], $data['metode'], $proofPath, (int) $user->getKey()],
+                'jumlah'
+            );
+            $paymentId = (int) ($resultSets[0][0]->id_pembayaran ?? 0);
+            if ($paymentId > 0) {
+                $extraUpdate = [];
+                if (filled($data['catatan'] ?? null)) {
+                    $extraUpdate['catatan'] = $data['catatan'];
+                }
+                if (\in_array($user->role, ['admin', 'principal'], true) && $data['metode'] === 'Tunai') {
+                    $extraUpdate['id_user_verifikator'] = $user->getKey();
+                }
+                if ($extraUpdate !== []) {
+                    DB::table('pembayaran')->where('id_pembayaran', $paymentId)->update($extraUpdate);
+                }
+            }
+
+            return back()->with('status', 'Pembayaran berhasil dicatat dan akan diproses sesuai metode pembayaran.');
+        }
+
         DB::transaction(function () use ($data, $familyId, $proofPath, $user): void {
             $bill = DB::table('tagihan as t')
                 ->join('rombel_siswa as r', 'r.id_rombel', '=', 't.id_rombel')
@@ -1897,6 +2104,29 @@ class SchoolFeatureController extends Controller
             'catatan' => ['nullable', 'string', 'max:255'],
         ]);
 
+        if ($this->isMysql()) {
+            $payment = DB::table('pembayaran')->where('id_pembayaran', $paymentId)->first();
+            abort_unless($payment !== null, 404);
+
+            $existingNote = trim((string) ($payment->catatan ?? ''));
+            $adminNote = trim((string) ($data['catatan'] ?? ''));
+            if ($adminNote === '') {
+                $finalNote = $existingNote !== '' ? $existingNote : null;
+            } elseif ($existingNote !== '') {
+                $finalNote = Str::limit("Orang tua: {$existingNote} | Admin: {$adminNote}", 255, '');
+            } else {
+                $finalNote = $adminNote;
+            }
+
+            $this->callProcedure(
+                'CALL sp_verifikasi_pembayaran(?, ?, ?, ?)',
+                [$paymentId, $data['decision'] === 'verify' ? 1 : 0, (int) $user->getKey(), $finalNote],
+                'decision'
+            );
+
+            return back()->with('status', 'Status pembayaran berhasil diperbarui.');
+        }
+
         DB::transaction(function () use ($data, $paymentId, $user): void {
             $payment = DB::table('pembayaran')
                 ->where('id_pembayaran', $paymentId)
@@ -1938,6 +2168,25 @@ class SchoolFeatureController extends Controller
             'catatan' => ['required', 'string', 'max:255'],
         ]);
 
+        if ($this->isMysql()) {
+            $payment = DB::table('pembayaran')->where('id_pembayaran', $paymentId)->first();
+            abort_unless($payment !== null, 404);
+
+            $existingNote = trim((string) ($payment->catatan ?? ''));
+            $cancelNote = trim((string) $data['catatan']);
+            $finalNote = $existingNote !== ''
+                ? Str::limit("{$existingNote} | Dibatalkan: {$cancelNote}", 255, '')
+                : $cancelNote;
+
+            $this->callProcedure(
+                'CALL sp_batalkan_pembayaran(?, ?, ?)',
+                [$paymentId, (int) $user->getKey(), $finalNote],
+                'catatan'
+            );
+
+            return back()->with('status', 'Kuitansi pembayaran berhasil dibatalkan.');
+        }
+
         DB::transaction(function () use ($data, $paymentId, $user): void {
             $payment = DB::table('pembayaran')
                 ->where('id_pembayaran', $paymentId)
@@ -1978,6 +2227,23 @@ class SchoolFeatureController extends Controller
             'metode' => ['required', Rule::in(['Tunai', 'Transfer'])],
             'keterangan' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if ($this->isMysql()) {
+            $this->callProcedure(
+                'CALL sp_transaksi_tabungan(?, ?, ?, ?, ?, ?)',
+                [
+                    (int) $data['id_siswa'],
+                    $data['jenis'],
+                    $data['jumlah'],
+                    $data['metode'],
+                    $data['keterangan'] ?? null,
+                    (int) $user->getKey(),
+                ],
+                'jumlah'
+            );
+
+            return back()->with('status', 'Transaksi tabungan berhasil dicatat.');
+        }
 
         DB::transaction(function () use ($data, $user): void {
             $student = DB::table('siswa')->where('id_siswa', $data['id_siswa'])->lockForUpdate()->first();
@@ -2142,6 +2408,17 @@ class SchoolFeatureController extends Controller
             throw ValidationException::withMessages([
                 'jatuh_tempo' => 'Tanggal jatuh tempo tidak boleh sebelum periode tagihan.',
             ]);
+        }
+
+        if ($this->isMysql()) {
+            $resultSets = $this->callProcedure(
+                'CALL sp_buat_tagihan_bulanan(?, ?, ?)',
+                [(int) $schoolYear->id_tahun_ajaran, $period, $data['jatuh_tempo']],
+                'periode'
+            );
+            $created = (int) ($resultSets[0][0]->tagihan_dibuat ?? 0);
+
+            return back()->with('status', $created.' tagihan SPP baru berhasil dibuat.');
         }
 
         $created = DB::transaction(function () use ($data, $period, $schoolYear): int {
@@ -2680,6 +2957,16 @@ class SchoolFeatureController extends Controller
             'id_siswa_duplikat' => ['required', 'integer', Rule::exists('siswa', 'id_siswa'), 'different:id_siswa_utama'],
         ]);
 
+        if ($this->isMysql()) {
+            $this->callProcedure(
+                'CALL sp_gabung_siswa(?, ?)',
+                [(int) $data['id_siswa_utama'], (int) $data['id_siswa_duplikat']],
+                'id_siswa_duplikat'
+            );
+
+            return back()->with('status', 'Data siswa ganda berhasil digabungkan ke data siswa utama.');
+        }
+
         DB::transaction(function () use ($data): void {
             $primaryId = (int) $data['id_siswa_utama'];
             $duplicateId = (int) $data['id_siswa_duplikat'];
@@ -2749,6 +3036,16 @@ class SchoolFeatureController extends Controller
             'id_keluarga_utama' => ['required', 'integer', Rule::exists('keluarga', 'id_keluarga')],
             'id_keluarga_duplikat' => ['required', 'integer', Rule::exists('keluarga', 'id_keluarga'), 'different:id_keluarga_utama'],
         ]);
+
+        if ($this->isMysql()) {
+            $this->callProcedure(
+                'CALL sp_gabung_keluarga(?, ?)',
+                [(int) $data['id_keluarga_utama'], (int) $data['id_keluarga_duplikat']],
+                'id_keluarga_duplikat'
+            );
+
+            return back()->with('status', 'Data keluarga ganda berhasil digabungkan.');
+        }
 
         DB::transaction(function () use ($data): void {
             $primaryId = (int) $data['id_keluarga_utama'];
@@ -3494,6 +3791,52 @@ class SchoolFeatureController extends Controller
             throw ValidationException::withMessages([
                 'decision' => 'Semua dokumen wajib harus tersedia dan berstatus valid sebelum pendaftaran dapat diverifikasi atau diterima.',
             ]);
+        }
+    }
+
+    private function isMysql(): bool
+    {
+        return DB::connection()->getDriverName() === 'mysql';
+    }
+
+    /**
+     * Execute a MySQL stored procedure, draining all result sets cleanly to avoid PDO 2014 errors,
+     * and translate SQLSTATE 45000 SIGNAL messages into Laravel ValidationException.
+     *
+     * @param  array<int, mixed>  $bindings
+     * @return array<int, array<int, object>>
+     */
+    private function callProcedure(string $sql, array $bindings, string $errorField): array
+    {
+        try {
+            $pdo = DB::connection()->getPdo();
+            $statement = $pdo->prepare($sql);
+            $statement->execute($bindings);
+            $resultSets = [];
+            do {
+                if ($statement->columnCount() > 0) {
+                    $resultSets[] = $statement->fetchAll(\PDO::FETCH_OBJ);
+                }
+            } while ($statement->nextRowset());
+            $statement->closeCursor();
+
+            return $resultSets;
+        } catch (\Throwable $exception) {
+            $sqlState = $exception instanceof QueryException
+                ? ($exception->errorInfo[0] ?? '')
+                : ($exception instanceof \PDOException ? ($exception->errorInfo[0] ?? $exception->getCode()) : '');
+            $message = $exception instanceof QueryException
+                ? ($exception->errorInfo[2] ?? $exception->getMessage())
+                : ($exception instanceof \PDOException ? ($exception->errorInfo[2] ?? $exception->getMessage()) : $exception->getMessage());
+
+            if ((string) $sqlState === '45000' || str_contains((string) $message, '1644')) {
+                $cleanMessage = trim((string) preg_replace('/^.*1644\s*/', '', (string) $message));
+                throw ValidationException::withMessages([
+                    $errorField => $cleanMessage !== '' ? $cleanMessage : 'Operasi ditolak oleh aturan basis data.',
+                ]);
+            }
+
+            throw $exception;
         }
     }
 }

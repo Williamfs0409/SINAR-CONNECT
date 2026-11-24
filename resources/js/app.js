@@ -1893,3 +1893,200 @@ document.querySelectorAll('[data-payment-mode-root]').forEach((root) => {
         });
     });
 });
+
+(() => {
+    const EXCLUDED_TYPES = new Set(['hidden', 'search', 'submit', 'button', 'reset']);
+
+    const findFieldLabelElement = (field) => {
+        if (field.id && field.form) {
+            const byFor = field.form.querySelector(`label[for="${CSS.escape(field.id)}"]`);
+            if (byFor) {
+                return byFor;
+            }
+        }
+        return field.closest('label');
+    };
+
+    const getCleanLabelText = (field) => {
+        if (field.dataset.fieldLabel) {
+            return field.dataset.fieldLabel.trim();
+        }
+        const labelEl = findFieldLabelElement(field);
+        if (labelEl) {
+            const clone = labelEl.cloneNode(true);
+            clone.querySelectorAll(
+                'input, select, textarea, button, .required-marker, .searchable-select-wrap, .registration-upload-feedback, .field-validation-error, .password-toggle, .registration-password-wrap'
+            ).forEach((el) => el.remove());
+            const text = clone.textContent
+                .replace(/\s+/g, ' ')
+                .replace(/\s*\(opsional[^)]*\)/gi, '')
+                .replace(/\s*\(JPG\/PNG[^)]*\)/gi, '')
+                .replace(/\s*\(PDF\/JPG[^)]*\)/gi, '')
+                .replace(/\s*\*+\s*$/, '')
+                .trim();
+            if (text !== '') {
+                return text;
+            }
+        }
+        return (
+            field.getAttribute('aria-label')
+            || field.getAttribute('placeholder')
+            || 'Kolom ini'
+        ).replace(/\s*\(opsional\)/gi, '').trim();
+    };
+
+    const syncRequiredMarker = (field) => {
+        if (EXCLUDED_TYPES.has(field.type) || field.disabled) {
+            return;
+        }
+        const labelEl = findFieldLabelElement(field);
+        if (!labelEl || labelEl.classList.contains('check-label')) {
+            return;
+        }
+        const isRequired = field.required || field.dataset.wasRequired === '1';
+        const existingMarker = labelEl.querySelector('.required-marker');
+        if (!isRequired) {
+            if (existingMarker && existingMarker.dataset.autoRequired === '1') {
+                existingMarker.remove();
+            }
+            return;
+        }
+        if (existingMarker || labelEl.textContent.includes('*')) {
+            return;
+        }
+
+        const marker = document.createElement('span');
+        marker.className = 'required-marker';
+        marker.dataset.autoRequired = '1';
+        marker.setAttribute('aria-hidden', 'true');
+        marker.textContent = '*';
+
+        const textNode = Array.from(labelEl.childNodes).find(
+            (node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== ''
+        );
+        if (textNode) {
+            textNode.after(marker);
+            return;
+        }
+
+        const firstCaption = labelEl.querySelector(':scope > span:not(.required-marker):not(.registration-password-wrap):not(.searchable-select-wrap), :scope > strong');
+        if (firstCaption) {
+            firstCaption.append(marker);
+            return;
+        }
+
+        labelEl.append(marker);
+    };
+
+    const buildIndonesianValidationMessage = (field) => {
+        const label = getCleanLabelText(field);
+        const v = field.validity;
+
+        if (v.valueMissing) {
+            if (field.type === 'file') {
+                return `${label} wajib diunggah.`;
+            }
+            if (field.tagName === 'SELECT' || field.type === 'checkbox' || field.type === 'radio') {
+                return `${label} wajib dipilih.`;
+            }
+            return `${label} wajib diisi.`;
+        }
+        if (v.typeMismatch) {
+            return field.type === 'email'
+                ? `Format ${label} tidak valid (contoh: nama@email.com).`
+                : `Format ${label} tidak valid.`;
+        }
+        if (v.patternMismatch) {
+            if (field.maxLength === 16) {
+                return `${label} harus terdiri dari 16 digit angka.`;
+            }
+            if (field.maxLength === 10) {
+                return `${label} harus terdiri dari 10 digit angka.`;
+            }
+            return `Format ${label} tidak sesuai.`;
+        }
+        if (v.tooShort) {
+            return `${label} minimal ${field.minLength} karakter.`;
+        }
+        if (v.tooLong) {
+            return `${label} maksimal ${field.maxLength} karakter.`;
+        }
+        if (v.rangeUnderflow) {
+            return `${label} minimal ${field.min}.`;
+        }
+        if (v.rangeOverflow) {
+            return `${label} maksimal ${field.max}.`;
+        }
+        return `${label} belum valid.`;
+    };
+
+    const showInlineError = (field, message) => {
+        field.classList.add('is-field-invalid');
+        const container = field.closest('.password-field, .registration-password-wrap, .searchable-select-wrap') || field;
+        let errorEl = container.nextElementSibling;
+        if (!errorEl || !errorEl.classList.contains('field-validation-error')) {
+            errorEl = document.createElement('small');
+            errorEl.className = 'field-validation-error';
+            errorEl.setAttribute('role', 'alert');
+            container.after(errorEl);
+        }
+        errorEl.textContent = message;
+    };
+
+    const clearInlineError = (field) => {
+        field.classList.remove('is-field-invalid');
+        const container = field.closest('.password-field, .registration-password-wrap, .searchable-select-wrap') || field;
+        const nextEl = container.nextElementSibling;
+        if (nextEl && nextEl.classList.contains('field-validation-error')) {
+            nextEl.remove();
+        }
+    };
+
+    const syncConditionalFields = (form) => {
+        const methodSelect = form.querySelector('select[name="metode"]');
+        const proofInput = form.querySelector('input[data-required-when-method]');
+        if (methodSelect && proofInput) {
+            proofInput.required = methodSelect.value === proofInput.dataset.requiredWhenMethod;
+            syncRequiredMarker(proofInput);
+            if (!proofInput.required) {
+                proofInput.setCustomValidity('');
+                clearInlineError(proofInput);
+            }
+        }
+    };
+
+    document.querySelectorAll('form').forEach((form) => {
+        syncConditionalFields(form);
+        form.querySelectorAll('input, select, textarea').forEach(syncRequiredMarker);
+    });
+
+    document.addEventListener('invalid', (event) => {
+        const field = event.target;
+        if (!(field instanceof HTMLElement) || !field.matches('input, select, textarea')) {
+            return;
+        }
+        if (EXCLUDED_TYPES.has(field.type)) {
+            return;
+        }
+        const message = buildIndonesianValidationMessage(field);
+        field.setCustomValidity(message);
+        showInlineError(field, message);
+    }, true);
+
+    const handleFieldUpdate = (event) => {
+        const field = event.target;
+        if (!(field instanceof HTMLElement) || !field.matches('input, select, textarea')) {
+            return;
+        }
+        field.setCustomValidity('');
+        if (field.form) {
+            syncConditionalFields(field.form);
+        }
+        if (field.checkValidity()) {
+            clearInlineError(field);
+        }
+    };
+
+    document.addEventListener('input', handleFieldUpdate, true);
+    document.addEventListener('change', handleFieldUpdate, true);
+})();

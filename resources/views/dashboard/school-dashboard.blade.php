@@ -436,7 +436,7 @@
                                                         <form method="POST" action="{{ route('admin.users.role', ['user' => data_get($record, 'id_user')]) }}" class="database-inline-form database-user-role-form">
                                                             @csrf
                                                             @method('PATCH')
-                                                            <select name="role" aria-label="Peran {{ data_get($record, 'name') }}">
+                                                            <select name="role" aria-label="Peran {{ data_get($record, 'name') }}" required>
                                                                 @foreach (['admin' => 'Administrator', 'teacher' => 'Guru', 'principal' => 'Kepala sekolah', 'parent' => 'Orang tua'] as $roleValue => $roleLabel)
                                                                     <option value="{{ $roleValue }}" @selected(($roleInternal[data_get($record, 'role')] ?? data_get($record, 'role')) === $roleValue)>{{ $roleLabel }}</option>
                                                                 @endforeach
@@ -474,7 +474,7 @@
                                                                     <label>Nomor KK<input name="no_kk" value="{{ data_get($record, 'no_kk') }}" maxlength="16" inputmode="numeric"></label>
                                                                     <label>Alamat<textarea name="alamat" rows="2" maxlength="2000">{{ data_get($record, 'alamat') }}</textarea></label>
                                                                     <label>Nama wali / orang tua<input name="wali_name" value="{{ data_get($record, 'edit_wali_name') }}" maxlength="100"></label>
-                                                                    <label>Hubungan<select name="hubungan">
+                                                                    <label>Hubungan<select name="hubungan" required>
                                                                         @if (! data_get($record, 'edit_wali_relationship'))
                                                                             <option value="" selected disabled>Pilih hubungan</option>
                                                                         @endif
