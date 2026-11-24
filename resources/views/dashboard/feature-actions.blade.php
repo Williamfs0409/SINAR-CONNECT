@@ -1564,11 +1564,20 @@
         <div class="database-section-heading"><div><h2>Dokumentasi kegiatan</h2><p>Foto kegiatan yang dapat diakses sesuai peran dan kelas terkait.</p></div></div>
         <div class="database-photo-grid">
             @forelse ($actions['activityPhotos'] ?? [] as $photo)
-                <a class="database-photo-card" href="{{ route('database.activity.photo', ['document' => $photo->id_dokumentasi]) }}" target="_blank" rel="noopener">
-                    <img src="{{ route('database.activity.photo', ['document' => $photo->id_dokumentasi]) }}" alt="{{ $photo->nama_kegiatan }} - {{ $photo->tahap }}" loading="lazy">
-                    <strong>{{ $photo->nama_kegiatan }}</strong>
-                    <small>{{ $photo->tanggal }} · {{ $photo->tahap }}{{ $photo->keterangan ? ' · '.$photo->keterangan : '' }}</small>
-                </a>
+                <div class="database-photo-card">
+                    <a class="database-photo-card-link" href="{{ route('database.activity.photo', ['document' => $photo->id_dokumentasi]) }}" target="_blank" rel="noopener">
+                        <img src="{{ route('database.activity.photo', ['document' => $photo->id_dokumentasi]) }}" alt="{{ $photo->nama_kegiatan }} - {{ $photo->tahap }}" loading="lazy">
+                        <strong>{{ $photo->nama_kegiatan }}</strong>
+                        <small>{{ $photo->tanggal }} · {{ $photo->tahap }}{{ $photo->keterangan ? ' · '.$photo->keterangan : '' }}</small>
+                    </a>
+                    @if (in_array($role, ['admin', 'principal', 'teacher'], true))
+                        <form method="POST" action="{{ route('database.activity.photo.destroy', ['document' => $photo->id_dokumentasi]) }}" class="database-photo-delete-form" data-confirm="Hapus foto dokumentasi '{{ $photo->nama_kegiatan }}' ini?">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="database-photo-delete-btn">Hapus foto</button>
+                        </form>
+                    @endif
+                </div>
             @empty
                 <p class="database-empty-note">Belum ada foto kegiatan.</p>
             @endforelse

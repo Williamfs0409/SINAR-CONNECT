@@ -1843,6 +1843,35 @@ class SchoolFeatureController extends Controller
         return back()->with('status', \count($documents).' foto kegiatan berhasil diunggah.');
     }
 
+    public function destroyActivityPhoto(int $documentId): RedirectResponse
+    {
+        $user = $this->userFor(['teacher', 'admin']);
+        $document = DB::table('dokumentasi_kegiatan as d')
+            ->join('kegiatan as k', 'k.id_kegiatan', '=', 'd.id_kegiatan')
+            ->where('d.id_dokumentasi', $documentId)
+            ->first(['d.id_dokumentasi', 'd.file_path', 'd.id_user_upload', 'k.id_kegiatan', 'k.id_user_pembuat']);
+        abort_unless($document !== null, 404);
+
+        if ($user->role === 'teacher') {
+            $teacherId = $this->teacherId($user);
+            $authorized = (int) $document->id_user_upload === (int) $user->getKey()
+                || (int) $document->id_user_pembuat === (int) $user->getKey()
+                || DB::table('kegiatan_kelas as kk')
+                    ->join('guru_kelas as gk', 'gk.id_kelas', '=', 'kk.id_kelas')
+                    ->where('kk.id_kegiatan', $document->id_kegiatan)
+                    ->where('gk.id_guru', $teacherId)
+                    ->exists();
+            abort_unless($authorized, 403);
+        }
+
+        DB::table('dokumentasi_kegiatan')->where('id_dokumentasi', $documentId)->delete();
+        if (! empty($document->file_path)) {
+            Storage::disk('local')->delete($document->file_path);
+        }
+
+        return back()->with('status', 'Foto dokumentasi kegiatan berhasil dihapus.');
+    }
+
     public function activityPhoto(int $documentId): StreamedResponse
     {
         $user = $this->userFor(['admin', 'principal', 'teacher', 'parent']);

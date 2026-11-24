@@ -191,6 +191,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.activity.photo.store');
     Route::get('/dashboard/dokumentasi/{document}/foto', [SchoolFeatureController::class, 'activityPhoto'])
         ->name('database.activity.photo');
+    Route::delete('/dashboard/dokumentasi/{document}/foto', [SchoolFeatureController::class, 'destroyActivityPhoto'])
+        ->name('database.activity.photo.destroy');
     Route::post('/dashboard/pembayaran', [SchoolFeatureController::class, 'storePayment'])
         ->name('database.payment.store');
     Route::patch('/dashboard/pembayaran/rekening', [SchoolFeatureController::class, 'updatePaymentSettings'])
