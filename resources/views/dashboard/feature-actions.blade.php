@@ -1941,32 +1941,48 @@
 @if ($section === 'tarif' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">
-            <div><h2>Kelola tarif biaya</h2><p>Tarif baru berlaku untuk tagihan yang dibuat setelah perubahan. Tagihan yang sudah terbit tidak ikut berubah.</p></div>
+            <div><h2>Kelola tarif biaya</h2><p>Tarif baru berlaku untuk tagihan yang dibuat setelah perubahan. Anda juga bisa mengedit atau menghapus tarif langsung dari tabel di bawah.</p></div>
         </div>
-        <form method="POST" action="{{ route('database.tariff.store') }}" class="database-form-grid">
-            @csrf
-            <label>Tahun ajaran<select name="id_tahun_ajaran" required>@foreach ($actions['schoolYears'] ?? [] as $year)<option value="{{ $year->id_tahun_ajaran }}">{{ $year->nama }}</option>@endforeach</select></label>
-            <label>Kelompok<select name="kelompok" required><option>KB</option><option>TK A</option><option>TK B</option></select></label>
-            <label>Jenis biaya<select name="id_jenis_biaya" required>@foreach ($actions['feeTypes'] ?? [] as $feeType)<option value="{{ $feeType->id_jenis_biaya }}">{{ $feeType->nama }} · {{ $feeType->kategori }}</option>@endforeach</select></label>
-            <label>Nominal<input type="number" name="nominal" min="0" max="9999999999" step="0.01" required></label>
-            <div class="database-form-wide"><button class="database-button" type="submit">Tambah tarif</button></div>
-        </form>
-        @forelse ($records as $tariff)
-            <form method="POST" action="{{ route('database.tariff.update', ['tariff' => $tariff->id_tarif]) }}" class="database-action-row">
-                @csrf
-                @method('PATCH')
-                <div>
-                    <strong>{{ $tariff->tahun_ajaran }} · {{ $tariff->kelompok }} · {{ $tariff->nama }}</strong>
-                    <small>{{ $tariff->kategori }}</small>
-                </div>
-                <label>Nominal
-                    <input type="number" name="nominal" value="{{ $tariff->nominal }}" min="0" max="9999999999" step="0.01" required>
-                </label>
-                <button class="database-button" type="submit">Simpan tarif</button>
-            </form>
-        @empty
-            <p class="database-empty-note">Tarif biaya belum tersedia.</p>
-        @endforelse
+        <div class="payment-mode-switcher" data-payment-mode-root>
+            <div class="payment-mode-tabs" role="tablist" aria-label="Menu kelola tarif">
+                <button type="button" role="tab" class="payment-mode-btn is-active" data-payment-mode-btn="create" aria-selected="true">
+                    Tambah Tarif Baru
+                </button>
+                <button type="button" role="tab" class="payment-mode-btn" data-payment-mode-btn="quick-edit" aria-selected="false">
+                    Ubah Nominal Cepat ({{ $records->count() }})
+                </button>
+            </div>
+
+            <div class="payment-mode-panel" data-payment-mode-panel="create">
+                <form method="POST" action="{{ route('database.tariff.store') }}" class="database-form-grid">
+                    @csrf
+                    <label>Tahun ajaran<select name="id_tahun_ajaran" required>@foreach ($actions['schoolYears'] ?? [] as $year)<option value="{{ $year->id_tahun_ajaran }}">{{ $year->nama }}</option>@endforeach</select></label>
+                    <label>Kelompok<select name="kelompok" required><option>KB</option><option>TK A</option><option>TK B</option></select></label>
+                    <label>Jenis biaya<select name="id_jenis_biaya" required>@foreach ($actions['feeTypes'] ?? [] as $feeType)<option value="{{ $feeType->id_jenis_biaya }}">{{ $feeType->nama }} · {{ $feeType->kategori }}</option>@endforeach</select></label>
+                    <label>Nominal (Rp)<input type="number" name="nominal" min="0" max="9999999999" step="0.01" required></label>
+                    <div class="database-form-wide"><button class="database-button" type="submit">Tambah tarif</button></div>
+                </form>
+            </div>
+
+            <div class="payment-mode-panel" data-payment-mode-panel="quick-edit" hidden>
+                @forelse ($records as $tariff)
+                    <form method="POST" action="{{ route('database.tariff.update', ['tariff' => $tariff->id_tarif]) }}" class="database-action-row" style="align-items: flex-end;">
+                        @csrf
+                        @method('PATCH')
+                        <div style="flex: 1 1 240px;">
+                            <strong>{{ $tariff->tahun_ajaran }} · {{ $tariff->kelompok }} · {{ $tariff->nama }}</strong>
+                            <small>{{ $tariff->kategori }}</small>
+                        </div>
+                        <label style="margin: 0;">Nominal (Rp)
+                            <input type="number" name="nominal" value="{{ $tariff->nominal }}" min="0" max="9999999999" step="0.01" required>
+                        </label>
+                        <button class="database-button" type="submit">Simpan</button>
+                    </form>
+                @empty
+                    <p class="database-empty-note">Tarif biaya belum tersedia.</p>
+                @endforelse
+            </div>
+        </div>
     </section>
 @endif
 
