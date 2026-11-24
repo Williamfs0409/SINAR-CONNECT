@@ -531,17 +531,6 @@ class SchoolFeatureController extends Controller
             ]);
         }
 
-        $this->assertNoDeleteDependencies($userId, [
-            ['absensi', 'id_user_pencatat', 'catatan absensi'],
-            ['dokumentasi_kegiatan', 'id_user_upload', 'dokumentasi kegiatan'],
-            ['kegiatan', 'id_user_pembuat', 'kegiatan'],
-            ['pembayaran', 'id_user_pencatat', 'catatan pembayaran'],
-            ['pembayaran', 'id_user_verifikator', 'verifikasi pembayaran'],
-            ['pendaftaran', 'id_user_verifikator', 'verifikasi pendaftaran'],
-            ['transaksi_tabungan', 'id_user_pencatat', 'catatan transaksi tabungan'],
-            ['audit_log', 'app_user_id', 'riwayat perubahan'],
-        ], 'akun pengguna');
-
         DB::transaction(function () use ($userId): void {
             if (Schema::hasTable('keluarga') && Schema::hasColumn('keluarga', 'id_user')) {
                 DB::table('keluarga')->where('id_user', $userId)->update(['id_user' => null]);
