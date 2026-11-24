@@ -1965,7 +1965,11 @@ document.querySelectorAll('[data-payment-mode-root]').forEach((root) => {
             (node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== ''
         );
         if (textNode) {
-            textNode.after(marker);
+            const captionWrap = document.createElement('span');
+            captionWrap.className = 'required-label-caption';
+            captionWrap.textContent = textNode.textContent.trimEnd();
+            captionWrap.append(marker);
+            textNode.replaceWith(captionWrap);
             return;
         }
 

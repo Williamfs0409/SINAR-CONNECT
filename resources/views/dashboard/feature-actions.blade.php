@@ -505,9 +505,28 @@
         @endif
 
         <h3 class="database-subheading">Perbarui profil guru</h3>
+        @php
+            $teacherAssignmentsByGuru = collect($actions['classAssignments'] ?? [])->groupBy('id_guru');
+        @endphp
         @forelse ($actions['teachers'] ?? [] as $teacher)
+            @php
+                $assignedClasses = $teacherAssignmentsByGuru->get($teacher->id_guru, collect());
+                $assignedSummary = $assignedClasses
+                    ->map(fn ($item) => $item->peran.' · '.$item->kelompok.' · '.$item->nama_kelas)
+                    ->implode(', ');
+            @endphp
             <details class="database-student-editor">
-                <summary>{{ $teacher->nama_lengkap }}{{ !empty($teacher->gelar_belakang) ? ', '.$teacher->gelar_belakang : '' }} <small>{{ $teacher->status ?? 'Aktif' }}</small></summary>
+                <summary>
+                    <span>
+                        {{ $teacher->nama_lengkap }}{{ !empty($teacher->gelar_belakang) ? ', '.$teacher->gelar_belakang : '' }}
+                        @if ($assignedSummary !== '')
+                            <small style="margin-left: 8px; font-weight: 500; opacity: 0.85;">{{ $assignedSummary }}</small>
+                        @elseif (!empty($teacher->jabatan))
+                            <small style="margin-left: 8px; font-weight: 500; opacity: 0.75;">{{ $teacher->jabatan }}</small>
+                        @endif
+                    </span>
+                    <small>{{ $teacher->status ?? 'Aktif' }}</small>
+                </summary>
                 <form method="POST" action="{{ route('database.teacher.update', ['teacher' => $teacher->id_guru]) }}" class="database-form-grid">
                     @csrf
                     @method('PATCH')

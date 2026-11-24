@@ -120,14 +120,15 @@ class SchoolDataController extends Controller
         ],
         'guru' => [
             'title' => 'Data Guru',
-            'description' => 'Data kepegawaian dan kelas yang diampu.',
+            'description' => 'Data kepegawaian, kelompok TK, dan kelas yang diampu.',
             'view' => 'v_guru_lengkap',
             'key' => 'id_guru',
             'columns' => [
                 'nama_dengan_gelar' => 'Nama guru',
                 'jabatan' => 'Jabatan',
                 'status' => 'Status',
-                'kelas_diampu' => 'Kelas diampu',
+                'kelompok_diampu' => 'Kelompok (TK)',
+                'kelas_diampu' => 'Kelas & peran',
                 'email' => 'Email',
             ],
             'scope' => 'all',
@@ -1681,6 +1682,7 @@ class SchoolDataController extends Controller
             'siswa' => $role === 'teacher'
                 ? $this->teacherStudentsQuery($scope)
                 : $this->viewQuery($module, $scope, $role),
+            'guru' => $this->teacherQuery(),
             'kelas' => $this->classQuery($scope, $role),
             'keluarga' => $this->familyQuery(),
             'pembelajaran' => $this->lessonQuery($scope, $role),
@@ -1725,7 +1727,7 @@ class SchoolDataController extends Controller
             default => $this->viewQuery($module, $scope, $role),
         };
 
-        if (! in_array($section, ['kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)
+        if (! in_array($section, ['guru', 'kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)
             && ! ($section === 'siswa' && $role === 'teacher')) {
             $direction = $module['direction'] ?? 'asc';
             $query->orderBy($module['order'] ?? array_key_first($module['columns']), $direction);
@@ -1772,6 +1774,46 @@ class SchoolDataController extends Controller
         }
 
         return $query;
+    }
+
+    private function teacherQuery(): Builder
+    {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $groupConcatExpr = $isSqlite
+            ? "GROUP_CONCAT(DISTINCT kl.kelompok)"
+            : "GROUP_CONCAT(DISTINCT kl.kelompok ORDER BY kl.kelompok SEPARATOR ', ')";
+        $classConcatExpr = $isSqlite
+            ? "GROUP_CONCAT(kl.nama_kelas || ' · ' || kl.kelompok || ' (' || gk.peran || ')', ', ')"
+            : "GROUP_CONCAT(CONCAT(kl.nama_kelas, ' · ', kl.kelompok, ' (', gk.peran, ')') ORDER BY kl.kelompok, kl.nama_kelas SEPARATOR ', ')";
+
+        return DB::table('v_guru_lengkap as vg')
+            ->select([
+                'vg.id_guru',
+                'vg.nama_dengan_gelar',
+                'vg.nama_lengkap',
+                'vg.jabatan',
+                'vg.status',
+                'vg.email',
+            ])
+            ->selectSub(
+                DB::table('guru_kelas as gk')
+                    ->join('kelas as kl', 'kl.id_kelas', '=', 'gk.id_kelas')
+                    ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'kl.id_tahun_ajaran')
+                    ->whereColumn('gk.id_guru', 'vg.id_guru')
+                    ->where('ta.is_aktif', true)
+                    ->selectRaw($groupConcatExpr),
+                'kelompok_diampu'
+            )
+            ->selectSub(
+                DB::table('guru_kelas as gk')
+                    ->join('kelas as kl', 'kl.id_kelas', '=', 'gk.id_kelas')
+                    ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'kl.id_tahun_ajaran')
+                    ->whereColumn('gk.id_guru', 'vg.id_guru')
+                    ->where('ta.is_aktif', true)
+                    ->selectRaw($classConcatExpr),
+                'kelas_diampu'
+            )
+            ->orderBy('vg.nama_lengkap');
     }
 
     private function teacherStudentsQuery(array $scope): Builder
