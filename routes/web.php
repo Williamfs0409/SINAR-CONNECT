@@ -205,6 +205,8 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.payment.proof');
     Route::post('/dashboard/tabungan', [SchoolFeatureController::class, 'storeSavings'])
         ->name('database.savings.store');
+    Route::delete('/dashboard/tabungan/{transaction}', [SchoolFeatureController::class, 'destroySavings'])
+        ->name('database.savings.destroy');
     Route::post('/dashboard/pembayaran/tabungan', [SchoolFeatureController::class, 'storeParentSavingsTransfer'])
         ->name('database.savings.transfer.store');
     Route::patch('/dashboard/pembayaran/tabungan/{deposit}/verifikasi', [SchoolFeatureController::class, 'reviewSavingsTransfer'])

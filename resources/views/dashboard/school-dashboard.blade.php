@@ -359,7 +359,7 @@
                         </div>
                     @else
                         @php
-                            $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'absensi', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true))
+                            $showActionColumn = (in_array($role, ['admin', 'principal'], true) && in_array($section, ['siswa', 'keluarga', 'pengguna', 'guru', 'kelas', 'tarif', 'tagihan', 'tabungan', 'absensi', 'pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true))
                                 || ($role === 'teacher' && in_array($section, ['pembelajaran', 'tugas', 'perkembangan', 'rapor', 'kegiatan'], true));
                         @endphp
                         <div class="database-table-wrap">
@@ -619,6 +619,16 @@
                                                                 @csrf
                                                                 @method('DELETE')
                                                                 <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus tagihan" title="Hapus tagihan">
+                                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    @elseif ($section === 'tabungan')
+                                                        <div class="database-row-actions">
+                                                            <form method="POST" action="{{ route('database.savings.destroy', ['transaction' => data_get($record, 'id_transaksi')]) }}" data-confirm="Hapus transaksi tabungan {{ data_get($record, 'jenis') }} Rp {{ number_format((float) data_get($record, 'jumlah'), 0, ',', '.') }} untuk {{ data_get($record, 'nama_lengkap') }}?">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button class="database-icon-button database-icon-button-danger" type="submit" aria-label="Hapus transaksi tabungan" title="Hapus transaksi tabungan">
                                                                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
                                                                 </button>
                                                             </form>

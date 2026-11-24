@@ -2118,6 +2118,7 @@ class SchoolDataController extends Controller
         $query = DB::table('transaksi_tabungan as tt')
             ->join('siswa as s', 's.id_siswa', '=', 'tt.id_siswa')
             ->select([
+                'tt.id_transaksi',
                 's.nama_lengkap',
                 'tt.tanggal',
                 'tt.jenis',

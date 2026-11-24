@@ -2313,6 +2313,48 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Transaksi tabungan berhasil dicatat.');
     }
 
+    public function destroySavings(int $transactionId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $transaction = DB::table('transaksi_tabungan')
+            ->where('id_transaksi', $transactionId)
+            ->first();
+        abort_unless($transaction !== null, 404);
+
+        if ($transaction->jenis === 'Setor') {
+            $balance = (float) DB::table('transaksi_tabungan')
+                ->where('id_siswa', $transaction->id_siswa)
+                ->selectRaw("COALESCE(SUM(CASE WHEN jenis = 'Setor' THEN jumlah ELSE -jumlah END), 0) as saldo")
+                ->value('saldo');
+            if (($balance - (float) $transaction->jumlah) < -0.0001) {
+                throw ValidationException::withMessages([
+                    'delete' => 'Tidak dapat menghapus setoran ini karena saldo tabungan siswa akan menjadi negatif. Hapus transaksi penarikan terkait terlebih dahulu.',
+                ]);
+            }
+        }
+
+        $isMysql = $this->isMysql();
+        if ($isMysql) {
+            DB::statement('SET @allow_delete_savings = 1');
+        }
+
+        try {
+            DB::transaction(function () use ($transactionId): void {
+                if (Schema::hasTable('setoran_tabungan') && Schema::hasColumn('setoran_tabungan', 'id_transaksi')) {
+                    DB::table('setoran_tabungan')->where('id_transaksi', $transactionId)->delete();
+                }
+
+                DB::table('transaksi_tabungan')->where('id_transaksi', $transactionId)->delete();
+            });
+        } finally {
+            if ($isMysql) {
+                DB::statement('SET @allow_delete_savings = NULL');
+            }
+        }
+
+        return back()->with('status', 'Transaksi tabungan berhasil dihapus.');
+    }
+
     public function storeParentSavingsTransfer(Request $request): RedirectResponse
     {
         $user = $this->userFor(['parent']);
