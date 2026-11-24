@@ -1267,6 +1267,7 @@ class SchoolDataController extends Controller
 
         if ($section === 'kegiatan') {
             $activities = DB::table('v_laporan_kegiatan')
+                ->orderByDesc('id_kegiatan')
                 ->orderByDesc('tanggal');
             if (in_array($role, ['teacher', 'parent'], true)) {
                 $activities->where(function (Builder $where) use ($scope, $role, $user): void {
@@ -1390,6 +1391,7 @@ class SchoolDataController extends Controller
         if ($section === 'kegiatan' && in_array($role, ['admin', 'principal'], true)) {
             $data['fieldTrips'] = DB::table('kegiatan as k')
                 ->where('k.jenis', 'Field Trip')
+                ->orderByDesc('k.id_kegiatan')
                 ->orderByDesc('k.tanggal')
                 ->select([
                     'k.id_kegiatan',
@@ -2057,7 +2059,7 @@ class SchoolDataController extends Controller
             });
         }
 
-        return $query->orderByDesc('tanggal');
+        return $query->orderByDesc('id_kegiatan')->orderByDesc('tanggal');
     }
 
     private function parentPaymentsQuery(array $scope): Builder

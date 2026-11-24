@@ -2094,3 +2094,18 @@ document.querySelectorAll('[data-payment-mode-root]').forEach((root) => {
     document.addEventListener('input', handleFieldUpdate, true);
     document.addEventListener('change', handleFieldUpdate, true);
 })();
+
+document.querySelectorAll('[data-activity-upload-form]').forEach((form) => {
+    const select = form.querySelector('[data-activity-upload-select]');
+    if (!select) {
+        return;
+    }
+    const syncAction = () => {
+        const option = select.selectedOptions[0];
+        if (option?.dataset.uploadUrl) {
+            form.action = option.dataset.uploadUrl;
+        }
+    };
+    syncAction();
+    select.addEventListener('change', syncAction);
+});

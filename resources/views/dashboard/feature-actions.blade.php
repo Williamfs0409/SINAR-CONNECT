@@ -1466,30 +1466,64 @@
 
 @if ($section === 'kegiatan' && in_array($role, ['teacher', 'admin', 'principal'], true))
     <section class="database-action-panel">
-        <div class="database-section-heading"><div><h2>Unggah dokumentasi kegiatan</h2><p>Pilih kelas, buat kegiatan, lalu unggah foto dokumentasi. Orang tua yang terhubung dengan kelas tersebut dapat melihat dokumentasinya.</p></div></div>
+        <div class="database-section-heading"><div><h2>Buat kegiatan baru</h2><p>Buat kegiatan terlebih dahulu, lalu unggah foto dokumentasinya di bagian bawah. Kegiatan yang baru dibuat otomatis muncul paling atas.</p></div></div>
         <form method="POST" action="{{ route('database.activity.store') }}" class="database-form-grid">
             @csrf
             <label>Kelas<select name="id_kelas" required>@foreach ($classOptions as $class)<option value="{{ $class->id_kelas }}">{{ $class->nama_kelas }} · {{ $class->kelompok }}</option>@endforeach</select></label>
-            <label>Nama kegiatan<input name="nama_kegiatan" maxlength="150" required></label>
+            <label>Nama kegiatan<input name="nama_kegiatan" maxlength="150" placeholder="Contoh: Kunjungan Kebun Binatang" required></label>
             <label>Jenis<select name="jenis" required><option>Dalam Kelas</option><option>Luar Kelas</option><option>Field Trip</option></select></label>
-            <label>Tanggal<input type="date" name="tanggal" required></label>
-            <label>Lokasi<input name="lokasi" maxlength="150"></label>
-            <label class="database-form-wide">Keterangan<textarea name="deskripsi" rows="3"></textarea></label>
+            <label>Tanggal<input type="date" name="tanggal" value="{{ old('tanggal', now('Asia/Jakarta')->toDateString()) }}" required></label>
+            <label>Lokasi (opsional)<input name="lokasi" maxlength="150" placeholder="Contoh: Halaman Sekolah"></label>
+            <label class="database-form-wide">Keterangan (opsional)<textarea name="deskripsi" rows="2" placeholder="Deskripsi singkat kegiatan"></textarea></label>
             <div class="database-form-wide"><button class="database-button" type="submit">Buat kegiatan</button></div>
         </form>
-        <h3 class="database-subheading">Pilih kegiatan dan upload foto</h3>
-        @foreach ($actions['activities'] ?? [] as $activity)
-            <form method="POST" action="{{ route('database.activity.photo.store', ['activity' => $activity->id_kegiatan]) }}" enctype="multipart/form-data" class="database-inline-form">
+
+        <h3 class="database-subheading">Upload foto dokumentasi</h3>
+        @php
+            $activityList = collect($actions['activities'] ?? []);
+            $firstActivity = $activityList->first();
+        @endphp
+        @if ($activityList->isEmpty())
+            <p class="database-empty-note">Belum ada kegiatan. Buat kegiatan di atas terlebih dahulu untuk mengunggah foto.</p>
+        @else
+            <form
+                method="POST"
+                action="{{ route('database.activity.photo.store', ['activity' => $firstActivity->id_kegiatan]) }}"
+                enctype="multipart/form-data"
+                class="database-form-grid"
+                data-activity-upload-form
+            >
                 @csrf
-                <strong>{{ $activity->nama_kegiatan }} · {{ $activity->tanggal }}</strong>
-                <select name="tahap" required><option>Selama</option><option>Sebelum</option><option>Sesudah</option></select>
-                <input type="file" name="foto[]" aria-label="Pilih foto dokumentasi" accept="image/jpeg,image/png,image/webp" multiple required data-activity-photo-input data-max-files="10" data-max-mb="5">
-                <input name="keterangan" maxlength="255" placeholder="Keterangan foto">
-                <button class="database-button" type="submit">Upload foto</button>
-                <div class="activity-photo-preview-grid" data-activity-photo-previews hidden aria-live="polite"></div>
-                <small class="database-empty-note" data-activity-photo-count>Pilih hingga 10 foto sekaligus (maksimal 5 MB per foto).</small>
+                <label class="database-form-wide">Pilih kegiatan
+                    <select name="selected_activity_id" required data-activity-upload-select>
+                        @foreach ($activityList as $activity)
+                            <option
+                                value="{{ $activity->id_kegiatan }}"
+                                data-upload-url="{{ route('database.activity.photo.store', ['activity' => $activity->id_kegiatan]) }}"
+                            >{{ $activity->nama_kegiatan }} · {{ $activity->tanggal }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>Tahap kegiatan
+                    <select name="tahap" required>
+                        <option value="Selama">Selama</option>
+                        <option value="Sebelum">Sebelum</option>
+                        <option value="Sesudah">Sesudah</option>
+                    </select>
+                </label>
+                <label>Keterangan foto (opsional)
+                    <input name="keterangan" maxlength="255" placeholder="Contoh: Foto bersama siswa">
+                </label>
+                <label class="database-form-wide">Pilih foto dokumentasi (JPG/PNG/WEBP, maks. 10 foto &amp; 5 MB/foto)
+                    <input type="file" name="foto[]" aria-label="Pilih foto dokumentasi" accept="image/jpeg,image/png,image/webp" multiple required data-activity-photo-input data-max-files="10" data-max-mb="5">
+                </label>
+                <div class="database-form-wide">
+                    <div class="activity-photo-preview-grid" data-activity-photo-previews hidden aria-live="polite"></div>
+                    <small class="database-empty-note" data-activity-photo-count>Pilih hingga 10 foto sekaligus (maksimal 5 MB per foto).</small>
+                </div>
+                <div class="database-form-wide"><button class="database-button" type="submit">Upload foto</button></div>
             </form>
-        @endforeach
+        @endif
     </section>
 @endif
 
