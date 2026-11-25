@@ -125,6 +125,12 @@ Route::middleware(['auth', EnsurePasswordChange::class, SetAuditUserContext::cla
         ->name('database.tariff.destroy');
     Route::post('/dashboard/tarif', [SchoolFeatureController::class, 'storeTariff'])
         ->name('database.tariff.store');
+    Route::post('/dashboard/diskon-siswa/tetapkan', [SchoolFeatureController::class, 'assignStudentDiscount'])
+        ->name('database.student-discount.assign');
+    Route::delete('/dashboard/diskon-siswa/{roster}', [SchoolFeatureController::class, 'removeStudentDiscount'])
+        ->name('database.student-discount.remove');
+    Route::post('/dashboard/diskon', [SchoolFeatureController::class, 'storeDiscountCategory'])
+        ->name('database.discount.store');
     Route::post('/dashboard/pendaftaran/{registration}/status', [SchoolFeatureController::class, 'reviewRegistration'])
         ->name('database.registration.review');
     Route::patch('/dashboard/pendaftaran/pengaturan', [SchoolFeatureController::class, 'updateRegistrationStatus'])

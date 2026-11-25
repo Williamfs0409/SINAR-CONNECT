@@ -256,11 +256,12 @@ class SchoolDataController extends Controller
         ],
         'rekap-pembayaran' => [
             'title' => 'Rekap Pembayaran',
-            'description' => 'Penerimaan pembayaran per bulan, jenis biaya, dan metode.',
+            'description' => 'Penerimaan pembayaran per bulan, jenis biaya, siswa, dan metode.',
             'view' => 'v_rekap_pembayaran_bulanan',
             'columns' => [
                 'bulan' => 'Bulan',
                 'jenis_biaya' => 'Jenis biaya',
+                'daftar_siswa' => 'Nama siswa',
                 'metode' => 'Metode',
                 'jumlah_kuitansi' => 'Jumlah kuitansi',
                 'total_diterima' => 'Total diterima',
@@ -358,6 +359,7 @@ class SchoolDataController extends Controller
             'title' => 'Diskon Siswa',
             'description' => 'Daftar siswa aktif penerima potongan biaya SPP bulanan.',
             'view' => 'v_diskon_siswa',
+            'key' => 'id_rombel',
             'columns' => [
                 'nama_lengkap' => 'Nama siswa',
                 'nama_kelas' => 'Kelas',
@@ -1471,6 +1473,26 @@ class SchoolDataController extends Controller
                 ->get(['id_jenis_biaya', 'nama', 'kategori']);
         }
 
+        if ($section === 'diskon-siswa' && in_array($role, ['admin', 'principal'], true)) {
+            $data['discounts'] = Schema::hasTable('diskon')
+                ? DB::table('diskon')->orderBy('id_diskon')->get()
+                : collect();
+            $data['activeRosters'] = Schema::hasTable('rombel_siswa') && Schema::hasTable('siswa') && Schema::hasTable('kelas')
+                ? DB::table('rombel_siswa as r')
+                    ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                    ->join('kelas as k', 'k.id_kelas', '=', 'r.id_kelas')
+                    ->where('r.status', 'Aktif')
+                    ->orderBy('s.nama_lengkap')
+                    ->get([
+                        'r.id_rombel',
+                        'r.id_diskon',
+                        's.nama_lengkap',
+                        'k.nama_kelas',
+                        'k.kelompok',
+                    ])
+                : collect();
+        }
+
         if ($section === 'perkembangan' && $role === 'teacher') {
             $data['portfolioRosters'] = $data['rosters'] ?? collect();
         }
@@ -1666,8 +1688,8 @@ class SchoolDataController extends Controller
                 'kelas_terlibat' => 'Kelas', 'laporan_sebelum' => 'Sebelum', 'laporan_selama' => 'Selama',
                 'laporan_sesudah' => 'Sesudah',
             ]],
-            'pembayaran' => ['title' => 'Pembayaran', 'description' => 'Kuitansi dan status verifikasi pembayaran.', 'columns' => [
-                'no_kuitansi' => 'Kuitansi', 'tanggal_bayar' => 'Tanggal', 'metode' => 'Metode',
+            'pembayaran' => ['title' => 'Pembayaran', 'description' => 'Kuitansi, siswa pembayar, dan status verifikasi pembayaran.', 'columns' => [
+                'no_kuitansi' => 'Kuitansi', 'nama_siswa' => 'Nama siswa', 'tanggal_bayar' => 'Tanggal', 'metode' => 'Metode',
                 'status' => 'Status', 'jumlah_tagihan' => 'Jumlah tagihan', 'total_bayar' => 'Total bayar',
                 'catatan' => 'Catatan',
             ]],
@@ -1693,18 +1715,8 @@ class SchoolDataController extends Controller
             'kegiatan' => $this->activityQuery($scope, $role, $user->getKey()),
             'pembayaran' => $role === 'parent'
                 ? $this->parentPaymentsQuery($scope)
-                : DB::table('v_pembayaran_detail as v')
-                    ->join('pembayaran as p', 'p.id_pembayaran', '=', 'v.id_pembayaran')
-                    ->select([
-                        'v.no_kuitansi',
-                        'v.tanggal_bayar',
-                        'v.metode',
-                        'v.status',
-                        'v.jumlah_tagihan',
-                        'v.total_bayar',
-                        'p.catatan',
-                    ])
-                    ->orderByDesc('v.tanggal_bayar'),
+                : $this->adminPaymentsQuery(),
+            'rekap-pembayaran' => $this->paymentRecapQuery(),
             'tarif' => DB::table('tarif as tf')
                 ->join('tahun_ajaran as ta', 'ta.id_tahun_ajaran', '=', 'tf.id_tahun_ajaran')
                 ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 'tf.id_jenis_biaya')
@@ -1729,7 +1741,7 @@ class SchoolDataController extends Controller
             default => $this->viewQuery($module, $scope, $role),
         };
 
-        if (! in_array($section, ['guru', 'kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)
+        if (! in_array($section, ['guru', 'kelas', 'pembelajaran', 'nilai', 'perkembangan', 'kegiatan', 'pembayaran', 'rekap-pembayaran', 'pengguna', 'tabungan', 'tarif', 'audit'], true)
             && ! ($section === 'siswa' && $role === 'teacher')) {
             $direction = $module['direction'] ?? 'asc';
             $query->orderBy($module['order'] ?? array_key_first($module['columns']), $direction);
@@ -2062,19 +2074,102 @@ class SchoolDataController extends Controller
         return $query->orderByDesc('id_kegiatan')->orderByDesc('tanggal');
     }
 
+    private function adminPaymentsQuery(): Builder
+    {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $studentConcat = $isSqlite
+            ? "GROUP_CONCAT(DISTINCT s.nama_lengkap)"
+            : "GROUP_CONCAT(DISTINCT s.nama_lengkap ORDER BY s.nama_lengkap SEPARATOR ', ')";
+
+        $query = DB::table('v_pembayaran_detail as v')
+            ->join('pembayaran as p', 'p.id_pembayaran', '=', 'v.id_pembayaran')
+            ->select([
+                'v.no_kuitansi',
+                'v.tanggal_bayar',
+                'v.metode',
+                'v.status',
+                'v.jumlah_tagihan',
+                'v.total_bayar',
+                'p.catatan',
+            ]);
+
+        if (Schema::hasTable('alokasi_pembayaran') && Schema::hasTable('tagihan') && Schema::hasTable('rombel_siswa') && Schema::hasTable('siswa')) {
+            $query->selectSub(
+                DB::table('alokasi_pembayaran as a')
+                    ->join('tagihan as t', 't.id_tagihan', '=', 'a.id_tagihan')
+                    ->join('rombel_siswa as r', 'r.id_rombel', '=', 't.id_rombel')
+                    ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                    ->whereColumn('a.id_pembayaran', 'v.id_pembayaran')
+                    ->selectRaw($studentConcat),
+                'nama_siswa'
+            );
+        } else {
+            $query->addSelect(DB::raw("'' as nama_siswa"));
+        }
+
+        return $query->orderByDesc('v.tanggal_bayar');
+    }
+
+    private function paymentRecapQuery(): Builder
+    {
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $query = DB::table('v_rekap_pembayaran_bulanan as vr')
+            ->select([
+                'vr.bulan',
+                'vr.jenis_biaya',
+                'vr.metode',
+                'vr.jumlah_kuitansi',
+                'vr.total_diterima',
+            ]);
+
+        if (Schema::hasTable('pembayaran') && Schema::hasTable('alokasi_pembayaran') && Schema::hasTable('tagihan') && Schema::hasTable('jenis_biaya') && Schema::hasTable('rombel_siswa') && Schema::hasTable('siswa')) {
+            $monthExpr = $isSqlite
+                ? "strftime('%Y-%m', p.tanggal_bayar)"
+                : "DATE_FORMAT(p.tanggal_bayar, '%Y-%m')";
+            $studentConcat = $isSqlite
+                ? "GROUP_CONCAT(DISTINCT s.nama_lengkap)"
+                : "GROUP_CONCAT(DISTINCT s.nama_lengkap ORDER BY s.nama_lengkap SEPARATOR ', ')";
+
+            $query->selectSub(
+                DB::table('pembayaran as p')
+                    ->join('alokasi_pembayaran as a', 'a.id_pembayaran', '=', 'p.id_pembayaran')
+                    ->join('tagihan as t', 't.id_tagihan', '=', 'a.id_tagihan')
+                    ->join('jenis_biaya as jb', 'jb.id_jenis_biaya', '=', 't.id_jenis_biaya')
+                    ->join('rombel_siswa as r', 'r.id_rombel', '=', 't.id_rombel')
+                    ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
+                    ->where('p.status', 'Terverifikasi')
+                    ->whereRaw("{$monthExpr} = vr.bulan")
+                    ->whereColumn('jb.nama', 'vr.jenis_biaya')
+                    ->whereColumn('p.metode', 'vr.metode')
+                    ->selectRaw($studentConcat),
+                'daftar_siswa'
+            );
+        } else {
+            $query->addSelect(DB::raw("'' as daftar_siswa"));
+        }
+
+        return $query->orderByDesc('vr.bulan');
+    }
+
     private function parentPaymentsQuery(array $scope): Builder
     {
-        $receiptExpr = DB::connection()->getDriverName() === 'mysql'
+        $isMysql = DB::connection()->getDriverName() === 'mysql';
+        $receiptExpr = $isMysql
             ? 'fn_no_kuitansi(p.id_pembayaran, p.tanggal_bayar)'
             : "'KWT-' || COALESCE(strftime('%Y', p.tanggal_bayar), '2026') || '-' || printf('%05d', p.id_pembayaran)";
+        $studentConcat = $isMysql
+            ? "GROUP_CONCAT(DISTINCT s.nama_lengkap ORDER BY s.nama_lengkap SEPARATOR ', ')"
+            : "GROUP_CONCAT(DISTINCT s.nama_lengkap)";
 
         return DB::table('pembayaran as p')
             ->join('alokasi_pembayaran as a', 'a.id_pembayaran', '=', 'p.id_pembayaran')
             ->join('tagihan as t', 't.id_tagihan', '=', 'a.id_tagihan')
             ->join('rombel_siswa as r', 'r.id_rombel', '=', 't.id_rombel')
+            ->join('siswa as s', 's.id_siswa', '=', 'r.id_siswa')
             ->whereIn('r.id_siswa', $scope['studentIds'])
             ->select([
                 DB::raw("{$receiptExpr} as no_kuitansi"),
+                DB::raw("{$studentConcat} as nama_siswa"),
                 'p.tanggal_bayar',
                 'p.metode',
                 'p.status',

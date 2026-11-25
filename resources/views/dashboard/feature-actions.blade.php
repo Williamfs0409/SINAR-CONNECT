@@ -1986,6 +1986,66 @@
     </section>
 @endif
 
+@if ($section === 'diskon-siswa' && in_array($role, ['admin', 'principal'], true))
+    <section class="database-action-panel">
+        <div class="database-section-heading">
+            <div><h2>Kelola diskon SPP siswa</h2><p>Berikan potongan biaya SPP bulanan (mis. Anak Guru atau Kurang Mampu) kepada siswa aktif. Potongan otomatis diterapkan saat menerbitkan tagihan SPP baru.</p></div>
+        </div>
+        <div class="payment-mode-switcher" data-payment-mode-root>
+            <div class="payment-mode-tabs" role="tablist" aria-label="Menu diskon siswa">
+                <button type="button" role="tab" class="payment-mode-btn is-active" data-payment-mode-btn="assign" aria-selected="true">
+                    Tetapkan Diskon ke Siswa
+                </button>
+                <button type="button" role="tab" class="payment-mode-btn" data-payment-mode-btn="category" aria-selected="false">
+                    Tambah Kategori Diskon
+                </button>
+            </div>
+
+            <div class="payment-mode-panel" data-payment-mode-panel="assign">
+                @if (($actions['activeRosters'] ?? collect())->isEmpty())
+                    <p class="database-empty-note">Belum ada siswa aktif untuk diberikan diskon.</p>
+                @elseif (($actions['discounts'] ?? collect())->isEmpty())
+                    <p class="database-empty-note">Belum ada kategori diskon. Tambahkan kategori diskon pada tab sebelah terlebih dahulu.</p>
+                @else
+                    <form method="POST" action="{{ route('database.student-discount.assign') }}" class="database-form-grid">
+                        @csrf
+                        <label>Siswa aktif
+                            <select name="id_rombel" required>
+                                @foreach ($actions['activeRosters'] as $roster)
+                                    <option value="{{ $roster->id_rombel }}">{{ $roster->nama_lengkap }} · {{ $roster->nama_kelas }} ({{ $roster->kelompok }})</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label>Kategori diskon SPP
+                            <select name="id_diskon" required>
+                                @foreach ($actions['discounts'] as $discount)
+                                    <option value="{{ $discount->id_diskon }}">{{ $discount->nama }} ({{ ($discount->tipe ?? '') === 'Persen' ? rtrim(rtrim(number_format((float) $discount->nilai, 2, ',', '.'), '0'), ',').'%' : 'Rp '.number_format((float) $discount->nilai, 0, ',', '.') }})</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <div class="database-form-wide"><button class="database-button" type="submit">Simpan diskon siswa</button></div>
+                    </form>
+                @endif
+            </div>
+
+            <div class="payment-mode-panel" data-payment-mode-panel="category" hidden>
+                <form method="POST" action="{{ route('database.discount.store') }}" class="database-form-grid">
+                    @csrf
+                    <label>Nama kategori diskon<input name="nama" maxlength="60" placeholder="Contoh: Beasiswa Yatim" required></label>
+                    <label>Tipe potongan
+                        <select name="tipe" required>
+                            <option value="Persen">Persen (%)</option>
+                            <option value="Nominal">Nominal (Rp)</option>
+                        </select>
+                    </label>
+                    <label>Besaran potongan (% atau Rp)<input type="number" name="nilai" min="0.01" step="0.01" placeholder="Contoh: 50 atau 100000" required></label>
+                    <div class="database-form-wide"><button class="database-button" type="submit">Tambah kategori diskon</button></div>
+                </form>
+            </div>
+        </div>
+    </section>
+@endif
+
 @if ($section === 'pengguna' && in_array($role, ['admin', 'principal'], true))
     <section class="database-action-panel">
         <div class="database-section-heading">

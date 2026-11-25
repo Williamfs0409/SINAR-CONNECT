@@ -2765,6 +2765,65 @@ class SchoolFeatureController extends Controller
         return back()->with('status', 'Tarif biaya berhasil diperbarui.');
     }
 
+    public function assignStudentDiscount(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'id_rombel' => ['required', 'integer', Rule::exists('rombel_siswa', 'id_rombel')],
+            'id_diskon' => ['required', 'integer', Rule::exists('diskon', 'id_diskon')],
+        ]);
+
+        DB::table('rombel_siswa')
+            ->where('id_rombel', (int) $data['id_rombel'])
+            ->update([
+                'id_diskon' => (int) $data['id_diskon'],
+                'updated_at' => now(),
+            ]);
+
+        return back()->with('status', 'Kategori diskon SPP siswa berhasil ditetapkan.');
+    }
+
+    public function removeStudentDiscount(int $rosterId): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $roster = DB::table('rombel_siswa')->where('id_rombel', $rosterId)->first();
+        abort_unless($roster !== null, 404);
+
+        DB::table('rombel_siswa')
+            ->where('id_rombel', $rosterId)
+            ->update([
+                'id_diskon' => null,
+                'updated_at' => now(),
+            ]);
+
+        return back()->with('status', 'Diskon SPP siswa berhasil dicabut.');
+    }
+
+    public function storeDiscountCategory(Request $request): RedirectResponse
+    {
+        $this->userFor(['admin']);
+        $data = $request->validate([
+            'nama' => ['required', 'string', 'max:60', Rule::unique('diskon', 'nama')],
+            'tipe' => ['required', Rule::in(['Persen', 'Nominal'])],
+            'nilai' => ['required', 'numeric', 'min:0.01', 'max:9999999999'],
+        ]);
+
+        if ($data['tipe'] === 'Persen' && (float) $data['nilai'] > 100) {
+            throw ValidationException::withMessages([
+                'nilai' => 'Potongan bertipe Persen maksimal bernilai 100%.',
+            ]);
+        }
+
+        DB::table('diskon')->insert([
+            'nama' => trim($data['nama']),
+            'tipe' => $data['tipe'],
+            'nilai' => $data['nilai'],
+            'kategori_biaya' => 'Bulanan',
+        ]);
+
+        return back()->with('status', 'Kategori diskon baru berhasil ditambahkan.');
+    }
+
     public function storeTariff(Request $request): RedirectResponse
     {
         $this->userFor(['admin']);
